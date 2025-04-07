@@ -7,4 +7,9 @@ export default {
   Frame: require('../../assets/Frame.png'),
   App: require("../../assets/AppLogo.png"),
   welcome: require("../../assets/welcome.png"),
+  mail: require("../../assets/mail.png"),
+  lock: require("../../assets/lock.png"),
+  google: require("../../assets/google.png"),
+  facebook: require("../../assets/communication.png"),
+  user: require("../../assets/user.png")
 };
