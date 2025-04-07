@@ -1,14 +1,14 @@
-import { StyleSheet, Text, View } from 'react-native'
-import React from 'react'
+import { Text, StyleSheet, View } from 'react-native'
+import React, { Component } from 'react'
 
-const signUp = () => {
-  return (
-    <View>
-      <Text>signUp</Text>
-    </View>
-  )
+export default class signUp extends Component {
+    render() {
+        return (
+            <View>
+                <Text>hello</Text>
+            </View>
+        )
+    }
 }
 
-export default signUp;
-
-const styles = StyleSheet.create({});
+const styles = StyleSheet.create({})
