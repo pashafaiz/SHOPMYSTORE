@@ -2,8 +2,8 @@ import { Image, ScrollView, StyleSheet, Text, View } from 'react-native'
 import React from 'react'
 import img from '../assets/Images/img';
 import Strings from '../constants/Strings';
-import fonts from '../constants/fonts'
 import Colors from '../constants/Colors';
+import fonts from '../constants/fonts';
 
 const signUp = () => {
     return (
@@ -16,6 +16,9 @@ const signUp = () => {
                 <Text style={styles.login}>{Strings.Login}</Text>
             </View>
             {/* </ScrollView> */}
+           
+
+
 
         </ScrollView>
     )
@@ -33,10 +36,9 @@ const styles = StyleSheet.create({
     },
     login: {
         alignSelf: "center",
-        // fontFamily: fonts.Balboo2,
         lineHeight: 137,
+        fontFamily:"bold",
         fontSize: 30,
-        fontWeight: 600,
         color: Colors.Black,
     },
     welcome: {
@@ -44,8 +46,9 @@ const styles = StyleSheet.create({
         width: "40%",
         height: "20%",
         alignSelf: "flex-end",
-        // marginRight: 30,
-        // bottom: 80,
         transform: [{ rotate: '-20deg' }]
     }
 });
+
+
+

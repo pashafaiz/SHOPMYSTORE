@@ -4,7 +4,8 @@ export default {
   Roket: require('../../assets/image3.png'),
   Begon: require('../../assets/image1183.png'),
   Gola: require('../../assets/image4.png'),
-  Frame: require('../../assets/Frame.png'),
+  logo: require('../../assets/logo.png'),
   App: require("../../assets/AppLogo.png"),
   welcome: require("../../assets/welcome.png"),
+  truk: require("../../assets/truk.png"),
 };
