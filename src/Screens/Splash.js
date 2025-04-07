@@ -7,20 +7,12 @@ const Splash = () => {
   return (
     <View style={styles.container}>
       <Image source={img.splash} style={styles.Splashimg1} />
-<<<<<<< HEAD
-      <Image source={img.star} style={styles.Splashimg3} />
-      <Image source={img.Frame} style={styles.Frame} />
-      <Image source={img.Gola} style={styles.Gola} />
-      <Image source={img.truk} style={styles.truk} />
-      <Image source={img.star} style={styles.Splashimg2} />
-=======
       <Image source={img.star} style={styles.Splashimg2} />
       <Image source={img.star} style={styles.Splashimg3} />
       <Image source={img.Frame} style={styles.Frame} />
       <Image source={img.Gola} style={styles.Gola} />
       <Image source={img.Roket} style={styles.Roket} />
       <Image source={img.Begon} style={styles.Begon} />
->>>>>>> 68a4673b2ba5502c9afc2c7ff12f4101e8adcc3c
     </View>
   );
 };
@@ -44,35 +36,6 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   Splashimg2: {
-<<<<<<< HEAD
-   bottom:80,
-   right:120
-
-  },
-  Splashimg3: {
-    alignSelf:'flex-end',
-    // marginLeft:40,
-    right:90,
-    position:"absolute",
-    top:90
-  },
-  Frame: {
-    height:300,
-    width:300
-  },
-  Gola:{
-   bottom:300,
-   alignSelf:'flex-start'
-  },
-  truk:{
-   height:200,
-   width:'100%',
-   bottom:100
-
-   
-  },
-
-=======
     alignSelf:"flex-end",
     marginRight:30
   },
@@ -82,5 +45,4 @@ const styles = StyleSheet.create({
     position:"absolute",
     top:90
   },
->>>>>>> 68a4673b2ba5502c9afc2c7ff12f4101e8adcc3c
 });
