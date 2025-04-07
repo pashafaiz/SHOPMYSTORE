@@ -9,6 +9,6 @@ const signUp = () => {
   )
 }
 
-export default signUp
+export default signUp;
 
-const styles = StyleSheet.create({})
+const styles = StyleSheet.create({});
