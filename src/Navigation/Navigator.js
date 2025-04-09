@@ -8,21 +8,21 @@ import SignUp from '../BeforeLogin/SignUp';
 import Groups from '../AfterLogin/Groups';
 import Products from '../AfterLogin/Products';
 import BottomTabs from '../AfterLogin/BottomTabs';
+import OTP from '../BeforeLogin/OTP';
 
 const Stack = createNativeStackNavigator();
 const Navigator = () => {
     return (
         <NavigationContainer>
-            <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName='Splash'>
-               <Stack.Screen name="Splash" component={Splash} />
+            <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName='Login'>
                <Stack.Screen name="BottomTabs" component={BottomTabs} />
-               <Stack.Screen name="DashBoard" component={DashBoard} />
                <Stack.Screen name="Groups" component={Groups} />
                <Stack.Screen name="Products" component={Products} />
                 <Stack.Screen name="Login" component={Login} />
                 <Stack.Screen name='SignUp' component={SignUp} />
-                
-
+                <Stack.Screen name="Splash" component={Splash} />
+                <Stack.Screen name="DashBoard" component={DashBoard} />
+                <Stack.Screen name='OTP' component={OTP} />
             </Stack.Navigator>
         </NavigationContainer>
     );

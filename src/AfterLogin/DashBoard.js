@@ -109,6 +109,37 @@ const DashBoard = () => {
   );
 };
 
+const RenderProductList = ({ item }) => (
+  <TouchableOpacity style={styles.itemBox} activeOpacity={0.7}>
+    <View style={styles.product_Img}>
+      <Image
+        source={item.product_Img}
+        style={styles.productImage}
+        resizeMode="contain"
+      />
+    </View>
+    <Text style={styles.itemText}>{item.Product_name}</Text>
+  </TouchableOpacity>
+);
+
+const RenderSliderList = ({ item }) => (
+  <View style={styles.slide}>
+    <Image source={item.image} style={styles.image} />
+    <View style={styles.overlay}>
+      <Text style={styles.Slider_text}>{item.title}</Text>
+    </View>
+  </View>
+);
+
+const RenderCategoryList = ({ item }) => (
+  <TouchableOpacity style={styles.itemContainer}>
+    <View style={styles.imageWrapper}>
+      <Image source={item.image} style={styles.image} />
+    </View>
+    <Text style={styles.label} numberOfLines={1}>{item.name}</Text>
+  </TouchableOpacity>
+);
+
 export default DashBoard;
 
 const styles = StyleSheet.create({

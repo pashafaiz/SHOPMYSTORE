@@ -4,6 +4,7 @@ export default {
     lightGray: "#F1F1F1",
     LightPink: '#fff0f3',
     pink: '#f89db2',
-    lightGray1: "#333"
+    lightGray1: "#444",
+    lightPurple: "#ddf"
 
 }

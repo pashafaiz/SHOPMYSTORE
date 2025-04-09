@@ -12,5 +12,9 @@ export default {
   lock: require("../../assets/lock.png"),
   google: require("../../assets/google.png"),
   facebook: require("../../assets/communication.png"),
-  user: require("../../assets/user.png")
+  user: require("../../assets/user.png"),
+  back_Icon: require("../../assets/Back.png"),
+  drawer: require("../../assets/drawer.png"),
+  notification: require("../../assets/notification.png"),
+  notification1: require("../../assets/bell.png")
 };

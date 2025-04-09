@@ -8,5 +8,9 @@ export default {
     login_facebook: "Login with Facebook",
     already_acc: "Already have an account? ",
     terms_Condition: "Terms & Conditions",
-    accept: "I Accept "
+    accept: "I Accept ",
+    OTP_Verify: "Verification",
+    continue: "Continue",
+    filterCatagory: "Shop by Categories",
+    featureProduct: "Featured Products"
 } 
