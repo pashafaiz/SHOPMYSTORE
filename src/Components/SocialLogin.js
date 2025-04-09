@@ -59,13 +59,13 @@ const styles = StyleSheet.create({
     },
     line: {
         height: 2,
-        backgroundColor: Colors.lightGray,
+        backgroundColor: Colors.lightPurple,
         width: 50,
 
     },
     orText: {
         marginHorizontal: 10,
-        color: '#999',
+        color: Colors.lightGray1,
         fontSize: 14,
     },
     socialButton: {

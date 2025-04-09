@@ -5,6 +5,7 @@ import Splash from '../AfterLogin/Splash';
 import DashBoard from '../AfterLogin/DashBoard';
 import Login from '../BeforeLogin/Login';
 import SignUp from '../BeforeLogin/SignUp';
+import OTP from '../BeforeLogin/OTP';
 
 const Stack = createNativeStackNavigator();
 const Navigator = () => {
@@ -15,6 +16,7 @@ const Navigator = () => {
                 <Stack.Screen name='SignUp' component={SignUp} />
                 <Stack.Screen name="Splash" component={Splash} />
                 <Stack.Screen name="DashBoard" component={DashBoard} />
+                <Stack.Screen name='OTP' component={OTP} />
             </Stack.Navigator>
         </NavigationContainer>
     );

@@ -4,9 +4,9 @@ import img from '../assets/Images/img';
 import Strings from '../constants/Strings';
 import fonts from '../constants/fonts'
 import Colors from '../constants/Colors';
-import InputBox from '../Contructor/InputBox';
-import Button from '../Contructor/Button';
-import SocialLogin from '../Contructor/SocialLogin';
+import InputBox from '../Components/InputBox';
+import Button from '../Components/Button';
+import SocialLogin from '../Components/SocialLogin';
 const { width, height } = Dimensions.get('window');
 import { useNavigation } from '@react-navigation/native';
 
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginHorizontal: 40,
-        marginTop: 20
+        marginTop: 20,
     },
     forgotPass: {
         alignSelf: "flex-end",

@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: Colors.White,
         borderWidth: 1,
-        borderColor: Colors.lightGray,
+        borderColor: Colors.lightPurple,
         borderRadius: 12,
         marginBottom: 16,
         paddingHorizontal: 10,
@@ -45,6 +45,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 10,
+        borderWidth: 1,
+        borderColor: Colors.lightPurple
     },
     icon: {
         width: 20,

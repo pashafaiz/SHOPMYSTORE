@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Image, Dimensions } from 'react-native';
-import InputBox from '../Contructor/InputBox';
+import InputBox from '../Components/InputBox';
 import Strings from '../constants/Strings';
 import Colors from '../constants/Colors';
 import img from '../assets/Images/img';
 const { width, height } = Dimensions.get('window');
 import { useNavigation } from '@react-navigation/native';
-import SocialLogin from '../Contructor/SocialLogin';
-import Button from '../Contructor/Button';
+import SocialLogin from '../Components/SocialLogin';
+import Button from '../Components/Button';
 
 
 const SignUp = () => {
@@ -41,7 +41,7 @@ const SignUp = () => {
                 </Text>
             </View>
 
-            <Button title={Strings.signUp} onPress={() => alert('Signup pressed')} style={styles.button} />
+            <Button title={Strings.signUp} onPress={() => { navigation.navigate("OTP") }} style={styles.button} />
             <SocialLogin />
 
             <View style={styles.no_acc}>
