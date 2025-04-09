@@ -2,32 +2,32 @@
   "migIndex": 1,
   "data": [
     {
+      "path": "src/assets/fonts/Baloo2-Bold.ttf",
+      "sha1": "76d9d9015ec3a706d5adcdf6452b23578c732f8c"
+    },
+    {
+      "path": "src/assets/fonts/Baloo2-ExtraBold.ttf",
+      "sha1": "e5fb953400027a22a1750b3b0c2c2019718da5b0"
+    },
+    {
+      "path": "src/assets/fonts/Baloo2-Medium.ttf",
+      "sha1": "a2d048736a1c9f8e2b01b1ecaa3de1db75a997db"
+    },
+    {
+      "path": "src/assets/fonts/Baloo2-Regular.ttf",
+      "sha1": "b183afe8d0c5f9c47865b7fe251e3783c80e5005"
+    },
+    {
+      "path": "src/assets/fonts/Baloo2-SemiBold.ttf",
+      "sha1": "a9bb32a0834f36b1185201f25fbe156715db804f"
+    },
+    {
       "path": "src/assets/fonts/Baloo2.ttf",
       "sha1": "d68d5a378b9ef2f142a65adcbd19e74066fef5a7"
     },
     {
       "path": "src/assets/fonts/bold.ttf",
       "sha1": "518a0361a245a66b49bc24ae0137f38328197bdc"
-    },
-    {
-      "path": "src/assets/fonts/font1.ttf",
-      "sha1": "81cca19cd01dbcfea3826e02cc1491ff7423c2b1"
-    },
-    {
-      "path": "src/assets/fonts/font2.ttf",
-      "sha1": "ee5c2e22ffeddefc433c9aa4c76779bb73a5c682"
-    },
-    {
-      "path": "src/assets/fonts/font3.ttf",
-      "sha1": "60e9c5ae94bf196a9232512aafc2685c8ce80e40"
-    },
-    {
-      "path": "src/assets/fonts/font4.ttf",
-      "sha1": "74b81677712cf4cae2f58c96229889f607de1dd4"
-    },
-    {
-      "path": "src/assets/fonts/font5.ttf",
-      "sha1": "7022f498b779524c02ee5f0127fc0288b4f9de34"
     },
     {
       "path": "src/assets/fonts/Inter_18pt-Black.ttf",
@@ -608,6 +608,10 @@
     {
       "path": "src/assets/fonts/RobotoSlab-Thin.ttf",
       "sha1": "2a1ccd29e72aeefc8cba07576111fbf54b716496"
+    },
+    {
+      "path": "src/assets/fonts/samibold.ttf",
+      "sha1": "c5d3a678ddf64aac7204d59f21ff2b30bb229e99"
     }
   ]
 }

@@ -52,11 +52,6 @@
 		<string>Baloo2.ttf</string>
 		<string>Kramash.ttf</string>
 		<string>bold.ttf</string>
-		<string>font1.ttf</string>
-		<string>font2.ttf</string>
-		<string>font3.ttf</string>
-		<string>font4.ttf</string>
-		<string>font5.ttf</string>
 		<string>Inter_18pt-Black.ttf</string>
 		<string>Inter_18pt-BlackItalic.ttf</string>
 		<string>Inter_18pt-BoldItalic.ttf</string>
@@ -201,6 +196,12 @@
 		<string>RobotoSlab-Regular.ttf</string>
 		<string>RobotoSlab-SemiBold.ttf</string>
 		<string>RobotoSlab-Thin.ttf</string>
+		<string>Baloo2-Bold.ttf</string>
+		<string>Baloo2-ExtraBold.ttf</string>
+		<string>Baloo2-Medium.ttf</string>
+		<string>Baloo2-Regular.ttf</string>
+		<string>Baloo2-SemiBold.ttf</string>
+		<string>samibold.ttf</string>
 	</array>
 </dict>
 </plist>
