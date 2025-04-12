@@ -36,7 +36,9 @@ const DashBoard = () => {
   const [selectedPostcode, setSelectedPostcode] = useState('');
   const [selectedGender, setSelectedGender] = useState('');
 
-  useEffect(() => {
+  useEffect(async() => {
+    let userdataaa = await AsyncStorage.getItem("userData")
+    console.log("----getdata---->",userdataaa);
     const interval = setInterval(() => {
       const nextIndex = (currentIndex + 1) % sliderData.length;
       flatListRef.current?.scrollToIndex({
