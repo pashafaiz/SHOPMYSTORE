@@ -81,6 +81,7 @@ const Login = () => {
   const handleLogin = async () => {
     setErrors({});
     let tempErrors = {};
+  
     if (!email) tempErrors.email = 'Email is required';
     if (!password) tempErrors.password = 'Password is required';
   
@@ -91,32 +92,46 @@ const Login = () => {
   
     setLoading(true);
   
-    const { ok, data } = await loginApi(email, password);
-    console.log("LOGIN RESPONSEe", { ok, data });
+    try {
+      const { ok, data } = await loginApi(email, password);
   
-    setLoading(false);
-  
-    if (ok && data.token) {
-      try {
-        console.log("Saving token...");
+      if (ok && data.token) {
         await AsyncStorage.setItem('userToken', data.token);
-    
         if (data.user) {
           await AsyncStorage.setItem('user', JSON.stringify(data.user));
         }
-    
-        console.log("Token saved. Navigating...");
+  
         navigation.reset({
           index: 0,
           routes: [{ name: 'BottomTabs' }],
         });
-      } catch (err) {
-        console.log("AsyncStorage error:", err);
+      } else {
+        // ✅ Handle backend validation errors
+        if (data?.errors) {
+          setErrors(data.errors);
+        } else if (data?.message) {
+          setErrors({
+            email: data.message,
+            password: data.message,
+          });
+        } else {
+          setErrors({
+            email: 'Login failed',
+            password: 'Login failed',
+          });
+        }
       }
+    } catch (error) {
+      console.log("Login error:", error);
+      setErrors({
+        email: 'Something went wrong',
+        password: 'Something went wrong',
+      });
     }
-    
-    
+  
+    setLoading(false);
   };
+  
   
 
   return (
