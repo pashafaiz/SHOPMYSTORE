@@ -1,7 +1,7 @@
 import {StyleSheet, Text, View, ActivityIndicator, Image} from 'react-native';
 import React from 'react';
-import img from '../assets/Images/img';
 import Colors from '../constants/Colors';
+import img from '../assets/Images/img';
 
 const Splash = () => {
   return (

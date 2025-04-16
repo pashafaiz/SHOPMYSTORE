@@ -1,13 +1,13 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import Splash from '../AfterLogin/Splash';
 import DashBoard from '../AfterLogin/DashBoard';
 import Login from '../BeforeLogin/Login';
 import SignUp from '../BeforeLogin/SignUp';
 import OTP from '../BeforeLogin/OTP';
 import BottomTabs from './BottomTabs';
 import Profile from '../AfterLogin/Profile';
+import Splash from '../BeforeLogin/Splash';
 
 const Stack = createNativeStackNavigator();
 // const Navigator = ({ initialRoute }) => {

@@ -42,7 +42,7 @@ const Login = () => {
         backAction
       );
   
-      return () => backHandler.remove(); // ✅ use `.remove()`, NOT `.destroy()`
+      return () => backHandler.remove();
     }, [])
   );
 
@@ -96,8 +96,10 @@ const Login = () => {
       const { ok, data } = await loginApi(email, password);
   
       if (ok && data.token) {
+        alert("-----")
         await AsyncStorage.setItem('userToken', data.token);
         if (data.user) {
+          alert("hiiii")
           await AsyncStorage.setItem('user', JSON.stringify(data.user));
         }
   
@@ -106,7 +108,6 @@ const Login = () => {
           routes: [{ name: 'BottomTabs' }],
         });
       } else {
-        // ✅ Handle backend validation errors
         if (data?.errors) {
           setErrors(data.errors);
         } else if (data?.message) {
