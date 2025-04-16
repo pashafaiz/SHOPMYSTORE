@@ -10,6 +10,7 @@ import Strings from '../constants/Strings';
 import Button from '../Components/Button';
 import Colors from '../constants/Colors';
 import { verifyOtpApi } from '../../apiClient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -76,24 +77,52 @@ const OTP = () => {
   };
   
 
+  // const handleVerifyOtp = async () => {
+  //   const enteredOtp = otp.join('');
+  //   if (enteredOtp.length !== 6) {
+  //     setError("Please enter a valid 6-digit OTP");
+  //     return;
+  //   }
+
+  //   setLoading(true);
+  //   const { ok, data } = await verifyOtpApi(enteredOtp, email);
+  //   console.log("---data-->",data);
+  //   setLoading(false);
+
+  //   if (ok) {
+  //     // navigation.navigate("BottomTabs");
+  //   } else {
+  //     setError(data?.errors?.otp || "OTP verification failed");
+  //   }
+  // };
+
   const handleVerifyOtp = async () => {
     const enteredOtp = otp.join('');
     if (enteredOtp.length !== 6) {
       setError("Please enter a valid 6-digit OTP");
       return;
     }
-
+  
     setLoading(true);
     const { ok, data } = await verifyOtpApi(enteredOtp, email);
+    console.log("---data-->", data);
     setLoading(false);
-
+  
     if (ok) {
-      navigation.navigate("BottomTabs");
+      try {
+        await AsyncStorage.setItem('token', data.token);
+        await AsyncStorage.setItem('user', JSON.stringify(data.user));
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'BottomTabs' }],
+        });
+      } catch (err) {
+        console.log('Error storing token/user:', err);
+      }
     } else {
       setError(data?.errors?.otp || "OTP verification failed");
     }
   };
-
   return (
     <View style={styles.container}>
       <Header

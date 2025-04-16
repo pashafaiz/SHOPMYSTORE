@@ -106,12 +106,14 @@
 
 
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, StatusBar, SafeAreaView, Platform, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, StatusBar, SafeAreaView, Platform, ActivityIndicator, LogBox } from 'react-native';
 import Navigator from './src/Navigation/Navigator';
 import { NavigationContainer } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from 'react-native-toast-message';
 
 export default function App() {
+  LogBox.ignoreAllLogs(true);
   const [initialRoute, setInitialRoute] = useState(null);
 
   useEffect(() => {
@@ -147,6 +149,7 @@ export default function App() {
         <NavigationContainer>
           <Navigator initialRouteName={initialRoute} />
         </NavigationContainer>
+        <Toast />
       </SafeAreaView>
     </View>
   );

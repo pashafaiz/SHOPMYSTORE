@@ -18,4 +18,5 @@ export default {
   notification1: require('../../assets/bell.png'),
   hide: require('../../assets/hide.png'),
   open: require('../../assets/open.png'),
+  setting: require("../../assets/settings.png")
 };
