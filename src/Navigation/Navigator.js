@@ -8,21 +8,14 @@ import OTP from '../BeforeLogin/OTP';
 import BottomTabs from './BottomTabs';
 import Profile from '../AfterLogin/Profile';
 import Splash from '../BeforeLogin/Splash';
+import Message from '../Message/Message';
+import ProductDetail from '../Products/ProductDetail';
+import UploadReel from '../AfterLogin/UploadReel';
+import ReelView from '../AfterLogin/ReelView';
+import All_Product from '../Products/All_Product';
 
 const Stack = createNativeStackNavigator();
-// const Navigator = ({ initialRoute }) => {
-//   return (
-//     <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={initialRoute}>
-//       <Stack.Screen name="Login" component={Login} />
-//       <Stack.Screen name="SignUp" component={SignUp} />
-//       <Stack.Screen name="Splash" component={Splash} />
-//       <Stack.Screen name="DashBoard" component={DashBoard} />
-//       <Stack.Screen name="OTP" component={OTP} />
-//       <Stack.Screen name="BottomTabs" component={BottomTabs} />
-//       <Stack.Screen name="Profile" component={Profile} />
-//     </Stack.Navigator>
-//   );
-// };
+
 
 
 const Navigator = ({ initialRouteName = 'Login' }) => {
@@ -35,6 +28,11 @@ const Navigator = ({ initialRouteName = 'Login' }) => {
       <Stack.Screen name='OTP' component={OTP} />
       <Stack.Screen name='BottomTabs' component={BottomTabs}/>
       <Stack.Screen name='Profile' component={Profile}/>
+      <Stack.Screen name='Message' component={Message} />
+      <Stack.Screen name='ProductDetail' component={ProductDetail}/>
+      <Stack.Screen name='UploadReel' component={UploadReel}/>
+      <Stack.Screen name="ReelView" component={ReelView} />
+      <Stack.Screen name='All_Product' component={All_Product}/>
     </Stack.Navigator>
   );
 };
@@ -44,34 +42,3 @@ const Navigator = ({ initialRouteName = 'Login' }) => {
 export default Navigator;
 
 
-
-// import React from 'react';
-// import { createNativeStackNavigator } from '@react-navigation/native-stack';
-// import Splash from '../AfterLogin/Splash';
-// import DashBoard from '../AfterLogin/DashBoard';
-// import Login from '../BeforeLogin/Login';
-// import SignUp from '../BeforeLogin/SignUp';
-// import OTP from '../BeforeLogin/OTP';
-// import BottomTabs from './BottomTabs';
-// import AuthLoading from '../Components/AuthLoading';
-// import Profile from '../AfterLogin/Profile';
-
-// const Stack = createNativeStackNavigator();
-
-// const Navigator = () => {
-//     return (
-//       <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={"Login"}>
-//         <Stack.Screen name="Login" component={Login} />
-//         <Stack.Screen name="AuthLoading" component={AuthLoading} />
-//         <Stack.Screen name='SignUp' component={SignUp} />
-//         <Stack.Screen name="Splash" component={Splash} />
-//         <Stack.Screen name="DashBoard" component={DashBoard} />
-//         <Stack.Screen name='OTP' component={OTP} />
-//         <Stack.Screen name='BottomTabs' component={BottomTabs} />
-//         <Stack.Screen name='Profile' component={Profile} />
-//       </Stack.Navigator>
-//     );
-//   };
-  
-
-// export default Navigator;

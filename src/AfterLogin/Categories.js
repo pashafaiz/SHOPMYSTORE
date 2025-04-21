@@ -1,158 +1,233 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  StyleSheet,
-  Text,
   View,
+  Text,
+  FlatList,
+  Image,
   TouchableOpacity,
-  ActivityIndicator,
-  TextInput,
+  StyleSheet,
+  Dimensions,
+  RefreshControl,
+  Alert,
 } from 'react-native';
-import * as ImagePicker from 'react-native-image-picker';
-import { uploadReelApi } from '../../apiClient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useNavigation } from '@react-navigation/native';
+import { getAllProductsApi, getProductsByCategoryApi } from '../../apiClient';
+import Loader from '../Components/Loader';
 import Toast from 'react-native-toast-message';
 
+const { width } = Dimensions.get('window');
+const scaleFactor = width / 375;
+const numColumns = 2;
+
+const categories = [
+  { id: 'all', name: 'All', icon: 'apps' },
+  { id: 'Assessories', name: 'Assessories', icon: 'devices' },
+  { id: 'Grocery', name: 'Grocery', icon: 'shopping-basket' },
+  { id: 'Toys', name: 'Toys', icon: 'medical-services' },
+  { id: 'Clothes', name: 'Clothes', icon: 'checkroom' },
+  { id: 'Shoes', name: 'Shoes', icon: 'shoes' },
+  { id : 'Trending', name: 'Trending', icon: 'trending'}
+];
+
 const Categories = () => {
-  const [video, setVideo] = useState(null);
-  const [caption, setCaption] = useState('');
+  const navigation = useNavigation();
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
-  const pickVideo = () => {
-    ImagePicker.launchImageLibrary({ mediaType: 'video' }, (response) => {
-      if (response.didCancel || response.errorCode) {
-        console.log('User cancelled or error: ', response.errorMessage);
-        Toast.show({ type: 'error', text1: response.errorMessage || 'Video selection cancelled' });
-      } else if (response.assets && response.assets.length > 0) {
-        setVideo(response.assets[0]);
-        Toast.show({ type: 'success', text1: 'Video selected ✅' });
-      }
-    });
-  };
-
-  const handleUpload = async () => {
-    if (!video || !video.uri) {
-      Toast.show({ type: 'error', text1: 'Please select a video first' });
-      return;
-    }
-
-    setLoading(true);
-    setUploadProgress(0);
-
+  const fetchProducts = async () => {
     try {
-      const token =
-        (await AsyncStorage.getItem('userToken')) ||
-        (await AsyncStorage.getItem('token'));
-console.log("----token---here--->",token);
-
-      const res = await uploadReelApi(token, video, caption, setUploadProgress);
-console.log("res-->",res);
-alert("1")
-      if (res.ok) {
-        Toast.show({ type: 'success', text1: 'Reel uploaded successfully ✅' });
-        setVideo(null);
-        setCaption('');
-        setUploadProgress(null);
+      setLoading(true);
+      const { ok, data } = selectedCategory === 'all'
+        ? await getAllProductsApi()
+        : await getProductsByCategoryApi(selectedCategory);
+      
+      if (ok) {
+        setProducts(data.products || []);
       } else {
-        const msg =
-          res.data?.msg ||
-          res.data?.errors?.video ||
-          'Upload failed ❌';
-
-        Toast.show({ type: 'error', text1: msg });
+        Toast.show({
+          type: 'error',
+          text1: data?.msg || 'Failed to fetch products'
+        });
       }
-    } catch (err) {
-      console.error('Upload error:', err);
-      Toast.show({ type: 'error', text1: 'Something went wrong ❌' });
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Network error. Please try again.'
+      });
+      console.error('Fetch error:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-
-    setLoading(false);
   };
+
+  useEffect(() => {
+    fetchProducts();
+  }, [selectedCategory]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchProducts();
+  };
+
+  const renderProductItem = ({ item }) => {
+    return(
+
+    <TouchableOpacity
+      style={styles.productItem}
+      onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
+    >
+      <Image
+        source={{ uri: item.media[0]?.url || 'https://via.placeholder.com/150' }}
+        style={styles.productImage}
+        resizeMode="contain"
+      />
+      <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
+      <Text style={styles.productPrice}>₹{item.price}</Text>
+    </TouchableOpacity>
+    )
+  }
+
+  const renderCategory = ({ item }) => (
+    <TouchableOpacity
+      style={[
+        styles.categoryItem,
+        selectedCategory === item.id && styles.selectedCategoryItem
+      ]}
+      onPress={() => setSelectedCategory(item.id)}
+    >
+      <Icon 
+        name={item.icon} 
+        size={24} 
+        color={selectedCategory === item.id ? '#10B981' : '#6B7280'} 
+        style={styles.categoryIcon}
+      />
+      <Text style={styles.categoryName} numberOfLines={1}>
+        {item.name}
+      </Text>
+    </TouchableOpacity>
+  );
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Upload Reel</Text>
+      {/* Categories Horizontal Scroll */}
+      <View style={styles.categoriesContainer}>
+        <FlatList
+          horizontal
+          data={categories}
+          renderItem={renderCategory}
+          keyExtractor={item => item.id}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesList}
+        />
+      </View>
 
-      <TouchableOpacity style={styles.selectBtn} onPress={pickVideo}>
-        <Text style={styles.selectText}>{video ? 'Change Video' : 'Select Video'}</Text>
-      </TouchableOpacity>
-
-      {video && (
-        <Text style={styles.fileName}>
-          Selected: {video.fileName || video.uri.split('/').pop()}
-        </Text>
-      )}
-
-      <TextInput
-        style={styles.captionInput}
-        placeholder="Enter caption..."
-        value={caption}
-        onChangeText={setCaption}
+      {/* Products Grid with Refresh */}
+      <FlatList
+        data={products}
+        renderItem={renderProductItem}
+        keyExtractor={item => item._id}
+        numColumns={numColumns}
+        contentContainerStyle={styles.productList}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#10B981']}
+            tintColor="#10B981"
+          />
+        }
+        ListEmptyComponent={
+          !loading && (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                {refreshing ? '' : 'No products found'}
+              </Text>
+            </View>
+          )
+        }
       />
 
-      {uploadProgress !== null && (
-        <Text style={styles.progressText}>Uploading: {uploadProgress}%</Text>
-      )}
-
-      <TouchableOpacity style={styles.uploadBtn} onPress={handleUpload} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.uploadText}>Upload</Text>}
-      </TouchableOpacity>
+      <Loader visible={loading} />
     </View>
   );
 };
 
-export default Categories;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#F9FAFB',
+    paddingTop: 10,
   },
-  title: {
-    fontSize: 22,
+  categoriesContainer: {
+    height: 90,
+    marginBottom: 10,
+  },
+  categoriesList: {
+    paddingHorizontal: 15,
+  },
+  categoryItem: {
+    width: 80,
+    alignItems: 'center',
+    marginRight: 15,
+    paddingVertical: 10,
+  },
+  selectedCategoryItem: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#10B981',
+  },
+  categoryIcon: {
+    marginBottom: 5,
+  },
+  categoryName: {
+    fontSize: 12,
+    color: '#4B5563',
+    textAlign: 'center',
+  },
+  productList: {
+    paddingHorizontal: 15,
+    paddingBottom: 20,
+  },
+  productItem: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    margin: 5,
+    padding: 10,
+    alignItems: 'center',
+    elevation: 2,
+    maxWidth: (width - 40) / 2,
+  },
+  productImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 8,
+  },
+  productName: {
+    fontSize: 14,
+    color: '#1F2937',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  productPrice: {
+    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 20,
-    alignSelf: 'center',
+    color: '#10B981',
+    marginTop: 4,
   },
-  selectBtn: {
-    backgroundColor: '#6a1b9a',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 10,
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 200,
   },
-  selectText: {
-    color: '#fff',
-    textAlign: 'center',
-  },
-  fileName: {
-    fontSize: 14,
-    marginBottom: 10,
-    color: '#555',
-  },
-  captionInput: {
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 10,
-  },
-  progressText: {
-    fontSize: 14,
-    color: '#888',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  uploadBtn: {
-    backgroundColor: '#ff6f00',
-    padding: 14,
-    borderRadius: 10,
-  },
-  uploadText: {
-    color: '#fff',
-    textAlign: 'center',
-    fontWeight: '600',
+  emptyText: {
+    fontSize: 16,
+    color: '#6B7280',
   },
 });
 
+export default Categories;

@@ -1,451 +1,3 @@
-// import React, {useState, useEffect, useCallback} from 'react';
-// import {
-//   View,
-//   Text,
-//   Image,
-//   TextInput,
-//   StyleSheet,
-//   Dimensions,
-//   TouchableOpacity,
-//   Pressable,
-// } from 'react-native';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
-// import {useFocusEffect} from '@react-navigation/native';
-// import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
-
-// import Colors from '../constants/Colors';
-// import img from '../assets/Images/img';
-// import Header from '../Components/Header';
-// import CustomModal from '../Components/CustomModal';
-// import Button from '../Components/Button';
-// import Loader from '../Components/Loader';
-// import {editProfileApi} from '../../apiClient';
-
-// const {width, height} = Dimensions.get('window');
-
-// const Profile = ({navigation}) => {
-//   const [user, setUser] = useState(null);
-//   const [modalVisible, setModalVisible] = useState(false);
-//   const [editModalVisible, setEditModalVisible] = useState(false);
-//   const [imageModalVisible, setImageModalVisible] = useState(false);
-//   const [previewModalVisible, setPreviewModalVisible] = useState(false);
-
-//   const [fullName, setFullName] = useState('');
-//   const [userName, setUserName] = useState('');
-//   const [profileImage, setProfileImage] = useState(null);
-
-//   const [loading, setLoading] = useState(false);
-//   const [successMessage, setSuccessMessage] = useState('');
-//   const [errorMessage, setErrorMessage] = useState('');
-
-//   const getUser = async () => {
-//     const storedUser = await AsyncStorage.getItem('user');
-//     if (storedUser) {
-//       const parsedUser = JSON.parse(storedUser);
-//       setUser(parsedUser);
-//       setFullName(parsedUser.fullName || '');
-//       setUserName(parsedUser.userName || '');
-//       setProfileImage(parsedUser.profileImage || null);
-//     }
-//   };
-
-//   useFocusEffect(
-//     useCallback(() => {
-//       getUser();
-//     }, []),
-//   );
-
-//   const handleLogout = async () => {
-//     await AsyncStorage.removeItem('user');
-//     await AsyncStorage.removeItem('userToken');
-//     setModalVisible(false);
-//     navigation.reset({index: 0, routes: [{name: 'Login'}]});
-//   };
-
-//   const handleUpdateProfile = async () => {
-//     try {
-//       setLoading(true);
-//       setEditModalVisible(false);
-//       setErrorMessage('');
-//       setSuccessMessage('');
-
-//       const token =
-//         (await AsyncStorage.getItem('userToken')) ||
-//         (await AsyncStorage.getItem('token'));
-
-//       if (!token) {
-//         setLoading(false);
-//         setErrorMessage('No token found');
-//         return;
-//       }
-
-//       const {ok, data} = await editProfileApi(token, fullName, userName);
-//       setLoading(false);
-
-//       if (ok) {
-//         const updatedUser = {...user, fullName, userName, profileImage};
-//         await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
-//         setUser(updatedUser);
-//         setSuccessMessage(data?.msg || 'Profile updated successfully');
-//         setTimeout(() => setSuccessMessage(''), 3000);
-//       } else {
-//         setErrorMessage(data?.msg || data?.errors?.userName || 'Update failed');
-//         setTimeout(() => setErrorMessage(''), 3000);
-//       }
-//     } catch (err) {
-//       setLoading(false);
-//       setErrorMessage('Something went wrong');
-//       setTimeout(() => setErrorMessage(''), 3000);
-//     }
-//   };
-
-//   const openCamera = () => {
-//     launchCamera({mediaType: 'photo'}, async response => {
-//       if (!response.didCancel && response.assets?.length) {
-//         const uri = response.assets[0].uri;
-//         setProfileImage(uri);
-//         setImageModalVisible(false);
-
-//         const updatedUser = {...user, profileImage: uri};
-//         setUser(updatedUser);
-//         await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
-//       }
-//     });
-//   };
-
-//   const openGallery = () => {
-//     launchImageLibrary({mediaType: 'photo'}, async response => {
-//       if (!response.didCancel && response.assets?.length) {
-//         const uri = response.assets[0].uri;
-//         setProfileImage(uri);
-//         setImageModalVisible(false);
-
-//         const updatedUser = {...user, profileImage: uri};
-//         setUser(updatedUser);
-//         await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
-//       }
-//     });
-//   };
-
-//   return (
-//     <View style={styles.container}>
-//       <View style={styles.profileDesign}>
-//         <Header
-//           title="Profile"
-//           onLeftPress={() => navigation.goBack()}
-//           rightIcon1={img.setting}
-//           onRightPress1={() => alert('Settings coming soon')}
-//           showRightIcon1
-//         />
-//       </View>
-
-//       {/* <TouchableOpacity
-//         onPress={() => setImageModalVisible(true)}
-//         onLongPress={() => setPreviewModalVisible(true)}
-//         delayLongPress={3000}
-//         activeOpacity={0.8}>
-//         <View style={styles.outerBorder}>
-//           <View style={styles.innerBorder}>
-//             <Image
-//               source={profileImage ? {uri: profileImage} : img.user}
-//               style={styles.profileImage}
-//             />
-//           </View>
-//         </View>
-//       </TouchableOpacity> */}
-
-//       <Pressable
-//         onPress={() => setImageModalVisible(true)}
-//         onLongPress={() => setPreviewModalVisible(true)}
-//         delayLongPress={800}
-//         style={styles.imagePressable}>
-//         <View style={styles.outerBorder}>
-//           <View style={styles.innerBorder}>
-//             <Image
-//               source={profileImage ? {uri: profileImage} : img.user}
-//               style={styles.profileImage}
-//             />
-//           </View>
-//         </View>
-//       </Pressable>
-
-//       <Text style={styles.name}>{user?.fullName || 'Your Name'}</Text>
-
-//       <View style={styles.mainInput}>
-//         <View style={styles.inputBox}>
-//           <Text style={styles.label}>Your Email</Text>
-//           <TextInput
-//             style={styles.input}
-//             value={user?.email || ''}
-//             editable={false}
-//           />
-//         </View>
-
-//         <View style={styles.inputBox}>
-//           <Text style={styles.label}>Phone Number</Text>
-//           <TextInput
-//             style={styles.input}
-//             value={user?.phoneNumber || ''}
-//             editable={false}
-//             keyboardType="phone-pad"
-//           />
-//         </View>
-
-//         <View style={styles.inputBox}>
-//           <Text style={styles.label}>Username</Text>
-//           <TextInput
-//             style={styles.input}
-//             value={user?.userName || ''}
-//             editable={false}
-//           />
-//         </View>
-//       </View>
-
-//       <View style={styles.buttonContainer}>
-//         <Button
-//           title="Edit Details"
-//           onPress={() => setEditModalVisible(true)}
-//           style={styles.logoutButton}
-//         />
-//         <Button
-//           title="Logout"
-//           onPress={() => setModalVisible(true)}
-//           style={styles.logoutButton}
-//         />
-//       </View>
-
-//       {/* Logout Modal */}
-//       <CustomModal
-//         visible={modalVisible}
-//         onRequestClose={() => setModalVisible(false)}
-//         title="Are you sure?"
-//         buttons={[
-//           {text: 'Cancel', onPress: () => setModalVisible(false)},
-//           {
-//             text: 'OK',
-//             onPress: handleLogout,
-//             style: {backgroundColor: Colors.pink},
-//             textStyle: {color: 'white'},
-//           },
-//         ]}
-//       />
-
-//       {/* Edit Profile Modal */}
-//       <CustomModal
-//         visible={editModalVisible}
-//         onRequestClose={() => setEditModalVisible(false)}
-//         title="Edit Profile"
-//         overlayStyle={{justifyContent: 'flex-end'}}
-//         containerStyle={{
-//           width,
-//           padding: 30,
-//           borderBottomLeftRadius: 0,
-//           borderBottomRightRadius: 0,
-//         }}
-//         buttons={[
-//           {text: 'Cancel', onPress: () => setEditModalVisible(false)},
-//           {
-//             text: 'Save',
-//             onPress: handleUpdateProfile,
-//             style: {backgroundColor: Colors.pink},
-//             textStyle: {color: 'white'},
-//           },
-//         ]}>
-//         <TextInput
-//           style={[styles.input, {marginBottom: 10}]}
-//           placeholder="Full Name"
-//           value={fullName}
-//           onChangeText={setFullName}
-//         />
-//         <TextInput
-//           style={styles.input}
-//           placeholder="Username"
-//           autoCapitalize="none"
-//           value={userName}
-//           onChangeText={setUserName}
-//         />
-//       </CustomModal>
-
-//       {/* Profile Image Picker Modal */}
-//       <CustomModal
-//         visible={imageModalVisible}
-//         onRequestClose={() => setImageModalVisible(false)}
-//         title="Update Profile Picture"
-//         overlayStyle={{justifyContent: 'flex-end'}}
-//         containerStyle={{
-//           width,
-//           padding: 30,
-//           borderBottomLeftRadius: 0,
-//           borderBottomRightRadius: 0,
-//         }}
-//         buttons={[
-//           {text: 'Choose from Gallery', onPress: openGallery},
-//           {text: 'Open Camera', onPress: openCamera},
-//           {text: 'Cancel', onPress: () => setImageModalVisible(false)},
-//         ]}
-//       />
-
-//       {/* Full Preview Modal */}
-//       <CustomModal
-//         visible={previewModalVisible}
-//         dismissOnOverlayPress={true}
-//         onRequestClose={() => setPreviewModalVisible(false)}
-//         overlayStyle={{
-//           backgroundColor: 'rgba(67, 62, 62, 0.8)',
-//           justifyContent: 'center',
-//           alignItems: 'center',
-//         }}
-//         containerStyle={{
-//           backgroundColor: 'transparent',
-//           width: 200,
-//           height: 200,
-//           borderRadius: 100,
-//           justifyContent: 'center',
-//           alignItems: 'center',
-//           alignSelf:"center"
-//         }}
-//        >
-//         <Image
-//           source={profileImage ? {uri: profileImage} : img.user}
-//           style={{
-//             width: 180,
-//             height: 180,
-//             borderRadius: 90,
-//             borderWidth: 2,
-//             borderColor: 'white',
-//             backgroundColor: '#fff',
-//           }}
-//           resizeMode="cover"
-//         />
-//       </CustomModal>
-
-//       {successMessage && (
-//         <View style={[styles.toastContainer, {backgroundColor: '#d4edda'}]}>
-//           <Text style={[styles.toastText, {color: '#155724'}]}>
-//             {successMessage}
-//           </Text>
-//         </View>
-//       )}
-//       {errorMessage && (
-//         <View style={[styles.toastContainer, {backgroundColor: '#f8d7da'}]}>
-//           <Text style={[styles.toastText, {color: '#721c24'}]}>
-//             {errorMessage}
-//           </Text>
-//         </View>
-//       )}
-
-//       <Loader visible={loading} />
-//     </View>
-//   );
-// };
-
-// export default Profile;
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     backgroundColor: Colors.LightPink,
-//   },
-//   profileDesign: {
-//     height: height * 0.15,
-//     backgroundColor: Colors.lightPurple,
-//   },
-//   outerBorder: {
-//     width: 120,
-//     height: 120,
-//     borderRadius: 55,
-//     borderWidth: 50,
-//     borderColor: Colors.LightPink,
-//     alignSelf: 'center',
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//     top: -40,
-//   },
-//   innerBorder: {
-//     width: 104,
-//     height: 104,
-//     borderRadius: 52,
-//     borderWidth: 2,
-//     borderColor: 'black',
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//   },
-//   profileImage: {
-//     width: 100,
-//     height: 100,
-//     borderRadius: 50,
-//     backgroundColor: '#fff',
-//   },
-//   imagePressable: {
-//     alignSelf: 'center',
-//     marginTop: -40,
-//   },
-//   name: {
-//     fontSize: 20,
-//     fontWeight: 'bold',
-//     color: Colors.dark,
-//     textAlign: 'center',
-//     marginTop: 10,
-//     top: -40,
-//   },
-//   mainInput: {
-//     paddingHorizontal: 30,
-//   },
-//   inputBox: {
-//     marginBottom: 15,
-//   },
-//   label: {
-//     fontSize: 12,
-//     color: Colors.gray,
-//     marginBottom: 4,
-//     marginLeft: 5,
-//   },
-//   input: {
-//     backgroundColor: Colors.lightPurple,
-//     padding: 12,
-//     borderRadius: 12,
-//     fontSize: 15,
-//     elevation: 2,
-//   },
-//   buttonContainer: {
-//     marginTop: 20,
-//   },
-//   logoutButton: {
-//     backgroundColor: '#ff9eb5',
-//     paddingVertical: 16,
-//     borderRadius: 20,
-//     alignItems: 'center',
-//     justifyContent: 'center',
-//     marginTop: 20,
-//     width: width * 0.8,
-//     alignSelf: 'center',
-//   },
-//   toastContainer: {
-//     position: 'absolute',
-//     bottom: 8,
-//     alignSelf: 'center',
-//     paddingHorizontal: 20,
-//     paddingVertical: 10,
-//     borderRadius: 25,
-//     elevation: 5,
-//     width: width * 0.8,
-//   },
-//   toastText: {
-//     fontSize: 14,
-//     fontWeight: '500',
-//     textAlign: 'center',
-//   },
-//   previewImage: {
-//     width: '100%',
-//     height: height * 0.5,
-//     borderTopLeftRadius: 20,
-//     borderTopRightRadius: 20,
-//   },
-// });
-
-
-
-
 import React, {useCallback, useEffect, useState} from 'react';
 import {
   View,
@@ -455,96 +7,146 @@ import {
   StyleSheet,
   Dimensions,
   Pressable,
+  FlatList,
+  TouchableOpacity,
+  ScrollView,
+  RefreshControl,
 } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
+import AntDesign from 'react-native-vector-icons/AntDesign'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useFocusEffect} from '@react-navigation/native';
 import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
-import Modal from 'react-native-modal';
-import Animated, {
-  useSharedValue,
-  useAnimatedGestureHandler,
-  useAnimatedStyle,
-  withSpring,
-} from 'react-native-reanimated';
-
-import {
-  GestureHandlerRootView,
-  PanGestureHandler,
-  PinchGestureHandler,
-} from 'react-native-gesture-handler';
-
+import {useNavigation} from '@react-navigation/native';
 import Colors from '../constants/Colors';
 import img from '../assets/Images/img';
 import Header from '../Components/Header';
 import CustomModal from '../Components/CustomModal';
 import Button from '../Components/Button';
 import Loader from '../Components/Loader';
-import {editProfileApi} from '../../apiClient';
+import ProductModal from '../Products/ProductModal';
+import {
+  editProfileApi,
+  createProductApi,
+  getAllProductsApi,
+  updateProductApi,
+  deleteProductApi,
+  getReelsApi,
+} from '../../apiClient';
+import Line from '../Components/Line';
+import Toast from 'react-native-toast-message';
 
 const {width, height} = Dimensions.get('window');
+const isTablet = width >= 768;
+const scaleFactor = width / 375;
 
-const Profile = ({navigation}) => {
+const log = (message, data = {}) => {
+  console.log(
+    JSON.stringify(
+      {timestamp: new Date().toISOString(), message, ...data},
+      null,
+      2,
+    ),
+  );
+};
+
+const Profile = () => {
+  const navigation = useNavigation();
   const [user, setUser] = useState(null);
+  const [userId, setUserId] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [imageModalVisible, setImageModalVisible] = useState(false);
-  const [previewModalVisible, setPreviewModalVisible] = useState(false);
+  const [productModalVisible, setProductModalVisible] = useState(false);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [products, setProducts] = useState([]);
+  const [reels, setReels] = useState([]);
+  const [currentProduct, setCurrentProduct] = useState(null);
   const [fullName, setFullName] = useState('');
   const [userName, setUserName] = useState('');
   const [profileImage, setProfileImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-
-  const scale = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-
-  const pinchHandler = useAnimatedGestureHandler({
-    onActive: event => {
-      scale.value = event.scale;
-    },
-    onEnd: () => {
-      scale.value = withSpring(1);
-      
-    },
-  });
-
-  // const pinchHandler = useAnimatedGestureHandler({
-  //   onActive: (event) => {
-  //     scale.value = event.scale;
-  //   },
-  // });
-  
-
-  const panHandler = useAnimatedGestureHandler({
-    onActive: event => {
-      translateX.value = event.translationX;
-      translateY.value = event.translationY;
-    },
-    onEnd: () => {
-      translateX.value = withSpring(0);
-      translateY.value = withSpring(0);
-    },
-  });
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      {scale: scale.value},
-      {translateX: translateX.value},
-      {translateY: translateY.value},
-    ],
-  }));
+  const [productOptionsVisible, setProductOptionsVisible] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [activeTab, setActiveTab] = useState('products');
 
   const getUser = async () => {
-    const storedUser = await AsyncStorage.getItem('user');
-    if (storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
-      setFullName(parsedUser.fullName || '');
-      setUserName(parsedUser.userName || '');
-      setProfileImage(parsedUser.profileImage || null);
+    try {
+      log('Fetching User Data');
+      const storedUser = await AsyncStorage.getItem('user');
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        log('User Data Fetched', {user: parsedUser});
+        setUser(parsedUser);
+        setUserId(parsedUser.id || '');
+        setFullName(parsedUser.fullName || '');
+        setUserName(parsedUser.userName || '');
+        setProfileImage(parsedUser.profileImage || null);
+      } else {
+        log('No User Data Found');
+        setErrorMessage('No user data found');
+        setTimeout(() => setErrorMessage(''), 3000);
+      }
+    } catch (err) {
+      log('Get User Error', {error: err.message});
+      setErrorMessage('Failed to load user data');
+      setTimeout(() => setErrorMessage(''), 3000);
     }
+  };
+
+  const fetchUserProducts = async () => {
+    try {
+      log('Fetching User Products', {userId});
+      setLoading(true);
+      const {ok, data} = await getAllProductsApi();
+      log('Products Response', {ok, data});
+      if (ok && data.products) {
+        const userProducts = data.products.filter(
+          product => product.createdBy === userId,
+        );
+        log('Filtered User Products', {count: userProducts.length});
+        setProducts(userProducts);
+      } else {
+        setErrorMessage(data.msg || 'Failed to fetch products');
+        setTimeout(() => setErrorMessage(''), 3000);
+      }
+    } catch (err) {
+      log('Fetch Products Error', {error: err.message});
+      setErrorMessage('Something went wrong');
+      setTimeout(() => setErrorMessage(''), 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUserReels = async () => {
+    try {
+      log('Fetching User Reels', {userId});
+      setLoading(true);
+      const {ok, data} = await getReelsApi();
+      log('Reels Response', {ok, data});
+      if (ok && Array.isArray(data.reels)) {
+        const userReels = data.reels.filter(reel => reel.user?._id === userId);
+        log('Filtered User Reels', {count: userReels.length});
+        setReels(userReels);
+      } else {
+        setErrorMessage(data.msg || 'Failed to fetch reels');
+        setTimeout(() => setErrorMessage(''), 3000);
+      }
+    } catch (err) {
+      log('Fetch Reels Error', {error: err.message});
+      setErrorMessage('Something went wrong');
+      setTimeout(() => setErrorMessage(''), 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    log('Refreshing Data');
+    await Promise.all([fetchUserProducts(), fetchUserReels()]);
   };
 
   useFocusEffect(
@@ -553,35 +155,51 @@ const Profile = ({navigation}) => {
     }, []),
   );
 
+  useEffect(() => {
+    if (userId) {
+      fetchUserProducts();
+      fetchUserReels();
+    }
+  }, [userId]);
+
   const handleLogout = async () => {
-    await AsyncStorage.removeItem('user');
-    await AsyncStorage.removeItem('userToken');
-    setModalVisible(false);
-    navigation.reset({index: 0, routes: [{name: 'Login'}]});
+    try {
+      log('Logging Out');
+      await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('userToken');
+      setModalVisible(false);
+      setSidebarVisible(false);
+      navigation.reset({index: 0, routes: [{name: 'Login'}]});
+    } catch (err) {
+      log('Logout Error', {error: err.message});
+      Toast.show({type: 'error', text1: 'Failed to logout'});
+    }
   };
 
   const handleUpdateProfile = async () => {
     try {
+      log('Updating Profile', {fullName, userName});
       setLoading(true);
       setEditModalVisible(false);
+      setSidebarVisible(false);
       setErrorMessage('');
       setSuccessMessage('');
 
-      const token =
-        (await AsyncStorage.getItem('userToken')) ||
-        (await AsyncStorage.getItem('token'));
-
+      const token = await AsyncStorage.getItem('userToken');
       if (!token) {
+        log('No Token Found');
         setLoading(false);
         setErrorMessage('No token found');
+        setTimeout(() => setErrorMessage(''), 3000);
         return;
       }
 
       const {ok, data} = await editProfileApi(token, fullName, userName);
+      log('Edit Profile Response', {ok, data});
       setLoading(false);
 
       if (ok) {
-        const updatedUser = {...user, fullName, userName, profileImage};
+        const updatedUser = {...user, fullName, userName};
         await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
         setUser(updatedUser);
         setSuccessMessage(data?.msg || 'Profile updated successfully');
@@ -591,6 +209,7 @@ const Profile = ({navigation}) => {
         setTimeout(() => setErrorMessage(''), 3000);
       }
     } catch (err) {
+      log('Update Profile Error', {error: err.message});
       setLoading(false);
       setErrorMessage('Something went wrong');
       setTimeout(() => setErrorMessage(''), 3000);
@@ -599,101 +218,448 @@ const Profile = ({navigation}) => {
 
   const openCamera = () => {
     launchCamera({mediaType: 'photo'}, async response => {
-      if (!response.didCancel && response.assets?.length) {
-        const uri = response.assets[0].uri;
-        setProfileImage(uri);
-        setImageModalVisible(false);
-        const updatedUser = {...user, profileImage: uri};
-        setUser(updatedUser);
-        await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+      try {
+        log('Camera Response', {response});
+        if (!response.didCancel && response.assets?.length) {
+          const uri = response.assets[0].uri;
+          log('Profile Image Selected', {uri});
+          setProfileImage(uri);
+          setImageModalVisible(false);
+        }
+      } catch (err) {
+        log('Camera Error', {error: err.message});
+        Toast.show({type: 'error', text1: 'Failed to capture image'});
       }
     });
   };
 
   const openGallery = () => {
     launchImageLibrary({mediaType: 'photo'}, async response => {
-      if (!response.didCancel && response.assets?.length) {
-        const uri = response.assets[0].uri;
-        setProfileImage(uri);
-        setImageModalVisible(false);
-        const updatedUser = {...user, profileImage: uri};
-        setUser(updatedUser);
-        await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+      try {
+        log('Gallery Response', {response});
+        if (!response.didCancel && response.assets?.length) {
+          const uri = response.assets[0].uri;
+          log('Profile Image Selected', {uri});
+          setProfileImage(uri);
+          setImageModalVisible(false);
+        }
+      } catch (err) {
+        log('Gallery Error', {error: err.message});
+        Toast.show({type: 'error', text1: 'Failed to select image'});
       }
     });
   };
 
+  const handleSubmitProduct = async productData => {
+    try {
+      log('Submitting Product', {productData, currentProduct});
+      setLoading(true);
+      setProductModalVisible(false);
+      setErrorMessage('');
+      setSuccessMessage('');
+
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        log('No Token Found');
+        setLoading(false);
+        setErrorMessage('No token found');
+        setTimeout(() => setErrorMessage(''), 3000);
+        return;
+      }
+
+      const productPayload = {...productData, createdBy: userId};
+      const {ok, data} = currentProduct
+        ? await updateProductApi(token, currentProduct.id, productPayload)
+        : await createProductApi(token, productPayload);
+      log('Product Submit Response', {ok, data});
+      setLoading(false);
+
+      if (ok) {
+        setSuccessMessage(
+          data?.msg ||
+            (currentProduct
+              ? 'Product updated successfully'
+              : 'Product added successfully'),
+        );
+        setTimeout(() => setSuccessMessage(''), 3000);
+        await fetchUserProducts();
+      } else {
+        setErrorMessage(data?.msg || 'Failed to manage product');
+        setTimeout(() => setErrorMessage(''), 3000);
+      }
+    } catch (err) {
+      log('Submit Product Error', {error: err.message});
+      setLoading(false);
+      setErrorMessage('Something went wrong');
+      setTimeout(() => setErrorMessage(''), 3000);
+    }
+  };
+
+  const handleEditProduct = product => {
+    try {
+      log('Editing Product', {product});
+      setCurrentProduct(product);
+      setProductModalVisible(true);
+    } catch (err) {
+      log('Edit Product Error', {error: err.message});
+      Toast.show({type: 'error', text1: 'Failed to open edit modal'});
+    }
+  };
+
+  const handleDeleteProduct = async productId => {
+    try {
+      log('Deleting Product', {productId});
+      setLoading(true);
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        log('No Token Found');
+        setLoading(false);
+        setErrorMessage('No token found');
+        setTimeout(() => setErrorMessage(''), 3000);
+        return;
+      }
+
+      const {ok, data} = await deleteProductApi(token, productId);
+      log('Delete Product Response', {ok, data});
+      setLoading(false);
+
+      if (ok) {
+        setSuccessMessage(data?.msg || 'Product deleted successfully');
+        setTimeout(() => setSuccessMessage(''), 3000);
+        await fetchUserProducts();
+        setProductOptionsVisible(false);
+      } else {
+        setErrorMessage(data?.msg || 'Failed to delete product');
+        setTimeout(() => setErrorMessage(''), 3000);
+      }
+    } catch (err) {
+      log('Delete Product Error', {error: err.message});
+      setLoading(false);
+      setErrorMessage('Something went wrong');
+      setTimeout(() => setErrorMessage(''), 3000);
+    }
+  };
+
+  const renderProductItem = ({item}) => {
+    const updatedAt = item.updatedAt
+      ? new Date(item.updatedAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })
+      : 'No date available';
+
+    return (
+      <TouchableOpacity
+        style={styles.productItem}
+        onPress={() =>
+          navigation.navigate('ProductDetail', {productId: item.id})
+        }
+        onLongPress={() => {
+          log('Product Long Press', {productId: item.id});
+          setSelectedProduct(item);
+          setProductOptionsVisible(true);
+        }}>
+        <Image
+          source={{
+            uri: item.media[0]?.url || 'https://via.placeholder.com/120',
+          }}
+          style={styles.productImage}
+          resizeMode="contain"
+          onError={error =>
+            log('Product Image Error', {error: error.nativeEvent})
+          }
+        />
+        <View style={styles.productOverlay}>
+          <Text
+            style={styles.productTitle}
+            numberOfLines={2}
+            ellipsizeMode="tail">
+            {item.name}
+          </Text>
+          <Line />
+          <Text
+            style={styles.productTitle}
+            numberOfLines={1}
+            ellipsizeMode="tail">
+            ₹{item.price}
+          </Text>
+          <Line />
+          <Text
+            style={styles.productDate}
+            numberOfLines={1}
+            ellipsizeMode="tail">
+            {updatedAt}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderReelItem = ({item}) => {
+    const updatedAt = item.updatedAt
+      ? new Date(item.updatedAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })
+      : 'No date available';
+
+    return (
+      <TouchableOpacity
+        style={styles.productItem}
+        onPress={() => {
+          log('Reel Clicked', {reelId: item._id});
+          navigation.navigate('ReelView', {reel: item});
+        }}>
+        <Image
+          source={{uri: item.thumbnail || 'https://via.placeholder.com/120'}}
+          style={styles.productImage}
+          resizeMode="contain"
+          onError={error =>
+            log('Reel Thumbnail Error', {error: error.nativeEvent})
+          }
+        />
+        <View style={styles.productOverlay}>
+          <Text
+            style={styles.productTitle}
+            numberOfLines={2}
+            ellipsizeMode="tail">
+            {item.caption || 'No caption'}
+          </Text>
+          <Line />
+          <Text
+            style={styles.productDate}
+            numberOfLines={1}
+            ellipsizeMode="tail">
+            {updatedAt}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <View style={styles.container}>
-      <View style={styles.profileDesign}>
-        <Header
-          title="Profile"
-          onLeftPress={() => navigation.goBack()}
-          rightIcon1={img.setting}
-          onRightPress1={() => alert('Settings coming soon')}
-          showRightIcon1
-        />
-      </View>
+      {/* <Header
+        title=""
+        onLeftPress={() => navigation.goBack()}
+        rightIcon1={img.App}
+        onRightPress1={() => navigation.navigate('Message')}
+        showRightIcon1
+        rightIcon2={img.drawer}
+        onRightPress2={() => setSidebarVisible(true)}
+        showRightIcon2
+      /> */}
 
-      <Pressable
-        onPress={() => setImageModalVisible(true)}
-        onLongPress={() => setPreviewModalVisible(true)}
-        delayLongPress={800}
-        style={styles.imagePressable}>
-        <View style={styles.outerBorder}>
-          <View style={styles.innerBorder}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={false} onRefresh={onRefresh} />
+        }>
+        <View style={styles.profileCard}>
+          <TouchableOpacity style={{alignSelf:"flex-end",paddingHorizontal:20}} onPress={()=>setSidebarVisible(true)}>
+            <Icon
+              name="settings"
+              size={24}
+              // color={selectedCategory === item.id ? '#10B981' : '#6B7280'}
+            />
+          </TouchableOpacity>
+          <Pressable
+            onPress={() => setImageModalVisible(true)}
+            style={styles.profileImageContainer}>
             <Image
               source={profileImage ? {uri: profileImage} : img.user}
               style={styles.profileImage}
+              resizeMode="cover"
+              onError={error =>
+                log('Profile Image Error', {error: error.nativeEvent})
+              }
+            />
+            <View style={styles.editIcon}>
+              <Text style={styles.editIconText}>✏️</Text>
+            </View>
+          </Pressable>
+          <Text style={styles.name}>{user?.fullName || 'Maria May'}</Text>
+          <Text style={styles.bio}>
+            Username: {user?.userName || 'N/A'} {'\n'} Email:{' '}
+            {user?.email || 'N/A'} {'\n'} Phone: {user?.phoneNumber || 'N/A'}
+          </Text>
+        </View>
+
+        <View style={styles.collectionsSection}>
+          <View style={styles.tabsContainer}>
+            <Button
+             icon={
+              <AntDesign
+                name="appstore1"
+                size={20}
+                color={activeTab === 'products' ? Colors.pink : '#6B7280'}
+              />
+            }
+              
+              onPress={() => {
+                setActiveTab('products');
+              }}
+              style={[
+                styles.tabButton,
+                activeTab === 'products' && styles.activeTabButton,
+              ]}
+              textStyle={[
+                styles.tabButtonText,
+                activeTab === 'products' && styles.activeTabButtonText,
+              ]}
+            />
+            <Button
+              title=""
+              icon={
+                <AntDesign
+                  name="playcircleo"
+                  size={20}
+                  color={activeTab === 'reels' ? Colors.pink : '#6B7280'}
+                />
+              }
+              onPress={() => {
+                log('Reels Button Clicked');
+                setActiveTab('reels');
+              }}
+              style={[
+                styles.tabButton,
+                activeTab === 'reels' && styles.activeTabButton,
+              ]}
+              textStyle={[
+                styles.tabButtonText,
+                activeTab === 'reels' && styles.activeTabButtonText,
+              ]}
+            />
+            <Button
+               icon={
+                <AntDesign
+                  name="shoppingcart"
+                  size={20}
+                  color={activeTab === 'cart' ? Colors.pink : '#6B7280'}
+                />
+              }
+              onPress={() => {
+                log('Cart Button Clicked');
+                setActiveTab('cart');
+              }}
+              style={[
+                styles.tabButton,
+                activeTab === 'cart' && styles.activeTabButton,
+              ]}
+              textStyle={[
+                styles.tabButtonText,
+                activeTab === 'cart' && styles.activeTabButtonText,
+              ]}
+            />
+            <Button
+               icon={
+                <AntDesign
+                  name="hearto"
+                  size={20}
+                  color={activeTab === 'wishlist' ? Colors.pink : '#6B7280'}
+                />
+              }
+              onPress={() => {
+                log('Wishlist Button Clicked');
+                setActiveTab('wishlist');
+              }}
+              style={[
+                styles.tabButton,
+                activeTab === 'wishlist' && styles.activeTabButton,
+              ]}
+              textStyle={[
+                styles.tabButtonText,
+                activeTab === 'wishlist' && styles.activeTabButtonText,
+              ]}
             />
           </View>
+
+          {activeTab === 'reels' ? (
+            reels.length > 0 ? (
+              <FlatList
+                data={reels}
+                renderItem={renderReelItem}
+                keyExtractor={item => item._id}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.collectionsListVertical}
+              />
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <Image source={img.camera} style={styles.emptyStateIcon} />
+                <Text style={styles.emptyStateTitle}>
+                  Capture the moment with a friend
+                </Text>
+                <Button
+                  title="Upload Reel"
+                  onPress={() => {
+                    log('Upload Reel Clicked');
+                    navigation.navigate('UploadReel');
+                  }}
+                  style={styles.uploadButton}
+                  textStyle={styles.uploadButtonText}
+                />
+              </View>
+            )
+          ) : activeTab === 'products' ? (
+            products.length > 0 ? (
+              <FlatList
+                data={products}
+                renderItem={renderProductItem}
+                keyExtractor={item =>
+                  item.id?.toString() || Math.random().toString()
+                }
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.collectionsListVertical}
+              />
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <Image source={img.post} style={styles.emptyStateIcon} />
+                <Text style={styles.emptyStateTitle}>
+                  Create your first post
+                </Text>
+                <Button
+                  title="Add Product"
+                  onPress={() => {
+                    log('Add Product Clicked');
+                    setCurrentProduct(null);
+                    setProductModalVisible(true);
+                  }}
+                  style={styles.uploadButton}
+                  textStyle={styles.uploadButtonText}
+                />
+              </View>
+            )
+          ) : activeTab === 'cart' ? (
+            <View style={styles.emptyStateContainer}>
+              <Image source={img.post} style={styles.emptyStateIcon} />
+              <Text style={styles.emptyStateTitle}>Your cart is empty</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyStateContainer}>
+              <Image source={img.post} style={styles.emptyStateIcon} />
+              <Text style={styles.emptyStateTitle}>Your wishlist is empty</Text>
+            </View>
+          )}
         </View>
-      </Pressable>
-
-      <Text style={styles.name}>{user?.fullName || 'Your Name'}</Text>
-
-      <View style={styles.mainInput}>
-        <View style={styles.inputBox}>
-          <Text style={styles.label}>Your Email</Text>
-          <TextInput style={styles.input} value={user?.email || ''} editable={false} />
-        </View>
-
-        <View style={styles.inputBox}>
-          <Text style={styles.label}>Phone Number</Text>
-          <TextInput
-            style={styles.input}
-            value={user?.phoneNumber || ''}
-            editable={false}
-            keyboardType="phone-pad"
-          />
-        </View>
-
-        <View style={styles.inputBox}>
-          <Text style={styles.label}>Username</Text>
-          <TextInput
-            style={styles.input}
-            value={user?.userName || ''}
-            editable={false}
-          />
-        </View>
-      </View>
-
-      <View style={styles.buttonContainer}>
-        <Button title="Edit Details" onPress={() => setEditModalVisible(true)} style={styles.logoutButton} />
-        <Button title="Logout" onPress={() => setModalVisible(true)} style={styles.logoutButton} />
-      </View>
+      </ScrollView>
 
       <CustomModal
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
-        title="Are you sure?"
+        title="Are you sure you want to logout?"
         buttons={[
-          {text: 'Cancel', onPress: () => setModalVisible(false)},
           {
-            text: 'OK',
+            text: 'Cancel',
+            onPress: () => setModalVisible(false),
+            style: styles.modalButtonCancel,
+          },
+          {
+            text: 'Logout',
             onPress: handleLogout,
-            style: {backgroundColor: Colors.pink},
-            textStyle: {color: 'white'},
+            style: styles.modalButtonLogout,
+            textStyle: styles.modalButtonText,
           },
         ]}
       />
@@ -702,31 +668,32 @@ const Profile = ({navigation}) => {
         visible={editModalVisible}
         onRequestClose={() => setEditModalVisible(false)}
         title="Edit Profile"
-        overlayStyle={{justifyContent: 'flex-end'}}
-        containerStyle={{
-          width,
-          padding: 30,
-          borderBottomLeftRadius: 0,
-          borderBottomRightRadius: 0,
-        }}
+        overlayStyle={styles.modalOverlay}
+        containerStyle={styles.editModalContainer}
         buttons={[
-          {text: 'Cancel', onPress: () => setEditModalVisible(false)},
+          {
+            text: 'Cancel',
+            onPress: () => setEditModalVisible(false),
+            style: styles.modalButtonCancel,
+          },
           {
             text: 'Save',
             onPress: handleUpdateProfile,
-            style: {backgroundColor: Colors.pink},
-            textStyle: {color: 'white'},
+            style: styles.modalButtonSave,
+            textStyle: styles.modalButtonText,
           },
         ]}>
         <TextInput
-          style={[styles.input, {marginBottom: 10}]}
+          style={styles.input}
           placeholder="Full Name"
+          placeholderTextColor="#6B7280"
           value={fullName}
           onChangeText={setFullName}
         />
         <TextInput
-          style={styles.input}
+          style={[styles.input, {marginTop: 15 * scaleFactor}]}
           placeholder="Username"
+          placeholderTextColor="#6B7280"
           autoCapitalize="none"
           value={userName}
           onChangeText={setUserName}
@@ -737,99 +704,110 @@ const Profile = ({navigation}) => {
         visible={imageModalVisible}
         onRequestClose={() => setImageModalVisible(false)}
         title="Update Profile Picture"
-        overlayStyle={{justifyContent: 'flex-end'}}
-        containerStyle={{
-          width,
-          padding: 30,
-          borderBottomLeftRadius: 0,
-          borderBottomRightRadius: 0,
-        }}
+        overlayStyle={styles.modalOverlay}
+        containerStyle={styles.editModalContainer}
         buttons={[
-          {text: 'Choose from Gallery', onPress: openGallery},
-          {text: 'Open Camera', onPress: openCamera},
-          {text: 'Cancel', onPress: () => setImageModalVisible(false)},
+          {
+            text: 'Choose from Gallery',
+            onPress: openGallery,
+            style: styles.modalButton,
+          },
+          {text: 'Open Camera', onPress: openCamera, style: styles.modalButton},
+          {
+            text: 'Cancel',
+            onPress: () => setImageModalVisible(false),
+            style: styles.modalButtonCancel,
+          },
         ]}
       />
 
-      {/* Full Zoom Preview Modal with GestureHandler */}
-      {/* <Modal
-        isVisible={previewModalVisible}
-        onBackdropPress={() => setPreviewModalVisible(false)}
-        onBackButtonPress={() => setPreviewModalVisible(false)}
-        useNativeDriver
-        style={{margin: 0}}>
-        <GestureHandlerRootView  onGestureEvent={panHandler}>
-          <Animated.View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-            <PinchGestureHandler onGestureEvent={pinchHandler}>
-              <Animated.Image
-                source={{uri: profileImage || ''}}
-                style={[
-                  {
-                    width: width * 0.8,
-                    height: width * 0.8,
-                    borderRadius: width * 0.4,
-                    backgroundColor: 'white',
-                  },
-                  animatedStyle,
-                ]}
-                resizeMode="contain"
-              />
-            </PinchGestureHandler>
-          </Animated.View>
-        </GestureHandlerRootView >
-      </Modal> */}
+      <ProductModal
+        visible={productModalVisible}
+        onClose={() => setProductModalVisible(false)}
+        onSubmit={handleSubmitProduct}
+        product={currentProduct}
+      />
 
-<CustomModal
-  visible={previewModalVisible}
-  onRequestClose={() => setPreviewModalVisible(false)}
-  overlayStyle={{
-    margin: 0,
-    backgroundColor: '#000000cc',
-    justifyContent: 'center',
-    alignItems: 'center',
-  }}
-  containerStyle={{
-    padding: 0,
-    borderRadius: 0,
-    backgroundColor: 'transparent',
-    alignSelf: 'center',
-    width: '100%',
-    height: '100%',
-  }}
-  dismissOnOverlayPress={true}
->
-  <GestureHandlerRootView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-    <PanGestureHandler onGestureEvent={panHandler}>
-      <Animated.View>
-        <PinchGestureHandler onGestureEvent={pinchHandler}>
-          <Animated.Image
-            source={{ uri: profileImage || '' }}
-            style={[
-              {
-                width: width * 0.8,
-                height: width * 0.8,
-                borderRadius: width * 0.4,
-              },
-              animatedStyle,
-            ]}
-            resizeMode="cover"
-          />
-        </PinchGestureHandler>
-      </Animated.View>
-    </PanGestureHandler>
-  </GestureHandlerRootView>
-</CustomModal>
+      {sidebarVisible && (
+        <Pressable
+          style={styles.sidebarOverlay}
+          onPress={() => setSidebarVisible(false)}>
+          <View style={styles.sidebar}>
+            <TouchableOpacity
+              style={styles.sidebarItem}
+              onPress={() => {
+                log('Edit Profile Clicked');
+                setEditModalVisible(true);
+                setSidebarVisible(false);
+              }}>
+              <Text style={styles.sidebarText}>Edit Profile</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.sidebarItem}
+              onPress={() => {
+                log('Logout Clicked');
+                setModalVisible(true);
+                setSidebarVisible(false);
+              }}>
+              <Text style={styles.sidebarText}>Logout</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.sidebarItem}
+              onPress={() => {
+                log('Settings Clicked');
+                Toast.show({type: 'info', text1: 'Settings coming soon'});
+                setSidebarVisible(false);
+              }}>
+              <Text style={styles.sidebarText}>Settings</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      )}
 
-
+      <CustomModal
+        visible={productOptionsVisible}
+        onRequestClose={() => setProductOptionsVisible(false)}
+        title="Product Options"
+        overlayStyle={styles.modalOverlay}
+        containerStyle={styles.editModalContainer}
+        buttons={[
+          {
+            text: 'Edit',
+            onPress: () => {
+              log('Edit Product Option Clicked', {
+                productId: selectedProduct?.id,
+              });
+              handleEditProduct(selectedProduct);
+              setProductOptionsVisible(false);
+            },
+            style: styles.modalButton,
+          },
+          {
+            text: 'Delete',
+            onPress: () => {
+              log('Delete Product Option Clicked', {
+                productId: selectedProduct?.id,
+              });
+              handleDeleteProduct(selectedProduct?.id);
+            },
+            style: styles.modalButtonLogout,
+          },
+          {
+            text: 'Cancel',
+            onPress: () => setProductOptionsVisible(false),
+            style: styles.modalButtonCancel,
+          },
+        ]}
+      />
 
       {successMessage && (
-        <View style={[styles.toastContainer, {backgroundColor: '#d4edda'}]}>
-          <Text style={[styles.toastText, {color: '#155724'}]}>{successMessage}</Text>
+        <View style={styles.toastContainerSuccess}>
+          <Text style={styles.toastTextSuccess}>{successMessage}</Text>
         </View>
       )}
       {errorMessage && (
-        <View style={[styles.toastContainer, {backgroundColor: '#f8d7da'}]}>
-          <Text style={[styles.toastText, {color: '#721c24'}]}>{errorMessage}</Text>
+        <View style={styles.toastContainerError}>
+          <Text style={styles.toastTextError}>{errorMessage}</Text>
         </View>
       )}
 
@@ -838,86 +816,279 @@ const Profile = ({navigation}) => {
   );
 };
 
-export default Profile;
-
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: Colors.LightPink},
-  profileDesign: {height: height * 0.15, backgroundColor: Colors.lightPurple},
-  outerBorder: {
-    width: 120,
-    height: 120,
-    borderRadius: 55,
-    borderWidth: 50,
-    borderColor: Colors.LightPink,
-    alignSelf: 'center',
-    justifyContent: 'center',
-    alignItems: 'center',
-    top: -40,
+  container: {
+    flex: 1,
+    backgroundColor: '#E5E7EB',
   },
-  innerBorder: {
-    width: 104,
-    height: 104,
-    borderRadius: 52,
-    borderWidth: 2,
-    borderColor: 'black',
-    justifyContent: 'center',
+  scrollContent: {
+    paddingBottom: 20 * scaleFactor,
+  },
+  profileCard: {
     alignItems: 'center',
+    paddingVertical: 20 * scaleFactor,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10 * scaleFactor,
+    marginHorizontal: 30 * scaleFactor,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    marginTop: 10 * scaleFactor,
+  },
+  profileImageContainer: {
+    position: 'relative',
+    marginBottom: 10 * scaleFactor,
   },
   profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#fff',
-    resizeMode: 'cover',
+    width: 80 * scaleFactor,
+    height: 80 * scaleFactor,
+    borderRadius: 40 * scaleFactor,
+    borderWidth: 2,
+    borderColor: '#BFDBFE',
   },
-  imagePressable: {alignSelf: 'center', marginTop: -40},
+  editIcon: {
+    position: 'absolute',
+    bottom: -5 * scaleFactor,
+    right: -5 * scaleFactor,
+    backgroundColor: '#3B82F6',
+    borderRadius: 10 * scaleFactor,
+    width: 20 * scaleFactor,
+    height: 20 * scaleFactor,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editIconText: {
+    fontSize: 12 * scaleFactor,
+    color: '#FFFFFF',
+  },
   name: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.dark,
+    fontSize: 20 * scaleFactor,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 5 * scaleFactor,
+  },
+  bio: {
+    fontSize: 14 * scaleFactor,
+    color: '#6B7280',
     textAlign: 'center',
-    marginTop: 10,
-    top: -40,
+    paddingHorizontal: 20 * scaleFactor,
+    marginBottom: 10 * scaleFactor,
   },
-  mainInput: {paddingHorizontal: 30},
-  inputBox: {marginBottom: 15},
-  label: {
-    fontSize: 12,
-    color: Colors.gray,
-    marginBottom: 4,
-    marginLeft: 5,
+  collectionsSection: {
+    marginHorizontal: 8 * scaleFactor,
+    marginTop: 20 * scaleFactor,
   },
-  input: {
-    backgroundColor: Colors.lightPurple,
-    padding: 12,
-    borderRadius: 12,
-    fontSize: 15,
-    elevation: 2,
+  tabsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 20 * scaleFactor,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
-  buttonContainer: {marginTop: 20},
-  logoutButton: {
-    backgroundColor: '#ff9eb5',
-    paddingVertical: 16,
-    borderRadius: 20,
+  tabButton: {
+    paddingVertical: 12 * scaleFactor,
+    paddingHorizontal: 25 * scaleFactor,
+    backgroundColor: 'transparent',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTabButton: {
+    borderBottomColor: Colors.pink,
+  },
+  tabButtonText: {
+    fontSize: 14 * scaleFactor,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  activeTabButtonText: {
+    color: Colors.pink,
+  },
+  emptyStateContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
-    width: width * 0.8,
-    alignSelf: 'center',
+    paddingVertical: 40 * scaleFactor,
+    paddingHorizontal: 20 * scaleFactor,
   },
-  toastContainer: {
-    position: 'absolute',
-    bottom: 8,
-    alignSelf: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 25,
-    elevation: 5,
-    width: width * 0.8,
+  emptyStateIcon: {
+    width: 80 * scaleFactor,
+    height: 80 * scaleFactor,
+    marginBottom: 20 * scaleFactor,
+    tintColor: '#9CA3AF',
   },
-  toastText: {
-    fontSize: 14,
+  emptyStateTitle: {
+    fontSize: 16 * scaleFactor,
     fontWeight: '500',
+    color: '#6B7280',
     textAlign: 'center',
+    marginBottom: 20 * scaleFactor,
+  },
+  uploadButton: {
+    backgroundColor: Colors.pink,
+    paddingVertical: 12 * scaleFactor,
+    paddingHorizontal: 30 * scaleFactor,
+    borderRadius: 8 * scaleFactor,
+  },
+  uploadButtonText: {
+    fontSize: 14 * scaleFactor,
+    fontWeight: '600',
+    color: Colors.White,
+  },
+  productItem: {
+    alignSelf: 'center',
+    width: '90%',
+    minHeight: 100 * scaleFactor,
+    marginBottom: 10 * scaleFactor,
+    borderRadius: 10 * scaleFactor,
+    overflow: 'hidden',
+    elevation: 3,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  productImage: {
+    width: 120 * scaleFactor,
+    height: '90%',
+    borderTopLeftRadius: 10 * scaleFactor,
+    borderBottomLeftRadius: 10 * scaleFactor,
+    marginLeft: 10,
+  },
+  productOverlay: {
+    padding: 5 * scaleFactor,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    paddingLeft: 20 * scaleFactor,
+    borderRadius: 10 * scaleFactor,
+    marginLeft: 10 * scaleFactor,
+    width: '54%',
+  },
+  productTitle: {
+    fontSize: 14 * scaleFactor,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  productDate: {
+    fontSize: 12 * scaleFactor,
+    color: '#6B7280',
+  },
+  collectionsListVertical: {
+    paddingBottom: 10 * scaleFactor,
+  },
+  sidebarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-start',
+  },
+  sidebar: {
+    width: width * 0.3,
+    backgroundColor: Colors.lightPurple,
+    padding: 10 * scaleFactor,
+    borderBottomLeftRadius: 20 * scaleFactor,
+    alignSelf: 'flex-end',
+  },
+  sidebarItem: {
+    paddingVertical: 12 * scaleFactor,
+    paddingHorizontal: 10 * scaleFactor,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  sidebarText: {
+    fontSize: 12 * scaleFactor,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  modalOverlay: {
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  editModalContainer: {
+    width,
+    padding: 20 * scaleFactor,
+    borderTopLeftRadius: 20 * scaleFactor,
+    borderTopRightRadius: 20 * scaleFactor,
+    backgroundColor: '#FFFFFF',
+  },
+  modalButton: {
+    backgroundColor: '#3B82F6',
+    paddingVertical: 10 * scaleFactor,
+    paddingHorizontal: 20 * scaleFactor,
+    borderRadius: 8 * scaleFactor,
+    marginVertical: 5 * scaleFactor,
+    alignItems: 'center',
+  },
+  modalButtonCancel: {
+    backgroundColor: '#6B7280',
+    paddingVertical: 10 * scaleFactor,
+    paddingHorizontal: 20 * scaleFactor,
+    borderRadius: 8 * scaleFactor,
+    marginVertical: 5 * scaleFactor,
+    alignItems: 'center',
+  },
+  modalButtonSave: {
+    backgroundColor: '#10B981',
+    paddingVertical: 10 * scaleFactor,
+    paddingHorizontal: 20 * scaleFactor,
+    borderRadius: 8 * scaleFactor,
+    marginVertical: 5 * scaleFactor,
+    alignItems: 'center',
+  },
+  modalButtonLogout: {
+    backgroundColor: '#EF4444',
+    paddingVertical: 10 * scaleFactor,
+    paddingHorizontal: 20 * scaleFactor,
+    borderRadius: 8 * scaleFactor,
+    marginVertical: 5 * scaleFactor,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16 * scaleFactor,
+    fontWeight: '600',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8 * scaleFactor,
+    padding: 10 * scaleFactor,
+    fontSize: 16 * scaleFactor,
+    color: '#1F2937',
+    backgroundColor: '#F9FAFB',
+  },
+  toastContainerSuccess: {
+    position: 'absolute',
+    bottom: 20 * scaleFactor,
+    alignSelf: 'center',
+    backgroundColor: '#10B981',
+    padding: 10 * scaleFactor,
+    borderRadius: 8 * scaleFactor,
+    elevation: 5,
+  },
+  toastTextSuccess: {
+    color: '#FFFFFF',
+    fontSize: 14 * scaleFactor,
+  },
+  toastContainerError: {
+    position: 'absolute',
+    bottom: 20 * scaleFactor,
+    alignSelf: 'center',
+    backgroundColor: '#EF4444',
+    padding: 10 * scaleFactor,
+    borderRadius: 8 * scaleFactor,
+    elevation: 5,
+  },
+  toastTextError: {
+    color: '#FFFFFF',
+    fontSize: 14 * scaleFactor,
   },
 });
+
+export default Profile;

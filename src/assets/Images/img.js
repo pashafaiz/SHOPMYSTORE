@@ -5,7 +5,7 @@ export default {
   Begon: require('../../assets/image1183.png'),
   Gola: require('../../assets/image4.png'),
   Frame: require('../../assets/Frame.png'),
-  App: require('../../assets/AppLogo.png'),
+  App: require('../../assets/App_logo.png'),
   welcome: require('../../assets/welcome.png'),
   mail: require('../../assets/mail.png'),
   lock: require('../../assets/lock.png'),

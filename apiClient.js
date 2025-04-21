@@ -1,305 +1,318 @@
-export const BASE_URL = 'https://shopmystore-backend-1.onrender.com/api';
 import axios from 'axios';
-import { Platform } from 'react-native';
-const request = async (endpoint, method = 'GET', body = null, headers = {}) => {
-  const config = {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...headers,
-    },
-  };
+import {Platform} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-  if (body) {
-    config.body = JSON.stringify(body);
-  }
+export const BASE_URL = 'https://shopmystore-backend-1.onrender.com/api';
 
-  try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, config);
-    const data = await response.json();
-    return { ok: response.ok, data };
-  } catch (error) {
-    console.error('API Error:', error);
-    return { ok: false, data: { msg: 'Something went wrong' } };
+const log = (message, data = {}) => {
+  console.log(
+    JSON.stringify(
+      {timestamp: new Date().toISOString(), message, ...data},
+      null,
+      2,
+    ),
+  );
+};
+
+const request = async (config, retries = 3) => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      log('API Request', {attempt, config});
+      const response = await axios(config);
+      log('API Response', {status: response.status, data: response.data});
+      return {ok: true, data: response.data};
+    } catch (error) {
+      const errorData = error?.response?.data || {msg: error.message};
+      log('API Error', {
+        attempt,
+        status: error?.response?.status,
+        error: errorData,
+      });
+      if (attempt === retries) {
+        return {ok: false, data: errorData};
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+    }
   }
 };
 
-// Auth APIs
-export const loginApi = (email, password) =>
-  request('/auth/login', 'POST', { email, password });
+// Interceptor to add token to all requests
+axios.interceptors.request.use(
+  async config => {
+    const token = await AsyncStorage.getItem('userToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  error => Promise.reject(error),
+);
 
-export const signupApi = (formData) =>
-  request('/auth/signup', 'POST', formData);
+// apiClient.js (partial update)
+export const createProductApi = async (token, productData) => {
+  if (
+    !productData?.name ||
+    !productData?.price ||
+    !productData?.createdBy ||
+    !productData?.category ||
+    !productData?.media?.length
+  ) {
+    log('Invalid Product Data', {productData});
+    return {ok: false, data: {msg: 'Missing required fields or media'}};
+  }
+
+  const formData = new FormData();
+  formData.append('name', productData.name);
+  formData.append('description', productData.description || '');
+  formData.append('price', productData.price.toString());
+  formData.append('category', productData.category); // Add category
+  formData.append('createdBy', productData.createdBy);
+  productData.media.forEach((media, index) => {
+    if (media.uri && !media.uri.startsWith('http')) {
+      formData.append('media', {
+        uri:
+          Platform.OS === 'android'
+            ? media.uri
+            : media.uri.replace('file://', ''),
+        name:
+          media.fileName ||
+          `media_${Date.now()}_${index}.${
+            media.mediaType === 'video' ? 'mp4' : 'jpg'
+          }`,
+        type:
+          media.type ||
+          (media.mediaType === 'video' ? 'video/mp4' : 'image/jpeg'),
+      });
+    } else if (media.uri && media.uri.startsWith('http')) {
+      formData.append('media', media.uri); // Existing Cloudinary URL
+    }
+  });
+
+  return request({
+    method: 'POST',
+    url: `${BASE_URL}/products`,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'multipart/form-data',
+    },
+    data: formData,
+    timeout: 60000, // Increased for multiple files
+  });
+};
+
+export const updateProductApi = async (token, id, productData) => {
+  if (
+    !id ||
+    !productData?.name ||
+    !productData?.price ||
+    !productData?.createdBy ||
+    !productData?.category
+  ) {
+    log('Invalid Update Product Data', {id, productData});
+    return {ok: false, data: {msg: 'Missing required fields or ID'}};
+  }
+
+  const formData = new FormData();
+  formData.append('name', productData.name);
+  formData.append('description', productData.description || '');
+  formData.append('price', productData.price.toString());
+  formData.append('category', productData.category); // Add category
+  formData.append('createdBy', productData.createdBy);
+
+  if (productData.media && productData.media.length > 0) {
+    productData.media.forEach((media, index) => {
+      if (media.uri && !media.uri.startsWith('http')) {
+        formData.append('media', {
+          uri:
+            Platform.OS === 'android'
+              ? media.uri
+              : media.uri.replace('file://', ''),
+          name:
+            media.fileName ||
+            `media_${Date.now()}_${index}.${
+              media.mediaType === 'video' ? 'mp4' : 'jpg'
+            }`,
+          type:
+            media.type ||
+            (media.mediaType === 'video' ? 'video/mp4' : 'image/jpeg'),
+        });
+      } else if (media.uri && media.uri.startsWith('http')) {
+        formData.append('media', media.uri);
+      }
+    });
+  }
+
+  return request({
+    method: 'PUT',
+    url: `${BASE_URL}/products/${id}`,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'multipart/form-data',
+    },
+    data: formData,
+    timeout: 60000,
+  });
+};
+
+export const getAllProductsApi = async () => {
+  return request({
+    method: 'GET',
+    url: `${BASE_URL}/products`,
+    timeout: 15000,
+  });
+};
+
+export const getProductApi = async productId => {
+  return request({
+    method: 'GET',
+    url: `${BASE_URL}/products/${productId}`,
+    timeout: 15000,
+  });
+};
+
+export const deleteProductApi = async (token, id) => {
+  if (!id) {
+    log('Invalid Product ID', {id});
+    return {ok: false, data: {msg: 'Missing product ID'}};
+  }
+
+  return request({
+    method: 'DELETE',
+    url: `${BASE_URL}/products/${id}`,
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    timeout: 15000,
+  });
+};
+
+export const getRelatedProductsApi = async productId => {
+  return request({
+    method: 'GET',
+    url: `${BASE_URL}/products/${productId}/related`,
+    timeout: 15000,
+  });
+};
+
+export const getProductsByCategoryApi = async category => {
+  if (!category) {
+    log('Missing category parameter');
+    return {ok: false, data: {msg: 'Category is required'}};
+  }
+
+  return request({
+    method: 'GET',
+    url: `${BASE_URL}/products/category/${category}`,
+    timeout: 15000,
+  });
+};
+
+export const editProfileApi = async (token, fullName, userName) => {
+  if (!fullName || !userName) {
+    log('Invalid Profile Data', {fullName, userName});
+    return {ok: false, data: {msg: 'Missing fullName or userName'}};
+  }
+
+  const formData = new FormData();
+  formData.append('fullName', fullName);
+  formData.append('userName', userName);
+
+  return request({
+    method: 'PUT',
+    url: `${BASE_URL}/auth/edit-profile`,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    data: {
+      fullName,
+      userName,
+    },
+    timeout: 30000,
+  });
+};
+// Reels API
+export const uploadReelApi = async (token, formData, onProgress = null) => {
+  if (!formData) {
+    log('Invalid FormData', {formData});
+    return {ok: false, data: {msg: 'No form data provided'}};
+  }
+
+  return request({
+    method: 'POST',
+    url: `${BASE_URL}/reels/upload-reel`,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'multipart/form-data',
+    },
+    data: formData,
+    timeout: 60000,
+    onUploadProgress: progressEvent => {
+      if (onProgress && progressEvent.total) {
+        const percent = Math.round(
+          (progressEvent.loaded * 100) / progressEvent.total,
+        );
+        log('Upload Progress', {percent});
+        onProgress(percent);
+      }
+    },
+  });
+};
+
+export const getReelsApi = async () => {
+  return request({
+    method: 'GET',
+    url: `${BASE_URL}/reels/reels`,
+    timeout: 15000,
+  });
+};
+
+export const postCommentApi = async (reelId, commentData) => {
+  return request({
+    method: 'POST',
+    url: `${BASE_URL}/reels/${reelId}/comments`,
+    data: commentData,
+    timeout: 15000,
+  });
+};
+
+export const getCommentsApi = async reelId => {
+  return request({
+    method: 'GET',
+    url: `${BASE_URL}/reels/${reelId}/comments`,
+    timeout: 15000,
+  });
+};
+
+// Authentication APIs
+export const loginApi = (email, password) =>
+  request({
+    method: 'POST',
+    url: `${BASE_URL}/auth/login`,
+    data: {email, password},
+    timeout: 15000,
+  });
+
+export const signupApi = formData =>
+  request({
+    method: 'POST',
+    url: `${BASE_URL}/auth/signup`,
+    data: formData,
+    timeout: 15000,
+  });
 
 export const verifyOtpApi = (otp, email) =>
-  request('/auth/verify-otp', 'POST', { otp, email });
-
-export const resendOtpApi = (email) =>
-  request('/auth/resend-otp', 'POST', { email });
-
-export const editProfileApi = (token, fullName, userName) =>
-  request('/auth/edit-profile', 'PUT', { fullName, userName }, {
-    Authorization: `Bearer ${token}`,
+  request({
+    method: 'POST',
+    url: `${BASE_URL}/auth/verify-otp`,
+    data: {otp, email},
+    timeout: 15000,
   });
 
-// Reels APIs
-export const getReelsApi = () => request('/auth/reels', 'GET');
-
-export const uploadReelApi = async (token, videoFile, caption = '', onProgress = null) => {
-  const formData = new FormData();
-
-  formData.append('video', {
-    uri: Platform.OS === 'android' ? videoFile.uri : videoFile.uri.replace('file://', ''),
-    name: videoFile.fileName || `reel_${Date.now()}.mp4`,
-    type: videoFile.type || 'video/mp4',
+export const resendOtpApi = email =>
+  request({
+    method: 'POST',
+    url: `${BASE_URL}/auth/resend-otp`,
+    data: {email},
+    timeout: 15000,
   });
-
-  formData.append('caption', caption);
-
-  try {
-    const response = await axios.post(`${BASE_URL}/auth/upload-reel`, formData, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'multipart/form-data',
-      },
-      onUploadProgress: progressEvent => {
-        if (onProgress && progressEvent.total) {
-          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          onProgress(percent);
-        }
-      },
-    });
-
-    return { ok: true, data: response.data };
-  } catch (error) {
-    console.error('Axios Upload Error:', error?.response?.data || error.message);
-    return {
-      ok: false,
-      data: error?.response?.data || { msg: 'Upload failed via axios ❌' },
-    };
-  }
-};
-
-export default request;
-
-
-// export const BASE_URL = 'https://shopmystore-backend-1.onrender.com/api';
-// // For local testing: export const BASE_URL = 'http://192.168.1.x:3000/api';
-
-// import axios from 'axios';
-// import { Platform } from 'react-native';
-
-// export const uploadReelApi = async (token, videoFile, caption = '', onProgress = null) => {
-//   if (!token) {
-//     console.error('No token provided');
-//     return { ok: false, data: { msg: 'Authentication token is missing' } };
-//   }
-
-//   if (!videoFile || !videoFile.uri) {
-//     console.error('No video file provided');
-//     return { ok: false, data: { msg: 'Video file is required' } };
-//   }
-
-//   if (videoFile.duration && videoFile.duration > 60) {
-//     console.error('Video duration exceeds limit');
-//     return { ok: false, data: { msg: 'Video must be 1 minute or less' } };
-//   }
-
-//   console.log('Video File Details:', {
-//     uri: videoFile.uri,
-//     type: videoFile.type,
-//     fileName: videoFile.fileName,
-//     size: videoFile.fileSize,
-//     duration: videoFile.duration,
-//     originalPath: videoFile.originalPath,
-//     timestamp: videoFile.timestamp,
-//   });
-
-//   const formData = new FormData();
-//   let uri = videoFile.uri; // Prefer uri over originalPath to avoid sandbox issues
-
-//   // Normalize URI to match Postman behavior
-//   if (Platform.OS === 'android' && !uri.startsWith('file://')) {
-//     uri = `file://${uri}`;
-//   } else if (Platform.OS === 'ios') {
-//     uri = uri.replace('file://', '');
-//   }
-
-//   const videoData = {
-//     uri,
-//     name: videoFile.fileName || `reel_${Date.now()}.mp4`,
-//     type: videoFile.type || 'video/mp4',
-//   };
-
-//   console.log('FormData Video:', videoData);
-//   formData.append('video', videoData);
-//   formData.append('caption', caption || '');
-
-//   console.log('FormData Prepared:', {
-//     video: { uri: videoData.uri, name: videoData.name, type: videoData.type },
-//     caption,
-//   });
-
-//   try {
-//     const response = await axios.post(
-//       `${BASE_URL}/auth/upload-reel`,
-//       formData,
-//       {
-//         headers: {
-//           Authorization: `Bearer ${token}`,
-//           // Let axios handle Content-Type to match Postman
-//         },
-//         timeout: 900000, // 15 minutes to handle slow networks
-//         onUploadProgress: (progressEvent) => {
-//           if (onProgress && progressEvent.total) {
-//             const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-//             console.log('Upload Progress:', percent);
-//             onProgress(percent);
-//           }
-//         },
-//         maxContentLength: Infinity,
-//         maxBodyLength: Infinity,
-//         responseType: 'json',
-//         // Add retry for network errors
-//         validateStatus: (status) => status >= 200 && status < 300,
-//       }
-//     );
-
-//     console.log('Upload Response:', response.data);
-//     return { ok: true, data: response.data };
-//   } catch (error) {
-//     const errorData = error?.response?.data || { msg: error.message };
-//     console.error('Axios Upload Error:', {
-//       status: error?.response?.status,
-//       data: errorData,
-//       message: error.message,
-//       code: error.code,
-//       config: error.config?.url,
-//       timestamp: new Date().toISOString(),
-//     });
-
-//     // Retry once for network errors
-//     if (error.code === 'ERR_NETWORK') {
-//       console.log('Retrying upload due to network error...');
-//       try {
-//         const retryResponse = await axios.post(
-//           `${BASE_URL}/auth/upload-reel`,
-//           formData,
-//           {
-//             headers: { Authorization: `Bearer ${token}` },
-//             timeout: 900000,
-//             onUploadProgress: (progressEvent) => {
-//               if (onProgress && progressEvent.total) {
-//                 const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-//                 console.log('Retry Upload Progress:', percent);
-//                 onProgress(percent);
-//               }
-//             },
-//             maxContentLength: Infinity,
-//             maxBodyLength: Infinity,
-//             responseType: 'json',
-//           }
-//         );
-//         console.log('Retry Upload Response:', retryResponse.data);
-//         return { ok: true, data: retryResponse.data };
-//       } catch (retryError) {
-//         const retryErrorData = retryError?.response?.data || { msg: retryError.message };
-//         console.error('Retry Axios Upload Error:', {
-//           status: retryError?.response?.status,
-//           data: retryErrorData,
-//           message: retryError.message,
-//           code: retryError.code,
-//           config: retryError.config?.url,
-//           timestamp: new Date().toISOString(),
-//         });
-//         return { ok: false, data: { msg: retryErrorData.msg || 'Upload failed after retry' } };
-//       }
-//     }
-
-//     return { ok: false, data: { msg: errorData.msg || 'Upload failed, please try again' } };
-//   }
-// };
-
-// export const pingApi = async () => {
-//   try {
-//     const response = await axios.get(`${BASE_URL}/ping`, {
-//       timeout: 10000,
-//     });
-//     console.log('Ping Response:', response.data);
-//     return { ok: true, data: response.data };
-//   } catch (error) {
-//     console.error('Ping Error:', {
-//       message: error.message,
-//       status: error.response?.status,
-//       code: error.code,
-//       timestamp: new Date().toISOString(),
-//     });
-//     return { ok: false, data: { msg: error.message } };
-//   }
-// };
-// // Auth APIs
-// export const loginApi = async (email, password) => {
-//   try {
-//     const response = await axios.post(`${BASE_URL}/auth/login`, { email, password });
-//     console.log('Login Response:', response.data);
-//     return { ok: true, data: response.data };
-//   } catch (error) {
-//     console.error('Login Error:', error?.response?.data || error.message);
-//     return { ok: false, data: error?.response?.data || { msg: 'Login failed' } };
-//   }
-// };
-
-// export const signupApi = async (formData) => {
-//   try {
-//     const response = await axios.post(`${BASE_URL}/auth/signup`, formData);
-//     return { ok: true, data: response.data };
-//   } catch (error) {
-//     console.error('Signup Error:', error?.response?.data || error.message);
-//     return { ok: false, data: error?.response?.data || { msg: 'Signup failed' } };
-//   }
-// };
-
-// export const verifyOtpApi = async (otp, email) => {
-//   try {
-//     const response = await axios.post(`${BASE_URL}/auth/verify-otp`, { otp, email });
-//     return { ok: true, data: response.data };
-//   } catch (error) {
-//     console.error('Verify OTP Error:', error?.response?.data || error.message);
-//     return { ok: false, data: error?.response?.data || { msg: 'OTP verification failed' } };
-//   }
-// };
-
-// export const resendOtpApi = async (email) => {
-//   try {
-//     const response = await axios.post(`${BASE_URL}/auth/resend-otp`, { email });
-//     return { ok: true, data: response.data };
-//   } catch (error) {
-//     console.error('Resend OTP Error:', error?.response?.data || error.message);
-//     return { ok: false, data: error?.response?.data || { msg: 'Resend OTP failed' } };
-//   }
-// };
-
-// export const editProfileApi = async (token, fullName, userName) => {
-//   try {
-//     const response = await axios.put(
-//       `${BASE_URL}/auth/edit-profile`,
-//       { fullName, userName },
-//       { headers: { Authorization: `Bearer ${token}` } }
-//     );
-//     return { ok: true, data: response.data };
-//   } catch (error) {
-//     console.error('Edit Profile Error:', error?.response?.data || error.message);
-//     return { ok: false, data: error?.response?.data || { msg: 'Edit profile failed' } };
-//   }
-// };
-
-// // Reels APIs
-// export const getReelsApi = async () => {
-//   try {
-//     const response = await axios.get(`${BASE_URL}/auth/reels`);
-//     return { ok: true, data: response.data };
-//   } catch (error) {
-//     console.error('Get Reels Error:', error?.response?.data || error.message);
-//     return { ok: false, data: error?.response?.data || { msg: 'Failed to fetch reels' } };
-//   }
-// };

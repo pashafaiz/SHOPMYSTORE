@@ -94,6 +94,7 @@ const Login = () => {
   
     try {
       const { ok, data } = await loginApi(email, password);
+  console.log("---data---->",data);
   
       if (ok && data.token) {
         alert("-----")

@@ -143,7 +143,6 @@ const Header = ({
     return (
         <View style={styles.header}>
             <View style={styles.headerContent}>
-                {/* Left Icon */}
                 <View style={styles.left}>
                     {showLeftIcon && leftIcon && (
                         <TouchableOpacity onPress={onLeftPress} style={styles.leftIconWrapper}>
@@ -152,7 +151,6 @@ const Header = ({
                     )}
                 </View>
 
-                {/* Center Content */}
                 <View style={styles.center}>
                     {isSearch ? (
                         <View style={styles.searchBox}>
