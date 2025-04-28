@@ -1,36 +1,19 @@
-// import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-// import React from 'react';
-
-// const Button = ({ title = "Login", onPress, style,textStyle }) => {
-//     return (
-//         <TouchableOpacity style={style} onPress={onPress}>
-//             <Text style={[styles.buttonText,textStyle]}>{title}</Text>
-//         </TouchableOpacity>
-//     );
-// };
-
-// export default Button;
-
-// const styles = StyleSheet.create({
-
-//     buttonText: {
-//         color: '#fff',
-//         fontSize: 18,
-//         fontWeight: '600',
-//     },
-// });
-
-
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import React from 'react';
+import LinearGradient from 'react-native-linear-gradient';
 
 const Button = ({ title, onPress, style, textStyle, icon }) => {
   return (
-    <TouchableOpacity style={style} onPress={onPress}>
-      <View style={styles.content}>
+    <TouchableOpacity style={[styles.container, style]} onPress={onPress}>
+      <LinearGradient
+        colors={['#7B61FF', '#9D4DFF']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.gradient}
+      >
         {icon && <View style={styles.icon}>{icon}</View>}
         <Text style={[styles.buttonText, textStyle]}>{title}</Text>
-      </View>
+      </LinearGradient>
     </TouchableOpacity>
   );
 };
@@ -38,16 +21,24 @@ const Button = ({ title, onPress, style, textStyle, icon }) => {
 export default Button;
 
 const styles = StyleSheet.create({
-  content: {
-    flexDirection: 'row',
+  container: {
     alignItems: 'center',
     justifyContent: 'center',
   },
+  gradient: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
   icon: {
-    marginRight: 8, // space between icon and text
+    marginRight: 8,
   },
   buttonText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '600',
   },

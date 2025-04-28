@@ -1,267 +1,71 @@
-// import React, { useRef, useState, useEffect, useCallback } from 'react';
-// import {
-//   StyleSheet, Text, TextInput, View, TouchableOpacity, Dimensions, ActivityIndicator,
-//   BackHandler
-// } from 'react-native';
-// import Header from '../Components/Header';
-// import img from '../assets/Images/img';
-// import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
-// import Strings from '../constants/Strings';
-// import Button from '../Components/Button';
-// import Colors from '../constants/Colors';
-// import { verifyOtpApi } from '../../apiClient';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// const { width } = Dimensions.get('window');
-
-// const OTP = () => {
-//   const navigation = useNavigation();
-//   const route = useRoute();
-//   const email = route.params?.email;
-
-//   const [otp, setOtp] = useState(['', '', '', '', '', '']);
-//   const [timer, setTimer] = useState(30);
-//   const [loading, setLoading] = useState(false);
-//   const [error, setError] = useState('');
-
-//   const inputRefs = useRef([]);
-
-//   useEffect(() => {
-//     if (timer > 0) {
-//       const interval = setInterval(() => {
-//         setTimer(prev => prev - 1);
-//       }, 1000);
-//       return () => clearInterval(interval);
-//     }
-//   }, [timer]);
-
-
-//   useFocusEffect(
-//     useCallback(() => {
-//       const onBackPress = () => {
-//         BackHandler.exitApp(); // exits app
-//         return true;
-//       };
-
-//       const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-
-//       return () => backHandler.remove();
-//     }, [])
-//   );
-
-//   const handleChange = (text, index) => {
-//     if (/^\d*$/.test(text)) {
-//       const newOtp = [...otp];
-//       newOtp[index] = text;
-//       setOtp(newOtp);
-//       setError('');
-
-//       if (text && index < 5) {
-//         inputRefs.current[index + 1].focus();
-//       }
-//       if (!text && index > 0) {
-//         inputRefs.current[index - 1].focus();
-//       }
-//     }
-//   };
-
-//   const handleResend = async () => {
-//     setTimer(30);
-//     setOtp(['', '', '', '', '', '']);
-//     inputRefs.current[0].focus();
-  
-//     const { ok, data } = await resendOtpApi(email);
-//     if (!ok) {
-//       setError(data?.errors?.email || "Failed to resend OTP");
-//     }
-//   };
-  
-
-//   // const handleVerifyOtp = async () => {
-//   //   const enteredOtp = otp.join('');
-//   //   if (enteredOtp.length !== 6) {
-//   //     setError("Please enter a valid 6-digit OTP");
-//   //     return;
-//   //   }
-
-//   //   setLoading(true);
-//   //   const { ok, data } = await verifyOtpApi(enteredOtp, email);
-//   //   console.log("---data-->",data);
-//   //   setLoading(false);
-
-//   //   if (ok) {
-//   //     // navigation.navigate("BottomTabs");
-//   //   } else {
-//   //     setError(data?.errors?.otp || "OTP verification failed");
-//   //   }
-//   // };
-
-//   const handleVerifyOtp = async () => {
-//     const enteredOtp = otp.join('');
-//     if (enteredOtp.length !== 6) {
-//       setError("Please enter a valid 6-digit OTP");
-//       return;
-//     }
-  
-//     setLoading(true);
-//     const { ok, data } = await verifyOtpApi(enteredOtp, email);
-//     console.log("---data-->", data);
-//     setLoading(false);
-  
-//     if (ok) {
-//       try {
-//         await AsyncStorage.setItem('token', data.token);
-//         await AsyncStorage.setItem('user', JSON.stringify(data.user));
-//         navigation.reset({
-//           index: 0,
-//           routes: [{ name: 'BottomTabs' }],
-//         });
-//       } catch (err) {
-//         console.log('Error storing token/user:', err);
-//       }
-//     } else {
-//       setError(data?.errors?.otp || "OTP verification failed");
-//     }
-//   };
-//   return (
-//     <View style={styles.container}>
-//       <Header
-//         title={Strings.OTP_Verify}
-//         showLeftIcon={true}
-//         leftIcon={img.back_Icon}
-//         onLeftPress={() => navigation.goBack()}
-//       />
-
-//       <View style={styles.verifyText}>
-//         <Text style={styles.verifyString}>Verification</Text>
-//         <Text style={styles.codeSend_String}>
-//           We’ve sent you the verification{'\n'}code on {email || "your email"}
-//         </Text>
-//       </View>
-
-//       <View style={styles.otpContainer}>
-//         {otp.map((digit, index) => (
-//           <TextInput
-//             key={index}
-//             ref={ref => (inputRefs.current[index] = ref)}
-//             style={[styles.otpInput, digit ? styles.filledInput : null]}
-//             maxLength={1}
-//             keyboardType="number-pad"
-//             value={digit}
-//             onChangeText={text => handleChange(text, index)}
-//           />
-//         ))}
-//       </View>
-
-//       {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-//       <Button
-//         title={loading ? <ActivityIndicator color="#fff" /> : Strings.continue}
-//         onPress={handleVerifyOtp}
-//         style={styles.button}
-//         disabled={loading}
-//       />
-
-//       <View style={styles.resendContainer}>
-//         {timer > 0 ? (
-//           <Text style={styles.timerText}>
-//             Re-send code in <Text style={styles.timerCount}>0:{timer.toString().padStart(2, '0')}</Text>
-//           </Text>
-//         ) : (
-//           <TouchableOpacity onPress={handleResend}>
-//             <Text style={styles.resendText}>Resend Code</Text>
-//           </TouchableOpacity>
-//         )}
-//       </View>
-//     </View>
-//   );
-// };
-
-// export default OTP;
-
-// const styles = StyleSheet.create({
-//   container: { flex: 1, backgroundColor: Colors.White },
-//   verifyText: { paddingHorizontal: 40, paddingVertical: 40 },
-//   verifyString: { fontSize: 25, fontWeight: '600', lineHeight: 40, marginBottom: 10 },
-//   codeSend_String: { fontSize: 16, lineHeight: 22, color: Colors.lightGray1 },
-//   otpContainer: {
-//     flexDirection: 'row',
-//     justifyContent: 'space-between',
-//     marginHorizontal: 30,
-//     marginTop: 20,
-//   },
-//   otpInput: {
-//     borderWidth: 1,
-//     borderColor: Colors.lightGray,
-//     borderRadius: 10,
-//     width: 45,
-//     height: 55,
-//     textAlign: 'center',
-//     fontSize: 20,
-//     color: Colors.lightGray1,
-//     backgroundColor: Colors.White,
-//   },
-//   filledInput: { borderColor: "#ddf" },
-//   button: {
-//     backgroundColor: Colors.pink,
-//     paddingVertical: 14,
-//     borderRadius: 20,
-//     alignItems: 'center',
-//     justifyContent: 'center',
-//     marginHorizontal: 40,
-//     marginTop: 50,
-//     width: width * 0.8,
-//   },
-//   resendContainer: { alignItems: 'center', marginTop: 20 },
-//   timerText: { fontSize: 14, color: Colors.lightGray1 },
-//   timerCount: { color: Colors.pink, fontWeight: '500' },
-//   resendText: { fontSize: 14, color: Colors.pink, fontWeight: '500' },
-//   errorText: {
-//     color: 'red',
-//     textAlign: 'center',
-//     fontSize: 13,
-//     marginTop: 10,
-//   }
-// });
-
-
-
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet, Text, TextInput, View, TouchableOpacity, Dimensions, ActivityIndicator,
-  BackHandler
+  BackHandler, Animated, Easing, KeyboardAvoidingView, Platform
 } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
 import Header from '../Components/Header';
 import img from '../assets/Images/img';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import Strings from '../constants/Strings';
 import Button from '../Components/Button';
 import Colors from '../constants/Colors';
-import { verifyOtpApi } from '../../apiClient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { verifyOtp, resendOtp, setOtp, setOtpTimer } from '.././/redux/slices/authSlice';
+import LinearGradient from 'react-native-linear-gradient';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+
+const scaleSize = (size) => Math.round(size * (width / 375));
+const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375));
 
 const OTP = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const email = route.params?.email;
-
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [timer, setTimer] = useState(30);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const dispatch = useDispatch();
+  const { otp: reduxOtp, otpTimer, loading, errors } = useSelector((state) => state.auth);
+  const [isAutoFillEnabled, setIsAutoFillEnabled] = useState(true);
 
   const inputRefs = useRef([]);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideUpAnim = useRef(new Animated.Value(50)).current;
+  const containerScale = useRef(new Animated.Value(0.9)).current;
+  const buttonScale = useRef(new Animated.Value(1)).current;
+  const errorShake = useRef(new Animated.Value(0)).current;
+  const inputScales = useRef(Array(6).fill().map(() => new Animated.Value(0.8))).current;
 
   useEffect(() => {
-    if (timer > 0) {
+    if (otpTimer > 0) {
       const interval = setInterval(() => {
-        setTimer(prev => prev - 1);
+        dispatch(setOtpTimer(otpTimer - 1));
       }, 1000);
       return () => clearInterval(interval);
     }
-  }, [timer]);
+  }, [otpTimer, dispatch]);
+
+  useEffect(() => {
+    if (isAutoFillEnabled && otpTimer > 0) {
+      const timeout = setTimeout(() => {
+        const mockOtp = ['1', '2', '3', '4', '5', '6'];
+        dispatch(setOtp(mockOtp));
+        inputScales.forEach((scale, index) => {
+          Animated.sequence([
+            Animated.timing(scale, {
+              toValue: 1.1,
+              duration: 150,
+              useNativeDriver: true,
+            }),
+            Animated.timing(scale, {
+              toValue: 1,
+              duration: 150,
+              useNativeDriver: true,
+            }),
+          ]).start();
+        });
+      }, 2000);
+      return () => clearTimeout(timeout);
+    }
+  }, [isAutoFillEnabled, otpTimer, dispatch]);
 
   useFocusEffect(
     useCallback(() => {
@@ -272,16 +76,49 @@ const OTP = () => {
 
       const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
 
-      return () => backHandler.remove();
-    }, [])
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideUpAnim, {
+          toValue: 0,
+          duration: 1000,
+          easing: Easing.out(Easing.exp),
+          useNativeDriver: true,
+        }),
+        Animated.spring(containerScale, {
+          toValue: 1,
+          friction: 5,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+        Animated.stagger(100, inputScales.map(scale =>
+          Animated.spring(scale, {
+            toValue: 1,
+            friction: 6,
+            tension: 60,
+            useNativeDriver: true,
+          })
+        )),
+      ]).start();
+
+      return () => {
+        backHandler.remove();
+        fadeAnim.setValue(0);
+        slideUpAnim.setValue(50);
+        containerScale.setValue(0.9);
+        inputScales.forEach(scale => scale.setValue(0.8));
+      };
+    }, [fadeAnim, slideUpAnim, containerScale, inputScales])
   );
 
   const handleChange = (text, index) => {
     if (/^\d*$/.test(text)) {
-      const newOtp = [...otp];
+      const newOtp = [...(reduxOtp || ['', '', '', '', '', ''])];
       newOtp[index] = text;
-      setOtp(newOtp);
-      setError('');
+      dispatch(setOtp(newOtp));
 
       if (text && index < 5) {
         inputRefs.current[index + 1].focus();
@@ -292,142 +129,338 @@ const OTP = () => {
     }
   };
 
-  const handleResend = async () => {
-    setTimer(30);
-    setOtp(['', '', '', '', '', '']);
+  const handleResend = () => {
+    dispatch(setOtp(['', '', '', '', '', '']));
+    dispatch(setOtpTimer(30));
     inputRefs.current[0].focus();
-  
-    const { ok, data } = await resendOtpApi(email);
-    if (!ok) {
-      setError(data?.errors?.email || "Failed to resend OTP");
-    }
+    dispatch(resendOtp(email));
   };
 
-  const handleVerifyOtp = async () => {
-    const enteredOtp = otp.join('');
+  const handleVerifyOtp = () => {
+    Animated.sequence([
+      Animated.timing(buttonScale, {
+        toValue: 0.92,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(buttonScale, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    const enteredOtp = reduxOtp?.join('') || '';
     if (enteredOtp.length !== 6) {
-      setError("Please enter a valid 6-digit OTP");
+      dispatch({ type: 'auth/verifyOtp/rejected', payload: { message: 'Please enter a valid 6-digit OTP' } });
+      triggerErrorShake();
       return;
     }
-  
-    setLoading(true);
-    const { ok, data } = await verifyOtpApi(enteredOtp, email);
-    console.log("---data-->", data);
-    setLoading(false);
-  
-    if (ok) {
-      try {
-        await AsyncStorage.setItem('userToken', data.token);
-        await AsyncStorage.setItem('user', JSON.stringify(data.user));
+
+    dispatch(verifyOtp({ otp: enteredOtp, email })).then((result) => {
+      if (result.meta.requestStatus === 'fulfilled') {
         navigation.reset({
           index: 0,
           routes: [{ name: 'BottomTabs' }],
         });
-      } catch (err) {
-        console.log('Error storing token/user:', err);
+      } else {
+        triggerErrorShake();
       }
-    } else {
-      setError(data?.errors?.otp || "OTP verification failed");
-    }
+    });
+  };
+
+  const triggerErrorShake = () => {
+    Animated.sequence([
+      Animated.timing(errorShake, {
+        toValue: 10,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(errorShake, {
+        toValue: -10,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(errorShake, {
+        toValue: 10,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(errorShake, {
+        toValue: 0,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const toggleAutoFill = () => {
+    setIsAutoFillEnabled(prev => !prev);
+    dispatch(setOtp(['', '', '', '', '', '']));
+    dispatch(setOtpTimer(30));
+    inputRefs.current[0].focus();
   };
 
   return (
     <View style={styles.container}>
+      <LinearGradient
+        colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']}
+        style={styles.backgroundGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+
       <Header
         title={Strings.OTP_Verify}
         showLeftIcon={true}
-        leftIcon={img.back_Icon}
+        leftIcon="arrow-back"
         onLeftPress={() => navigation.goBack()}
+        transparent
+        style={styles.header}
       />
 
-      <View style={styles.verifyText}>
-        <Text style={styles.verifyString}>Verification</Text>
-        <Text style={styles.codeSend_String}>
-          We’ve sent you the verification{'\n'}code on {email || "your email"}
-        </Text>
-      </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoid}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 20}
+      >
+        <Animated.View 
+          style={[
+            styles.contentContainer,
+            {
+              opacity: fadeAnim,
+              transform: [
+                { translateY: slideUpAnim },
+                { scale: containerScale }
+              ],
+            }
+          ]}
+        >
+          <View style={styles.verifyText}>
+            <Text style={styles.verifyString}>Verify Your Identity</Text>
+            <Text style={styles.codeSend_String}>
+              A 6-digit code has been sent to{'\n'}
+              <Text style={styles.emailText}>{email || "your email"}</Text>
+            </Text>
+          </View>
 
-      <View style={styles.otpContainer}>
-        {otp.map((digit, index) => (
-          <TextInput
-            key={index}
-            ref={ref => (inputRefs.current[index] = ref)}
-            style={[styles.otpInput, digit ? styles.filledInput : null]}
-            maxLength={1}
-            keyboardType="number-pad"
-            value={digit}
-            onChangeText={text => handleChange(text, index)}
-          />
-        ))}
-      </View>
+          <Animated.View style={{ transform: [{ translateX: errorShake }] }}>
+            <View style={styles.otpContainer}>
+              {(reduxOtp || ['', '', '', '', '', '']).map((digit, index) => (
+                <Animated.View
+                  key={index}
+                  style={{ transform: [{ scale: inputScales[index] }] }}
+                >
+                  <TextInput
+                    ref={ref => (inputRefs.current[index] = ref)}
+                    style={[
+                      styles.otpInput, 
+                      digit ? styles.filledInput : null,
+                      errors.message ? styles.errorInput : null
+                    ]}
+                    maxLength={1}
+                    keyboardType="number-pad"
+                    value={digit}
+                    onChangeText={text => handleChange(text, index)}
+                    selectionColor="#7B61FF"
+                    autoFocus={index === 0}
+                    accessibilityLabel={`OTP digit ${index + 1}`}
+                  />
+                </Animated.View>
+              ))}
+            </View>
+          </Animated.View>
 
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {errors.message ? (
+            <Text style={styles.errorText}>{errors.message}</Text>
+          ) : (
+            <Text style={styles.instructionText}>Enter the code from your email</Text>
+          )}
 
-      <Button
-        title={loading ? <ActivityIndicator color="#fff" /> : Strings.continue}
-        onPress={handleVerifyOtp}
-        style={styles.button}
-        disabled={loading}
-      />
+          <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+            <Button
+              title={loading ? <ActivityIndicator color="#fff" /> : Strings.continue}
+              onPress={handleVerifyOtp}
+              style={styles.button}
+              textStyle={styles.buttonText}
+              gradientColors={['#7B61FF', '#AD4DFF']}
+              disabled={loading}
+            />
+          </Animated.View>
 
-      <View style={styles.resendContainer}>
-        {timer > 0 ? (
-          <Text style={styles.timerText}>
-            Re-send code in <Text style={styles.timerCount}>0:{timer.toString().padStart(2, '0')}</Text>
-          </Text>
-        ) : (
-          <TouchableOpacity onPress={handleResend}>
-            <Text style={styles.resendText}>Resend Code</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+          <View style={styles.resendContainer}>
+            {otpTimer > 0 ? (
+              <Text style={styles.timerText}>
+                Resend in <Text style={styles.timerCount}>0:{otpTimer.toString().padStart(2, '0')}</Text>
+              </Text>
+            ) : (
+              <TouchableOpacity onPress={handleResend}>
+                <LinearGradient
+                  colors={['#7B61FF', '#AD4DFF']}
+                  style={styles.resendButton}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <Text style={styles.resendText}>Resend Code</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={toggleAutoFill}>
+              <Text style={styles.toggleText}>
+                {isAutoFillEnabled ? 'Disable Autofill' : 'Enable Autofill'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </View>
   );
 };
 
-export default OTP;
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.White },
-  verifyText: { paddingHorizontal: 40, paddingVertical: 40 },
-  verifyString: { fontSize: 25, fontWeight: '600', lineHeight: 40, marginBottom: 10 },
-  codeSend_String: { fontSize: 16, lineHeight: 22, color: Colors.lightGray1 },
+  container: {
+    flex: 1,
+    backgroundColor: '#0A0A1E',
+  },
+  backgroundGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
+  header: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: scaleSize(16),
+    margin: scaleSize(16),
+    paddingVertical: scaleSize(12),
+    paddingHorizontal: scaleSize(16),
+    shadowColor: '#7B61FF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  keyboardAvoid: {
+    flex: 1,
+  },
+  contentContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: scaleSize(24),
+    paddingBottom: scaleSize(40),
+  },
+  verifyText: {
+    marginBottom: scaleSize(40),
+    paddingHorizontal: scaleSize(16),
+    alignItems: 'center',
+  },
+  verifyString: {
+    fontSize: scaleFont(20),
+    fontWeight: '800',
+    color: Colors.White,
+    marginBottom: scaleSize(12),
+    textShadowColor: 'rgba(123, 97, 255, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  codeSend_String: {
+    fontSize: scaleFont(15),
+    lineHeight: scaleFont(22),
+    color: '#C0C4D0',
+    textAlign: 'center',
+  },
+  emailText: {
+    color: '#7B61FF',
+    fontWeight: '600',
+  },
   otpContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginHorizontal: 30,
-    marginTop: 20,
+    marginHorizontal: scaleSize(10),
+    marginBottom: scaleSize(16),
   },
   otpInput: {
     borderWidth: 1,
-    borderColor: Colors.lightGray,
-    borderRadius: 10,
-    width: 45,
-    height: 55,
+    borderColor: 'rgba(123, 97, 255, 0.4)',
+    borderRadius: scaleSize(14),
+    width: scaleSize(45),
+    height: scaleSize(54),
     textAlign: 'center',
-    fontSize: 20,
-    color: Colors.lightGray1,
-    backgroundColor: Colors.White,
+    fontSize: scaleFont(16),
+    fontWeight: '600',
+    color: Colors.White,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#7B61FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
-  filledInput: { borderColor: "#ddf" },
+  filledInput: { 
+    fontSize:16,
+    borderColor: '#7B61FF',
+    backgroundColor: 'rgba(123, 97, 255, 0.1)',
+  },
+  errorInput: {
+    borderColor: '#FF6B6B',
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+  },
   button: {
-    backgroundColor: Colors.pink,
-    paddingVertical: 14,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 40,
-    marginTop: 50,
-    width: width * 0.8,
+    height: scaleSize(56),
+    borderRadius: scaleSize(14),
+    marginTop: scaleSize(32),
+    shadowColor: '#7B61FF',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
   },
-  resendContainer: { alignItems: 'center', marginTop: 20 },
-  timerText: { fontSize: 14, color: Colors.lightGray1 },
-  timerCount: { color: Colors.pink, fontWeight: '500' },
-  resendText: { fontSize: 14, color: Colors.pink, fontWeight: '500' },
+  buttonText: {
+    fontSize: scaleFont(18),
+    fontWeight: '700',
+    color: Colors.White,
+  },
+  resendContainer: {
+    alignItems: 'center',
+    marginTop: scaleSize(28),
+  },
+  resendButton: {
+    paddingVertical: scaleSize(10),
+    paddingHorizontal: scaleSize(20),
+    borderRadius: scaleSize(10),
+  },
+  timerText: {
+    fontSize: scaleFont(15),
+    color: '#C0C4D0',
+  },
+  timerCount: {
+    color: '#7B61FF',
+    fontWeight: '600',
+  },
+  resendText: {
+    fontSize: scaleFont(15),
+    color: Colors.White,
+    fontWeight: '600',
+  },
+  toggleText: {
+    fontSize: scaleFont(12),
+    color: '#7B61FF',
+    marginTop: scaleSize(12),
+  },
   errorText: {
-    color: 'red',
+    color: '#FF6B6B',
+    fontSize: scaleFont(14),
     textAlign: 'center',
-    fontSize: 13,
-    marginTop: 10,
-  }
+    marginTop: scaleSize(12),
+    marginBottom: scaleSize(12),
+  },
+  instructionText: {
+    color: '#C0C4D0',
+    fontSize: scaleFont(12),
+    textAlign: 'center',
+    marginTop: scaleSize(12),
+    marginBottom: scaleSize(12),
+  },
 });
+
+export default OTP;

@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,469 +11,568 @@ import {
   TouchableOpacity,
   ScrollView,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import AntDesign from 'react-native-vector-icons/AntDesign'
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {useFocusEffect} from '@react-navigation/native';
-import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
-import {useNavigation} from '@react-navigation/native';
+import AntDesign from 'react-native-vector-icons/AntDesign';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useFocusEffect } from '@react-navigation/native';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import { useNavigation } from '@react-navigation/native';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  fetchUser,
+  fetchUserProducts,
+  fetchUserReels,
+  fetchCart,
+  fetchWishlist,
+  updateProfile,
+  submitProduct,
+  deleteProduct,
+  removeFromCart,
+  removeFromWishlist,
+  logout,
+  setRefreshing,
+  clearMessages,
+} from '../redux/slices/profileSlice';
 import Colors from '../constants/Colors';
 import img from '../assets/Images/img';
 import Header from '../Components/Header';
 import CustomModal from '../Components/CustomModal';
 import Button from '../Components/Button';
-import Loader from '../Components/Loader';
 import ProductModal from '../Products/ProductModal';
-import {
-  editProfileApi,
-  createProductApi,
-  getAllProductsApi,
-  updateProductApi,
-  deleteProductApi,
-  getReelsApi,
-} from '../../apiClient';
 import Line from '../Components/Line';
 import Toast from 'react-native-toast-message';
+import Trace from '../utils/Trace';
+import LinearGradient from 'react-native-linear-gradient';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  FadeIn,
+} from 'react-native-reanimated';
 
-const {width, height} = Dimensions.get('window');
-const isTablet = width >= 768;
+const { width, height } = Dimensions.get('window');
 const scaleFactor = width / 375;
+const scale = (size) => size * scaleFactor;
+const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375));
+const isTablet = width >= 768;
+const numColumns = 3;
+const itemSpacing = scale(10);
+const itemWidth = (width - (itemSpacing * (numColumns + 1))) / numColumns;
 
-const log = (message, data = {}) => {
-  console.log(
-    JSON.stringify(
-      {timestamp: new Date().toISOString(), message, ...data},
-      null,
-      2,
-    ),
+// Skeleton Loader Component for Products
+const SkeletonProductItem = () => {
+  return (
+    <LinearGradient
+      colors={['#2A2A4A', '#1E1E3F']}
+      style={styles.productItem}
+    >
+      <View style={[styles.productImage, styles.skeletonImage]} />
+      <View style={styles.productInfo}>
+        <View style={[styles.skeletonText, { width: '80%', height: scale(16), marginBottom: scale(4) }]} />
+        <View style={[styles.skeletonText, { width: '40%', height: scale(14) }]} />
+      </View>
+    </LinearGradient>
   );
 };
 
-const Profile = () => {
+// Reusable Animated Item Component
+const AnimatedItem = ({ children, onPress, onPressIn, onPressOut, index, onLongPress }) => {
+  const scaleValue = useSharedValue(0.95);
+  const opacityValue = useSharedValue(0);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: withSpring(scaleValue.value) }],
+    opacity: opacityValue.value,
+  }));
+
+  useEffect(() => {
+    scaleValue.value = 1;
+    opacityValue.value = 1;
+  }, [scaleValue, opacityValue]);
+
+  return (
+    <Animated.View
+      entering={FadeIn.delay(index * 50)}
+      style={animatedStyle}
+    >
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={onPress}
+        onLongPress={onLongPress}
+        onPressIn={() => {
+          scaleValue.value = 0.95;
+          if (onPressIn) onPressIn();
+        }}
+        onPressOut={() => {
+          scaleValue.value = 1;
+          if (onPressOut) onPressOut();
+        }}
+      >
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+const Profile = ({ onScroll }) => {
   const navigation = useNavigation();
-  const [user, setUser] = useState(null);
-  const [userId, setUserId] = useState('');
-  const [modalVisible, setModalVisible] = useState(false);
+  const dispatch = useDispatch();
+  const {
+    user,
+    userId,
+    products,
+    reels,
+    cart,
+    wishlist,
+    loadingProducts,
+    successMessage,
+    errorMessage,
+    refreshing,
+  } = useSelector((state) => state.profile);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [productModalVisible, setProductModalVisible] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(false);
-  const [products, setProducts] = useState([]);
-  const [reels, setReels] = useState([]);
+  const [productOptionsModalVisible, setProductOptionsModalVisible] = useState(false);
   const [currentProduct, setCurrentProduct] = useState(null);
   const [fullName, setFullName] = useState('');
   const [userName, setUserName] = useState('');
   const [profileImage, setProfileImage] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
-  const [productOptionsVisible, setProductOptionsVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [activeTab, setActiveTab] = useState('products');
 
-  const getUser = async () => {
-    try {
-      log('Fetching User Data');
-      const storedUser = await AsyncStorage.getItem('user');
-      if (storedUser) {
-        const parsedUser = JSON.parse(storedUser);
-        log('User Data Fetched', {user: parsedUser});
-        setUser(parsedUser);
-        setUserId(parsedUser.id || '');
-        setFullName(parsedUser.fullName || '');
-        setUserName(parsedUser.userName || '');
-        setProfileImage(parsedUser.profileImage || null);
-      } else {
-        log('No User Data Found');
-        setErrorMessage('No user data found');
-        setTimeout(() => setErrorMessage(''), 3000);
-      }
-    } catch (err) {
-      log('Get User Error', {error: err.message});
-      setErrorMessage('Failed to load user data');
-      setTimeout(() => setErrorMessage(''), 3000);
+  // Handle Redux success and error messages with Toast
+  useEffect(() => {
+    if (successMessage) {
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: successMessage,
+        position: 'top',
+        topOffset: scale(20),
+        visibilityTime: 3000,
+        onHide: () => dispatch(clearMessages()),
+      });
     }
-  };
-
-  const fetchUserProducts = async () => {
-    try {
-      log('Fetching User Products', {userId});
-      setLoading(true);
-      const {ok, data} = await getAllProductsApi();
-      log('Products Response', {ok, data});
-      if (ok && data.products) {
-        const userProducts = data.products.filter(
-          product => product.createdBy === userId,
-        );
-        log('Filtered User Products', {count: userProducts.length});
-        setProducts(userProducts);
-      } else {
-        setErrorMessage(data.msg || 'Failed to fetch products');
-        setTimeout(() => setErrorMessage(''), 3000);
-      }
-    } catch (err) {
-      log('Fetch Products Error', {error: err.message});
-      setErrorMessage('Something went wrong');
-      setTimeout(() => setErrorMessage(''), 3000);
-    } finally {
-      setLoading(false);
+    if (errorMessage) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: errorMessage,
+        position: 'top',
+        topOffset: scale(20),
+        visibilityTime: 3000,
+        onHide: () => dispatch(clearMessages()),
+      });
     }
-  };
+  }, [successMessage, errorMessage, dispatch]);
 
-  const fetchUserReels = async () => {
-    try {
-      log('Fetching User Reels', {userId});
-      setLoading(true);
-      const {ok, data} = await getReelsApi();
-      log('Reels Response', {ok, data});
-      if (ok && Array.isArray(data.reels)) {
-        const userReels = data.reels.filter(reel => reel.user?._id === userId);
-        log('Filtered User Reels', {count: userReels.length});
-        setReels(userReels);
-      } else {
-        setErrorMessage(data.msg || 'Failed to fetch reels');
-        setTimeout(() => setErrorMessage(''), 3000);
-      }
-    } catch (err) {
-      log('Fetch Reels Error', {error: err.message});
-      setErrorMessage('Something went wrong');
-      setTimeout(() => setErrorMessage(''), 3000);
-    } finally {
-      setLoading(false);
+  // Define tabs based on user type
+  const getTabs = () => {
+    const tabs = [
+      { id: 'reels', icon: 'play-box', label: 'Reels' },
+      { id: 'cart', icon: 'cart', label: 'Cart' },
+      { id: 'wishlist', icon: 'heart', label: 'Wishlist' },
+    ];
+    if (user?.userType === 'seller') {
+      tabs.unshift({ id: 'products', icon: 'shopping', label: 'Products' });
     }
+    if (!tabs.some((tab) => tab.id === activeTab)) {
+      setActiveTab(tabs[0].id);
+    }
+    return tabs;
   };
 
-  const onRefresh = async () => {
-    log('Refreshing Data');
-    await Promise.all([fetchUserProducts(), fetchUserReels()]);
-  };
+  const tabs = getTabs();
 
+  // Sync local inputs with Redux state
+  useEffect(() => {
+    if (user) {
+      setFullName(user.fullName || '');
+      setUserName(user.userName || '');
+      setProfileImage(user.profileImage || null);
+    }
+  }, [user]);
+
+  // Fetch data on focus
   useFocusEffect(
     useCallback(() => {
-      getUser();
-    }, []),
+      dispatch(fetchUser()).then((result) => {
+        if (result.meta.requestStatus === 'fulfilled' && userId) {
+          dispatch(fetchUserReels(userId));
+          dispatch(fetchCart());
+          dispatch(fetchWishlist());
+          if (user?.userType === 'seller') {
+            dispatch(fetchUserProducts(userId));
+          }
+        }
+      });
+    }, [dispatch, userId, user?.userType])
   );
 
+  // Fetch data when userId changes
   useEffect(() => {
     if (userId) {
-      fetchUserProducts();
-      fetchUserReels();
+      dispatch(fetchUserReels(userId));
+      dispatch(fetchCart());
+      dispatch(fetchWishlist());
+      if (user?.userType === 'seller') {
+        dispatch(fetchUserProducts(userId));
+      }
     }
-  }, [userId]);
+  }, [dispatch, userId, user?.userType]);
 
-  const handleLogout = async () => {
-    try {
-      log('Logging Out');
-      await AsyncStorage.removeItem('user');
-      await AsyncStorage.removeItem('userToken');
-      setModalVisible(false);
-      setSidebarVisible(false);
-      navigation.reset({index: 0, routes: [{name: 'Login'}]});
-    } catch (err) {
-      log('Logout Error', {error: err.message});
-      Toast.show({type: 'error', text1: 'Failed to logout'});
+  // Handle pull-to-refresh
+  const onRefresh = useCallback(() => {
+    dispatch(setRefreshing(true));
+    Trace('Refreshing Data');
+    const fetchPromises = [
+      dispatch(fetchUserReels(userId)),
+      dispatch(fetchCart()),
+      dispatch(fetchWishlist()),
+    ];
+    if (user?.userType === 'seller') {
+      fetchPromises.push(dispatch(fetchUserProducts(userId)));
     }
+    Promise.all(fetchPromises).finally(() => {
+      dispatch(setRefreshing(false));
+    });
+  }, [dispatch, userId, user?.userType]);
+
+  // Handle logout
+  const handleLogout = () => {
+    dispatch(logout()).then((result) => {
+      if (result.meta.requestStatus === 'fulfilled') {
+        setSidebarVisible(false);
+        navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+      }
+    });
   };
 
-  const handleUpdateProfile = async () => {
-    try {
-      log('Updating Profile', {fullName, userName});
-      setLoading(true);
-      setEditModalVisible(false);
-      setSidebarVisible(false);
-      setErrorMessage('');
-      setSuccessMessage('');
-
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) {
-        log('No Token Found');
-        setLoading(false);
-        setErrorMessage('No token found');
-        setTimeout(() => setErrorMessage(''), 3000);
-        return;
-      }
-
-      const {ok, data} = await editProfileApi(token, fullName, userName);
-      log('Edit Profile Response', {ok, data});
-      setLoading(false);
-
-      if (ok) {
-        const updatedUser = {...user, fullName, userName};
-        await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
-        setUser(updatedUser);
-        setSuccessMessage(data?.msg || 'Profile updated successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setErrorMessage(data?.msg || data?.errors?.userName || 'Update failed');
-        setTimeout(() => setErrorMessage(''), 3000);
-      }
-    } catch (err) {
-      log('Update Profile Error', {error: err.message});
-      setLoading(false);
-      setErrorMessage('Something went wrong');
-      setTimeout(() => setErrorMessage(''), 3000);
-    }
+  const confirmLogout = () => {
+    setSidebarVisible(false);
+    Trace('Logout Confirmation Toast Shown');
+    Toast.show({
+      type: 'info',
+      text1: 'Are you sure?',
+      text2: 'Tap to confirm logout',
+      onPress: handleLogout,
+      position: 'top',
+      topOffset: scale(20),
+      visibilityTime: 5000,
+    });
   };
 
+  // Handle profile update
+  const handleUpdateProfile = () => {
+    dispatch(updateProfile({ fullName, userName }));
+    setEditModalVisible(false);
+    setSidebarVisible(false);
+  };
+
+  // Handle image selection
   const openCamera = () => {
-    launchCamera({mediaType: 'photo'}, async response => {
+    launchCamera({ mediaType: 'photo' }, async (response) => {
       try {
-        log('Camera Response', {response});
+        Trace('Camera Response', { response });
         if (!response.didCancel && response.assets?.length) {
           const uri = response.assets[0].uri;
-          log('Profile Image Selected', {uri});
+          Trace('Profile Image Selected', { uri });
           setProfileImage(uri);
           setImageModalVisible(false);
         }
       } catch (err) {
-        log('Camera Error', {error: err.message});
-        Toast.show({type: 'error', text1: 'Failed to capture image'});
+        Trace('Camera Error', { error: err.message });
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Failed to capture image',
+          position: 'top',
+          topOffset: scale(20),
+        });
       }
     });
   };
 
   const openGallery = () => {
-    launchImageLibrary({mediaType: 'photo'}, async response => {
+    launchImageLibrary({ mediaType: 'photo' }, async (response) => {
       try {
-        log('Gallery Response', {response});
+        Trace('Gallery Response', { response });
         if (!response.didCancel && response.assets?.length) {
           const uri = response.assets[0].uri;
-          log('Profile Image Selected', {uri});
+          Trace('Profile Image Selected', { uri });
           setProfileImage(uri);
           setImageModalVisible(false);
         }
       } catch (err) {
-        log('Gallery Error', {error: err.message});
-        Toast.show({type: 'error', text1: 'Failed to select image'});
+        Trace('Gallery Error', { error: err.message });
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Failed to select image',
+          position: 'top',
+          topOffset: scale(20),
+        });
       }
     });
   };
 
-  const handleSubmitProduct = async productData => {
-    try {
-      log('Submitting Product', {productData, currentProduct});
-      setLoading(true);
-      setProductModalVisible(false);
-      setErrorMessage('');
-      setSuccessMessage('');
-
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) {
-        log('No Token Found');
-        setLoading(false);
-        setErrorMessage('No token found');
-        setTimeout(() => setErrorMessage(''), 3000);
-        return;
+  // Handle product submission
+  const handleSubmitProduct = (productData) => {
+    dispatch(submitProduct({ productData, currentProduct })).then(() => {
+      if (user?.userType === 'seller') {
+        dispatch(fetchUserProducts(userId));
       }
-
-      const productPayload = {...productData, createdBy: userId};
-      const {ok, data} = currentProduct
-        ? await updateProductApi(token, currentProduct.id, productPayload)
-        : await createProductApi(token, productPayload);
-      log('Product Submit Response', {ok, data});
-      setLoading(false);
-
-      if (ok) {
-        setSuccessMessage(
-          data?.msg ||
-            (currentProduct
-              ? 'Product updated successfully'
-              : 'Product added successfully'),
-        );
-        setTimeout(() => setSuccessMessage(''), 3000);
-        await fetchUserProducts();
-      } else {
-        setErrorMessage(data?.msg || 'Failed to manage product');
-        setTimeout(() => setErrorMessage(''), 3000);
-      }
-    } catch (err) {
-      log('Submit Product Error', {error: err.message});
-      setLoading(false);
-      setErrorMessage('Something went wrong');
-      setTimeout(() => setErrorMessage(''), 3000);
-    }
+    });
+    setProductModalVisible(false);
   };
 
-  const handleEditProduct = product => {
+  // Handle product edit
+  const handleEditProduct = (product) => {
     try {
-      log('Editing Product', {product});
+      Trace('Editing Product', { product });
       setCurrentProduct(product);
       setProductModalVisible(true);
+      setProductOptionsModalVisible(false);
     } catch (err) {
-      log('Edit Product Error', {error: err.message});
-      Toast.show({type: 'error', text1: 'Failed to open edit modal'});
+      Trace('Edit Product Error', { error: err.message });
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to open edit modal',
+        position: 'top',
+        topOffset: scale(20),
+      });
     }
   };
 
-  const handleDeleteProduct = async productId => {
-    try {
-      log('Deleting Product', {productId});
-      setLoading(true);
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) {
-        log('No Token Found');
-        setLoading(false);
-        setErrorMessage('No token found');
-        setTimeout(() => setErrorMessage(''), 3000);
-        return;
-      }
-
-      const {ok, data} = await deleteProductApi(token, productId);
-      log('Delete Product Response', {ok, data});
-      setLoading(false);
-
-      if (ok) {
-        setSuccessMessage(data?.msg || 'Product deleted successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-        await fetchUserProducts();
-        setProductOptionsVisible(false);
-      } else {
-        setErrorMessage(data?.msg || 'Failed to delete product');
-        setTimeout(() => setErrorMessage(''), 3000);
-      }
-    } catch (err) {
-      log('Delete Product Error', {error: err.message});
-      setLoading(false);
-      setErrorMessage('Something went wrong');
-      setTimeout(() => setErrorMessage(''), 3000);
-    }
+  // Handle product deletion
+  const handleDeleteProduct = (productId) => {
+    dispatch(deleteProduct(productId));
+    setProductOptionsModalVisible(false);
   };
 
-  const renderProductItem = ({item}) => {
-    const updatedAt = item.updatedAt
-      ? new Date(item.updatedAt).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        })
-      : 'No date available';
+  // Show product options
+  const showProductOptions = (product) => {
+    setSelectedProduct(product);
+    Trace('Product Options Modal Shown', { productId: product?.id });
+    setProductOptionsModalVisible(true);
+  };
 
+  // Handle remove from cart
+  const handleRemoveFromCart = (productId) => {
+    dispatch(removeFromCart(productId));
+  };
+
+  // Handle remove from wishlist
+  const handleRemoveFromWishlist = (productId) => {
+    dispatch(removeFromWishlist(productId));
+  };
+
+  // Render product item
+  const renderProductItem = ({ item, index }) => {
     return (
-      <TouchableOpacity
-        style={styles.productItem}
+      <AnimatedItem
+        index={index}
         onPress={() =>
-          navigation.navigate('ProductDetail', {productId: item.id})
+          navigation.navigate('ProductDetail', { productId: item.id })
         }
         onLongPress={() => {
-          log('Product Long Press', {productId: item.id});
-          setSelectedProduct(item);
-          setProductOptionsVisible(true);
-        }}>
-        <Image
-          source={{
-            uri: item.media[0]?.url || 'https://via.placeholder.com/120',
-          }}
-          style={styles.productImage}
-          resizeMode="contain"
-          onError={error =>
-            log('Product Image Error', {error: error.nativeEvent})
-          }
-        />
-        <View style={styles.productOverlay}>
-          <Text
-            style={styles.productTitle}
-            numberOfLines={2}
-            ellipsizeMode="tail">
-            {item.name}
-          </Text>
-          <Line />
-          <Text
-            style={styles.productTitle}
-            numberOfLines={1}
-            ellipsizeMode="tail">
-            ₹{item.price}
-          </Text>
-          <Line />
-          <Text
-            style={styles.productDate}
-            numberOfLines={1}
-            ellipsizeMode="tail">
-            {updatedAt}
-          </Text>
-        </View>
-      </TouchableOpacity>
+          Trace('Product Long Press', { productId: item.id });
+          showProductOptions(item);
+        }}
+      >
+        <LinearGradient
+          colors={['#2A2A4A', '#1E1E3F']}
+          style={styles.productItem}
+        >
+          <Image
+            source={{
+              uri: item.media[0]?.url || 'https://via.placeholder.com/120',
+            }}
+            style={styles.productImage}
+            resizeMode="contain"
+            onError={(error) =>
+              Trace('Product Image Error', { error: error.nativeEvent })
+            }
+          />
+          <View style={styles.productInfo}>
+            <Text style={styles.productTitle} numberOfLines={2}>
+              {item.name}
+            </Text>
+            <Text style={styles.productPrice}>₹{item.price}</Text>
+          </View>
+        </LinearGradient>
+      </AnimatedItem>
     );
   };
 
-  const renderReelItem = ({item}) => {
-    const updatedAt = item.updatedAt
-      ? new Date(item.updatedAt).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        })
-      : 'No date available';
-
+  // Render skeleton loader
+  const renderSkeletonLoader = () => {
+    const skeletonItems = Array(6).fill({});
     return (
-      <TouchableOpacity
-        style={styles.productItem}
+      <FlatList
+        key="skeleton-list"
+        data={skeletonItems}
+        renderItem={() => <SkeletonProductItem />}
+        keyExtractor={(item, index) => `skeleton-${index}`}
+        numColumns={numColumns}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.collectionsList}
+      />
+    );
+  };
+
+  // Render reel item
+  const renderReelItem = ({ item, index }) => {
+    return (
+      <AnimatedItem
+        index={index}
         onPress={() => {
-          log('Reel Clicked', {reelId: item._id});
-          navigation.navigate('ReelView', {reel: item});
-        }}>
-        <Image
-          source={{uri: item.thumbnail || 'https://via.placeholder.com/120'}}
-          style={styles.productImage}
-          resizeMode="contain"
-          onError={error =>
-            log('Reel Thumbnail Error', {error: error.nativeEvent})
-          }
-        />
-        <View style={styles.productOverlay}>
-          <Text
-            style={styles.productTitle}
-            numberOfLines={2}
-            ellipsizeMode="tail">
-            {item.caption || 'No caption'}
-          </Text>
-          <Line />
-          <Text
-            style={styles.productDate}
-            numberOfLines={1}
-            ellipsizeMode="tail">
-            {updatedAt}
-          </Text>
-        </View>
-      </TouchableOpacity>
+          Trace('Reel Clicked', { reelId: item._id });
+          navigation.navigate('ReelView', { reel: item });
+        }}
+      >
+        <LinearGradient
+          colors={['#2A2A4A', '#1E1E3F']}
+          style={[styles.productItem, styles.reelItem]}
+        >
+          <Image
+            source={{ uri: item.thumbnail || 'https://via.placeholder.com/120' }}
+            style={styles.productImage}
+            resizeMode="cover"
+            onError={(error) =>
+              Trace('Reel Thumbnail Error', { error: error.nativeEvent })
+            }
+          />
+          <LinearGradient
+            colors={['rgba(0, 0, 0, 0.2)', 'rgba(0, 0, 0, 0.5)']}
+            style={styles.imageOverlay}
+          />
+          <View style={styles.playIcon}>
+            <MaterialCommunityIcons name="play" size={scale(24)} color="#FFFFFF" />
+          </View>
+          <View style={styles.productInfo}>
+            <Text style={styles.productTitle} numberOfLines={2}>
+              {item.caption || 'No caption'}
+            </Text>
+          </View>
+        </LinearGradient>
+      </AnimatedItem>
+    );
+  };
+
+  // Render cart item
+  const renderCartItem = ({ item, index }) => {
+    return (
+      <AnimatedItem
+        index={index}
+        onPress={() =>
+          navigation.navigate('ProductDetail', { productId: item._id })
+        }
+      >
+        <LinearGradient
+          colors={['#2A2A4A', '#1E1E3F']}
+          style={styles.productItem}
+        >
+          <Image
+            source={{ uri: item.media[0]?.url || 'https://via.placeholder.com/120' }}
+            style={styles.productImage}
+            resizeMode="contain"
+          />
+          <View style={styles.productInfo}>
+            <Text style={styles.productTitle} numberOfLines={2}>
+              {item.name}
+            </Text>
+            <Text style={styles.productPrice}>₹{item.price}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.closeIconContainer}
+            onPress={() => handleRemoveFromCart(item._id)}
+          >
+            <AntDesign name="close" size={scale(16)} color="#EF4444" />
+          </TouchableOpacity>
+        </LinearGradient>
+      </AnimatedItem>
+    );
+  };
+
+  // Render wishlist item
+  const renderWishlistItem = ({ item, index }) => {
+    return (
+      <AnimatedItem
+        index={index}
+        onPress={() =>
+          navigation.navigate('ProductDetail', { productId: item._id })
+        }
+      >
+        <LinearGradient
+          colors={['#2A2A4A', '#1E1E3F']}
+          style={styles.productItem}
+        >
+          <Image
+            source={{ uri: item.media[0]?.url || 'https://via.placeholder.com/120' }}
+            style={styles.productImage}
+            resizeMode="contain"
+          />
+          <View style={styles.productInfo}>
+            <Text style={styles.productTitle} numberOfLines={2}>
+              {item.name}
+            </Text>
+            <Text style={styles.productPrice}>₹{item.price}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.closeIconContainer}
+            onPress={() => handleRemoveFromWishlist(item._id)}
+          >
+            <AntDesign name="close" size={scale(16)} color="#EF4444" />
+          </TouchableOpacity>
+        </LinearGradient>
+      </AnimatedItem>
     );
   };
 
   return (
-    <View style={styles.container}>
-      {/* <Header
-        title=""
-        onLeftPress={() => navigation.goBack()}
-        rightIcon1={img.App}
-        onRightPress1={() => navigation.navigate('Message')}
-        showRightIcon1
-        rightIcon2={img.drawer}
-        onRightPress2={() => setSidebarVisible(true)}
-        showRightIcon2
-      /> */}
-
+    <LinearGradient
+      colors={['#0A0A1E', '#1E1E3F']}
+      style={styles.container}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
       <ScrollView
+        onScroll={onScroll}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={false} onRefresh={onRefresh} />
-        }>
-        <View style={styles.profileCard}>
-          <TouchableOpacity style={{alignSelf:"flex-end",paddingHorizontal:20}} onPress={()=>setSidebarVisible(true)}>
-            <Icon
-              name="settings"
-              size={24}
-              // color={selectedCategory === item.id ? '#10B981' : '#6B7280'}
-            />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#A855F7']}
+            tintColor="#A855F7"
+          />
+        }
+      >
+        <LinearGradient
+          colors={['#1A1A3A', '#2A2A5A']}
+          style={styles.profileCard}
+        >
+          <TouchableOpacity
+            style={{ alignSelf: 'flex-end', paddingHorizontal: scale(20) }}
+            onPress={() => setSidebarVisible(true)}
+          >
+            <Icon name="settings" size={scale(24)} color="#FFFFFF" />
           </TouchableOpacity>
           <Pressable
             onPress={() => setImageModalVisible(true)}
-            style={styles.profileImageContainer}>
+            style={styles.profileImageContainer}
+          >
             <Image
-              source={profileImage ? {uri: profileImage} : img.user}
+              source={profileImage ? { uri: profileImage } : img.user}
               style={styles.profileImage}
               resizeMode="cover"
-              onError={error =>
-                log('Profile Image Error', {error: error.nativeEvent})
+              onError={(error) =>
+                Trace('Profile Image Error', { error: error.nativeEvent })
               }
             />
             <View style={styles.editIcon}>
@@ -485,609 +584,640 @@ const Profile = () => {
             Username: {user?.userName || 'N/A'} {'\n'} Email:{' '}
             {user?.email || 'N/A'} {'\n'} Phone: {user?.phoneNumber || 'N/A'}
           </Text>
-        </View>
+          <View style={styles.statsRow}>
+            {user?.userType === 'seller' && (
+              <View style={styles.stat}>
+                <Text style={styles.statValue}>{products.length}</Text>
+                <Text style={styles.statLabel}>Products</Text>
+              </View>
+            )}
+            <View style={styles.stat}>
+              <Text style={styles.statValue}>{reels.length}</Text>
+              <Text style={styles.statLabel}>Reels</Text>
+            </View>
+          </View>
+        </LinearGradient>
 
         <View style={styles.collectionsSection}>
-          <View style={styles.tabsContainer}>
-            <Button
-             icon={
-              <AntDesign
-                name="appstore1"
-                size={20}
-                color={activeTab === 'products' ? Colors.pink : '#6B7280'}
-              />
-            }
-              
-              onPress={() => {
-                setActiveTab('products');
-              }}
-              style={[
-                styles.tabButton,
-                activeTab === 'products' && styles.activeTabButton,
-              ]}
-              textStyle={[
-                styles.tabButtonText,
-                activeTab === 'products' && styles.activeTabButtonText,
-              ]}
-            />
-            <Button
-              title=""
-              icon={
-                <AntDesign
-                  name="playcircleo"
-                  size={20}
-                  color={activeTab === 'reels' ? Colors.pink : '#6B7280'}
-                />
-              }
-              onPress={() => {
-                log('Reels Button Clicked');
-                setActiveTab('reels');
-              }}
-              style={[
-                styles.tabButton,
-                activeTab === 'reels' && styles.activeTabButton,
-              ]}
-              textStyle={[
-                styles.tabButtonText,
-                activeTab === 'reels' && styles.activeTabButtonText,
-              ]}
-            />
-            <Button
-               icon={
-                <AntDesign
-                  name="shoppingcart"
-                  size={20}
-                  color={activeTab === 'cart' ? Colors.pink : '#6B7280'}
-                />
-              }
-              onPress={() => {
-                log('Cart Button Clicked');
-                setActiveTab('cart');
-              }}
-              style={[
-                styles.tabButton,
-                activeTab === 'cart' && styles.activeTabButton,
-              ]}
-              textStyle={[
-                styles.tabButtonText,
-                activeTab === 'cart' && styles.activeTabButtonText,
-              ]}
-            />
-            <Button
-               icon={
-                <AntDesign
-                  name="hearto"
-                  size={20}
-                  color={activeTab === 'wishlist' ? Colors.pink : '#6B7280'}
-                />
-              }
-              onPress={() => {
-                log('Wishlist Button Clicked');
-                setActiveTab('wishlist');
-              }}
-              style={[
-                styles.tabButton,
-                activeTab === 'wishlist' && styles.activeTabButton,
-              ]}
-              textStyle={[
-                styles.tabButtonText,
-                activeTab === 'wishlist' && styles.activeTabButtonText,
-              ]}
-            />
-          </View>
+          <LinearGradient
+            colors={['#2A2A5A', '#3A3A7A']}
+            style={styles.tabsContainer}
+          >
+            <View style={styles.tabBar}>
+              {tabs.map((tab) => (
+                <TouchableOpacity
+                  key={tab.id}
+                  style={[styles.tab, activeTab === tab.id && styles.activeTab]}
+                  onPress={() => {
+                    Trace(`${tab.label} Button Clicked`);
+                    setActiveTab(tab.id);
+                  }}
+                >
+                  <MaterialCommunityIcons
+                    name={tab.icon}
+                    size={scale(20)}
+                    color={activeTab === tab.id ? '#A855F7' : '#B0B0D0'}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </LinearGradient>
 
-          {activeTab === 'reels' ? (
+          <Line
+            style={{
+              borderColor: '#B0B0D0',
+              marginBottom: scale(10),
+              width: '90%',
+              alignSelf: 'center',
+            }}
+          />
+
+          {activeTab === 'products' && user?.userType === 'seller' ? (
+            loadingProducts ? (
+              renderSkeletonLoader()
+            ) : products.length > 0 ? (
+              <>
+                <TouchableOpacity
+                  onPress={() => {
+                    Trace('Add Product Clicked');
+                    setCurrentProduct(null);
+                    setProductModalVisible(true);
+                  }}
+                  style={{
+                    paddingHorizontal: scale(20),
+                    marginBottom: scale(10),
+                  }}
+                >
+                  <AntDesign name="plussquare" size={scale(20)} color="#A855F7" />
+                </TouchableOpacity>
+                <FlatList
+                  key="products-list"
+                  data={products}
+                  renderItem={renderProductItem}
+                  keyExtractor={(item) =>
+                    item.id?.toString() || Math.random().toString()
+                  }
+                  numColumns={numColumns}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={styles.collectionsList}
+                />
+              </>
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <Image source={img.post} style={styles.emptyStateIcon} />
+                <Text style={styles.emptyStateTitle}>
+                  Create your first product
+                </Text>
+                <TouchableOpacity
+                  style={styles.uploadButton}
+                  onPress={() => {
+                    Trace('Add Product Clicked');
+                    setCurrentProduct(null);
+                    setProductModalVisible(true);
+                  }}
+                >
+                  <LinearGradient
+                    colors={['#A855F7', '#7B61FF']}
+                    style={styles.uploadButtonGradient}
+                  >
+                    <Text style={styles.uploadButtonText}>Add Product</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            )
+          ) : activeTab === 'reels' ? (
             reels.length > 0 ? (
-              <FlatList
-                data={reels}
-                renderItem={renderReelItem}
-                keyExtractor={item => item._id}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.collectionsListVertical}
-              />
+              <>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('UploadReel')}
+                  style={{
+                    paddingHorizontal: scale(20),
+                    marginBottom: scale(10),
+                  }}
+                >
+                  <AntDesign name="plussquare" size={scale(20)} color="#A855F7" />
+                </TouchableOpacity>
+                <FlatList
+                  key="reels-list"
+                  data={reels}
+                  renderItem={renderReelItem}
+                  keyExtractor={(item) => item._id}
+                  numColumns={numColumns}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={styles.collectionsList}
+                />
+              </>
             ) : (
               <View style={styles.emptyStateContainer}>
                 <Image source={img.camera} style={styles.emptyStateIcon} />
                 <Text style={styles.emptyStateTitle}>
                   Capture the moment with a friend
                 </Text>
-                <Button
-                  title="Upload Reel"
+                <TouchableOpacity
+                  style={styles.uploadButton}
                   onPress={() => {
-                    log('Upload Reel Clicked');
+                    Trace('Upload Reel Clicked');
                     navigation.navigate('UploadReel');
                   }}
-                  style={styles.uploadButton}
-                  textStyle={styles.uploadButtonText}
-                />
+                >
+                  <LinearGradient
+                    colors={['#A855F7', '#7B61FF']}
+                    style={styles.uploadButtonGradient}
+                  >
+                    <Text style={styles.uploadButtonText}>Upload Reel</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
               </View>
             )
-          ) : activeTab === 'products' ? (
-            products.length > 0 ? (
+          ) : activeTab === 'cart' ? (
+            cart.length > 0 ? (
               <FlatList
-                data={products}
-                renderItem={renderProductItem}
-                keyExtractor={item =>
-                  item.id?.toString() || Math.random().toString()
-                }
+                key="cart-list"
+                data={cart}
+                renderItem={renderCartItem}
+                keyExtractor={(item) => item._id}
+                numColumns={numColumns}
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.collectionsListVertical}
+                contentContainerStyle={styles.collectionsList}
               />
             ) : (
               <View style={styles.emptyStateContainer}>
                 <Image source={img.post} style={styles.emptyStateIcon} />
-                <Text style={styles.emptyStateTitle}>
-                  Create your first post
-                </Text>
-                <Button
-                  title="Add Product"
-                  onPress={() => {
-                    log('Add Product Clicked');
-                    setCurrentProduct(null);
-                    setProductModalVisible(true);
-                  }}
-                  style={styles.uploadButton}
-                  textStyle={styles.uploadButtonText}
-                />
+                <Text style={styles.emptyStateTitle}>Your cart is empty</Text>
               </View>
             )
-          ) : activeTab === 'cart' ? (
-            <View style={styles.emptyStateContainer}>
-              <Image source={img.post} style={styles.emptyStateIcon} />
-              <Text style={styles.emptyStateTitle}>Your cart is empty</Text>
-            </View>
           ) : (
-            <View style={styles.emptyStateContainer}>
-              <Image source={img.post} style={styles.emptyStateIcon} />
-              <Text style={styles.emptyStateTitle}>Your wishlist is empty</Text>
-            </View>
+            wishlist.length > 0 ? (
+              <FlatList
+                key="wishlist-list"
+                data={wishlist}
+                renderItem={renderWishlistItem}
+                keyExtractor={(item) => item._id}
+                numColumns={numColumns}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.collectionsList}
+              />
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <Image source={img.post} style={styles.emptyStateIcon} />
+                <Text style={styles.emptyStateTitle}>Your wishlist is empty</Text>
+              </View>
+            )
           )}
         </View>
       </ScrollView>
 
-      <CustomModal
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-        title="Are you sure you want to logout?"
-        buttons={[
-          {
-            text: 'Cancel',
-            onPress: () => setModalVisible(false),
-            style: styles.modalButtonCancel,
-          },
-          {
-            text: 'Logout',
-            onPress: handleLogout,
-            style: styles.modalButtonLogout,
-            textStyle: styles.modalButtonText,
-          },
-        ]}
-      />
-
-      <CustomModal
-        visible={editModalVisible}
-        onRequestClose={() => setEditModalVisible(false)}
-        title="Edit Profile"
-        overlayStyle={styles.modalOverlay}
-        containerStyle={styles.editModalContainer}
-        buttons={[
-          {
-            text: 'Cancel',
-            onPress: () => setEditModalVisible(false),
-            style: styles.modalButtonCancel,
-          },
-          {
-            text: 'Save',
-            onPress: handleUpdateProfile,
-            style: styles.modalButtonSave,
-            textStyle: styles.modalButtonText,
-          },
-        ]}>
-        <TextInput
-          style={styles.input}
-          placeholder="Full Name"
-          placeholderTextColor="#6B7280"
-          value={fullName}
-          onChangeText={setFullName}
-        />
-        <TextInput
-          style={[styles.input, {marginTop: 15 * scaleFactor}]}
-          placeholder="Username"
-          placeholderTextColor="#6B7280"
-          autoCapitalize="none"
-          value={userName}
-          onChangeText={setUserName}
-        />
-      </CustomModal>
-
-      <CustomModal
-        visible={imageModalVisible}
-        onRequestClose={() => setImageModalVisible(false)}
-        title="Update Profile Picture"
-        overlayStyle={styles.modalOverlay}
-        containerStyle={styles.editModalContainer}
-        buttons={[
-          {
-            text: 'Choose from Gallery',
-            onPress: openGallery,
-            style: styles.modalButton,
-          },
-          {text: 'Open Camera', onPress: openCamera, style: styles.modalButton},
-          {
-            text: 'Cancel',
-            onPress: () => setImageModalVisible(false),
-            style: styles.modalButtonCancel,
-          },
-        ]}
-      />
-
-      <ProductModal
-        visible={productModalVisible}
-        onClose={() => setProductModalVisible(false)}
-        onSubmit={handleSubmitProduct}
-        product={currentProduct}
-      />
-
-      {sidebarVisible && (
-        <Pressable
-          style={styles.sidebarOverlay}
-          onPress={() => setSidebarVisible(false)}>
-          <View style={styles.sidebar}>
-            <TouchableOpacity
-              style={styles.sidebarItem}
-              onPress={() => {
-                log('Edit Profile Clicked');
-                setEditModalVisible(true);
-                setSidebarVisible(false);
-              }}>
-              <Text style={styles.sidebarText}>Edit Profile</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.sidebarItem}
-              onPress={() => {
-                log('Logout Clicked');
-                setModalVisible(true);
-                setSidebarVisible(false);
-              }}>
-              <Text style={styles.sidebarText}>Logout</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.sidebarItem}
-              onPress={() => {
-                log('Settings Clicked');
-                Toast.show({type: 'info', text1: 'Settings coming soon'});
-                setSidebarVisible(false);
-              }}>
-              <Text style={styles.sidebarText}>Settings</Text>
-            </TouchableOpacity>
-          </View>
-        </Pressable>
-      )}
-
-      <CustomModal
-        visible={productOptionsVisible}
-        onRequestClose={() => setProductOptionsVisible(false)}
-        title="Product Options"
-        overlayStyle={styles.modalOverlay}
-        containerStyle={styles.editModalContainer}
-        buttons={[
-          {
-            text: 'Edit',
-            onPress: () => {
-              log('Edit Product Option Clicked', {
-                productId: selectedProduct?.id,
-              });
-              handleEditProduct(selectedProduct);
-              setProductOptionsVisible(false);
+      <View style={styles.modalContainer}>
+        <CustomModal
+          containerStyle={{ alignSelf: 'center' }}
+          visible={editModalVisible}
+          onRequestClose={() => setEditModalVisible(false)}
+          title="Edit Profile"
+          buttons={[
+            {
+              text: 'Cancel',
+              onPress: () => setEditModalVisible(false),
+              style: styles.modalButtonCancel,
             },
-            style: styles.modalButton,
-          },
-          {
-            text: 'Delete',
-            onPress: () => {
-              log('Delete Product Option Clicked', {
-                productId: selectedProduct?.id,
-              });
-              handleDeleteProduct(selectedProduct?.id);
+            {
+              text: 'Save',
+              onPress: handleUpdateProfile,
+              style: styles.modalButtonSave,
+              textStyle: styles.modalButtonText,
             },
-            style: styles.modalButtonLogout,
-          },
-          {
-            text: 'Cancel',
-            onPress: () => setProductOptionsVisible(false),
-            style: styles.modalButtonCancel,
-          },
-        ]}
-      />
+          ]}
+        >
+          <TextInput
+            style={styles.input}
+            placeholder="Full Name"
+            placeholderTextColor="#B0B0D0"
+            value={fullName}
+            onChangeText={setFullName}
+          />
+          <TextInput
+            style={[styles.input, { marginTop: scale(15) }]}
+            placeholder="Username"
+            placeholderTextColor="#B0B0D0"
+            autoCapitalize="none"
+            value={userName}
+            onChangeText={setUserName}
+          />
+        </CustomModal>
 
-      {successMessage && (
-        <View style={styles.toastContainerSuccess}>
-          <Text style={styles.toastTextSuccess}>{successMessage}</Text>
-        </View>
-      )}
-      {errorMessage && (
-        <View style={styles.toastContainerError}>
-          <Text style={styles.toastTextError}>{errorMessage}</Text>
-        </View>
-      )}
+        <CustomModal
+          visible={imageModalVisible}
+          containerStyle={{ alignSelf: 'center' }}
+          onRequestClose={() => setImageModalVisible(false)}
+          title="Update Profile Picture"
+          buttons={[
+            {
+              text: 'Choose from Gallery',
+              onPress: openGallery,
+              style: styles.modalButton,
+            },
+            {
+              text: 'Open Camera',
+              onPress: openCamera,
+              style: styles.modalButton,
+            },
+            {
+              text: 'Cancel',
+              onPress: () => setImageModalVisible(false),
+              style: styles.modalButtonCancel,
+            },
+          ]}
+        />
 
-      <Loader visible={loading} />
-    </View>
+        {user?.userType === 'seller' && (
+          <>
+            <ProductModal
+              visible={productModalVisible}
+              onClose={() => setProductModalVisible(false)}
+              onSubmit={handleSubmitProduct}
+              product={currentProduct}
+            />
+            <CustomModal
+              visible={productOptionsModalVisible}
+              containerStyle={{ alignSelf: 'center' }}
+              onRequestClose={() => setProductOptionsModalVisible(false)}
+              title="Product Options"
+              buttons={[
+                {
+                  text: 'Edit',
+                  onPress: () => handleEditProduct(selectedProduct),
+                  style: styles.modalButton,
+                  textStyle: { fontSize: 13 },
+                },
+                {
+                  text: 'Delete',
+                  onPress: () => handleDeleteProduct(selectedProduct?.id),
+                  style: styles.modalButtonDelete,
+                  textStyle: { fontSize: 13 },
+                },
+                {
+                  text: 'Cancel',
+                  onPress: () => setProductOptionsModalVisible(false),
+                  style: styles.modalButtonCancel,
+                  textStyle: { fontSize: 12 },
+                },
+              ]}
+            />
+          </>
+        )}
+
+        {sidebarVisible && (
+          <Modal
+            transparent={true}
+            visible={sidebarVisible}
+            onRequestClose={() => setSidebarVisible(false)}
+            animationType="fade"
+          >
+            <Pressable
+              style={styles.sidebarOverlay}
+              onPress={() => setSidebarVisible(false)}
+            >
+              <LinearGradient
+                colors={['#2A2A4A', '#1E1E3F']}
+                style={styles.sidebar}
+              >
+                <TouchableOpacity
+                  style={styles.sidebarItem}
+                  onPress={() => {
+                    Trace('Edit Profile Clicked');
+                    setEditModalVisible(true);
+                    setSidebarVisible(false);
+                  }}
+                >
+                  <Text style={styles.sidebarText}>Edit Profile</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.sidebarItem}
+                  onPress={confirmLogout}
+                >
+                  <Text style={styles.sidebarText}>Logout</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.sidebarItem}
+                  onPress={() => {
+                    Trace('Settings Clicked');
+                    Toast.show({
+                      type: 'info',
+                      text1: 'Info',
+                      text2: 'Settings coming soon',
+                      position: 'top',
+                      topOffset: scale(20),
+                    });
+                    setSidebarVisible(false);
+                  }}
+                >
+                  <Text style={styles.sidebarText}>Settings</Text>
+                </TouchableOpacity>
+              </LinearGradient>
+            </Pressable>
+          </Modal>
+        )}
+      </View>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#E5E7EB',
   },
   scrollContent: {
-    paddingBottom: 20 * scaleFactor,
+    paddingBottom: scale(20),
   },
   profileCard: {
     alignItems: 'center',
-    paddingVertical: 20 * scaleFactor,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10 * scaleFactor,
-    marginHorizontal: 30 * scaleFactor,
+    paddingVertical: scale(20),
+    borderRadius: scale(15),
+    marginHorizontal: scale(10),
+    marginTop: scale(10),
     elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    marginTop: 10 * scaleFactor,
   },
   profileImageContainer: {
     position: 'relative',
-    marginBottom: 10 * scaleFactor,
+    marginBottom: scale(10),
   },
   profileImage: {
-    width: 80 * scaleFactor,
-    height: 80 * scaleFactor,
-    borderRadius: 40 * scaleFactor,
+    width: scale(80),
+    height: scale(80),
+    borderRadius: scale(40),
     borderWidth: 2,
-    borderColor: '#BFDBFE',
+    borderColor: '#A855F7',
   },
   editIcon: {
     position: 'absolute',
-    bottom: -5 * scaleFactor,
-    right: -5 * scaleFactor,
-    backgroundColor: '#3B82F6',
-    borderRadius: 10 * scaleFactor,
-    width: 20 * scaleFactor,
-    height: 20 * scaleFactor,
+    bottom: -scale(5),
+    right: -scale(5),
+    backgroundColor: '#A855F7',
+    borderRadius: scale(10),
+    width: scale(20),
+    height: scale(20),
     justifyContent: 'center',
     alignItems: 'center',
   },
   editIconText: {
-    fontSize: 12 * scaleFactor,
+    fontSize: scale(12),
     color: '#FFFFFF',
   },
   name: {
-    fontSize: 20 * scaleFactor,
+    fontSize: scaleFont(20),
     fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 5 * scaleFactor,
+    color: '#FFFFFF',
+    marginBottom: scale(5),
   },
   bio: {
-    fontSize: 14 * scaleFactor,
-    color: '#6B7280',
+    fontSize: scaleFont(14),
+    color: '#B0B0D0',
     textAlign: 'center',
-    paddingHorizontal: 20 * scaleFactor,
-    marginBottom: 10 * scaleFactor,
+    paddingHorizontal: scale(20),
+    marginBottom: scale(10),
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '80%',
+    marginTop: scale(5),
+  },
+  stat: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: scaleFont(16),
+    fontWeight: '600',
+    color: '#A855F7',
+  },
+  statLabel: {
+    fontSize: scaleFont(12),
+    color: '#B0B0D0',
   },
   collectionsSection: {
-    marginHorizontal: 8 * scaleFactor,
-    marginTop: 20 * scaleFactor,
+    marginTop: scale(20),
   },
   tabsContainer: {
+    paddingVertical: scale(10),
+    paddingHorizontal: scale(20),
+    borderTopLeftRadius: scale(20),
+    borderTopRightRadius: scale(20),
+    elevation: 3,
+  },
+  tabBar: {
     flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: scale(25),
+    padding: scale(5),
+    marginHorizontal: scale(10),
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20 * scaleFactor,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingVertical: scale(10),
+    borderRadius: scale(20),
   },
-  tabButton: {
-    paddingVertical: 12 * scaleFactor,
-    paddingHorizontal: 25 * scaleFactor,
-    backgroundColor: 'transparent',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+  activeTab: {
+    backgroundColor: 'rgba(168, 85, 247, 0.2)',
   },
-  activeTabButton: {
-    borderBottomColor: Colors.pink,
+  tabText: {
+    fontSize: scaleFont(14),
+    color: '#B0B0D0',
+    marginLeft: scale(5),
+    fontWeight: '500',
   },
-  tabButtonText: {
-    fontSize: 14 * scaleFactor,
+  activeTabText: {
+    color: '#A855F7',
     fontWeight: '600',
-    color: '#6B7280',
-  },
-  activeTabButtonText: {
-    color: Colors.pink,
   },
   emptyStateContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40 * scaleFactor,
-    paddingHorizontal: 20 * scaleFactor,
+    paddingVertical: scale(40),
+    paddingHorizontal: scale(20),
   },
   emptyStateIcon: {
-    width: 80 * scaleFactor,
-    height: 80 * scaleFactor,
-    marginBottom: 20 * scaleFactor,
-    tintColor: '#9CA3AF',
+    width: scale(80),
+    height: scale(80),
+    marginBottom: scale(20),
+    tintColor: '#B0B0D0',
   },
   emptyStateTitle: {
-    fontSize: 16 * scaleFactor,
+    fontSize: scaleFont(16),
     fontWeight: '500',
-    color: '#6B7280',
+    color: '#FFFFFF',
     textAlign: 'center',
-    marginBottom: 20 * scaleFactor,
+    marginBottom: scale(20),
   },
   uploadButton: {
-    backgroundColor: Colors.pink,
-    paddingVertical: 12 * scaleFactor,
-    paddingHorizontal: 30 * scaleFactor,
-    borderRadius: 8 * scaleFactor,
-  },
-  uploadButtonText: {
-    fontSize: 14 * scaleFactor,
-    fontWeight: '600',
-    color: Colors.White,
-  },
-  productItem: {
-    alignSelf: 'center',
-    width: '90%',
-    minHeight: 100 * scaleFactor,
-    marginBottom: 10 * scaleFactor,
-    borderRadius: 10 * scaleFactor,
+    borderRadius: scale(8),
     overflow: 'hidden',
-    elevation: 3,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    flexDirection: 'row',
+  },
+  uploadButtonGradient: {
+    paddingVertical: scale(12),
+    paddingHorizontal: scale(30),
     alignItems: 'center',
   },
+  uploadButtonText: {
+    fontSize: scaleFont(14),
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  productItem: {
+    width: itemWidth,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: scale(10),
+    marginHorizontal: itemSpacing / 5,
+    marginVertical: scale(2),
+    padding: scale(10),
+    alignItems: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  reelItem: {
+    borderWidth: 2,
+    borderColor: 'rgba(168, 85, 247, 0.4)',
+  },
   productImage: {
-    width: 120 * scaleFactor,
-    height: '90%',
-    borderTopLeftRadius: 10 * scaleFactor,
-    borderBottomLeftRadius: 10 * scaleFactor,
-    marginLeft: 10,
+    width: '100%',
+    height: itemWidth * 1.2,
+    borderRadius: scale(8),
   },
-  productOverlay: {
-    padding: 5 * scaleFactor,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    paddingLeft: 20 * scaleFactor,
-    borderRadius: 10 * scaleFactor,
-    marginLeft: 10 * scaleFactor,
-    width: '54%',
+  skeletonImage: {
+    backgroundColor: '#3A3A5A',
+    opacity: 0.5,
   },
-  productTitle: {
-    fontSize: 14 * scaleFactor,
-    color: '#1F2937',
-    fontWeight: '500',
+  skeletonText: {
+    backgroundColor: '#3A3A5A',
+    borderRadius: scale(4),
+    opacity: 0.5,
   },
-  productDate: {
-    fontSize: 12 * scaleFactor,
-    color: '#6B7280',
-  },
-  collectionsListVertical: {
-    paddingBottom: 10 * scaleFactor,
-  },
-  sidebarOverlay: {
+  imageOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
+    borderRadius: scale(8),
+  },
+  playIcon: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -scale(12) }, { translateY: -scale(12) }],
+    backgroundColor: 'rgba(168, 85, 247, 0.8)',
+    borderRadius: scale(20),
+    padding: scale(8),
+  },
+  productInfo: {
+    width: '100%',
+    alignItems: 'center',
+    marginTop: scale(5),
+  },
+  productTitle: {
+    fontSize: scaleFont(12),
+    color: '#FFFFFF',
+    textAlign: 'center',
+    fontWeight: '500',
+    marginBottom: scale(4),
+    height: scale(32),
+  },
+  productPrice: {
+    fontSize: scaleFont(14),
+    fontWeight: '700',
+    color: '#A855F7',
+  },
+  collectionsList: {
+    paddingHorizontal: itemSpacing * 1.5,
+    paddingBottom: scale(20),
+  },
+  sidebarOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-start',
   },
   sidebar: {
     width: width * 0.3,
-    backgroundColor: Colors.lightPurple,
-    padding: 10 * scaleFactor,
-    borderBottomLeftRadius: 20 * scaleFactor,
-    alignSelf: 'flex-end',
+    padding: scale(10),
+    borderBottomLeftRadius: scale(20),
   },
   sidebarItem: {
-    paddingVertical: 12 * scaleFactor,
-    paddingHorizontal: 10 * scaleFactor,
+    paddingVertical: scale(12),
+    paddingHorizontal: scale(10),
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   sidebarText: {
-    fontSize: 12 * scaleFactor,
-    color: '#1F2937',
+    fontSize: scaleFont(12),
+    color: '#FFFFFF',
     fontWeight: '500',
   },
-  modalOverlay: {
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  editModalContainer: {
-    width,
-    padding: 20 * scaleFactor,
-    borderTopLeftRadius: 20 * scaleFactor,
-    borderTopRightRadius: 20 * scaleFactor,
-    backgroundColor: '#FFFFFF',
+  modalContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalButton: {
-    backgroundColor: '#3B82F6',
-    paddingVertical: 10 * scaleFactor,
-    paddingHorizontal: 20 * scaleFactor,
-    borderRadius: 8 * scaleFactor,
-    marginVertical: 5 * scaleFactor,
+    backgroundColor: 'transparent',
+    paddingVertical: scale(10),
+    paddingHorizontal: scale(20),
+    borderRadius: scale(8),
+    marginVertical: scale(5),
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#A855F7',
+  },
+  modalButtonDelete: {
+    backgroundColor: 'transparent',
+    paddingVertical: scale(10),
+    paddingHorizontal: scale(10),
+    borderRadius: scale(8),
+    marginVertical: scale(5),
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EF4444',
   },
   modalButtonCancel: {
-    backgroundColor: '#6B7280',
-    paddingVertical: 10 * scaleFactor,
-    paddingHorizontal: 20 * scaleFactor,
-    borderRadius: 8 * scaleFactor,
-    marginVertical: 5 * scaleFactor,
+    backgroundColor: 'transparent',
+    paddingVertical: scale(10),
+    paddingHorizontal: scale(5),
+    borderRadius: scale(8),
+    marginVertical: scale(5),
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#6B7280',
   },
   modalButtonSave: {
-    backgroundColor: '#10B981',
-    paddingVertical: 10 * scaleFactor,
-    paddingHorizontal: 20 * scaleFactor,
-    borderRadius: 8 * scaleFactor,
-    marginVertical: 5 * scaleFactor,
+    backgroundColor: 'transparent',
+    paddingVertical: scale(10),
+    paddingHorizontal: scale(20),
+    borderRadius: scale(8),
+    marginVertical: scale(5),
     alignItems: 'center',
-  },
-  modalButtonLogout: {
-    backgroundColor: '#EF4444',
-    paddingVertical: 10 * scaleFactor,
-    paddingHorizontal: 20 * scaleFactor,
-    borderRadius: 8 * scaleFactor,
-    marginVertical: 5 * scaleFactor,
-    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#10B981',
   },
   modalButtonText: {
     color: '#FFFFFF',
-    fontSize: 16 * scaleFactor,
+    fontSize: scaleFont(16),
     fontWeight: '600',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8 * scaleFactor,
-    padding: 10 * scaleFactor,
-    fontSize: 16 * scaleFactor,
-    color: '#1F2937',
-    backgroundColor: '#F9FAFB',
-  },
-  toastContainerSuccess: {
-    position: 'absolute',
-    bottom: 20 * scaleFactor,
-    alignSelf: 'center',
-    backgroundColor: '#10B981',
-    padding: 10 * scaleFactor,
-    borderRadius: 8 * scaleFactor,
-    elevation: 5,
-  },
-  toastTextSuccess: {
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: scale(8),
+    padding: scale(10),
+    fontSize: scaleFont(16),
     color: '#FFFFFF',
-    fontSize: 14 * scaleFactor,
-  },
-  toastContainerError: {
-    position: 'absolute',
-    bottom: 20 * scaleFactor,
-    alignSelf: 'center',
-    backgroundColor: '#EF4444',
-    padding: 10 * scaleFactor,
-    borderRadius: 8 * scaleFactor,
-    elevation: 5,
-  },
-  toastTextError: {
-    color: '#FFFFFF',
-    fontSize: 14 * scaleFactor,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    width: '100%',
   },
 });
 

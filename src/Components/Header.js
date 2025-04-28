@@ -1,259 +1,155 @@
-// import { Dimensions, Image, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
-// import React from 'react';
-// import img from '../assets/Images/img';
-// import Colors from '../constants/Colors';
-
-// const { width } = Dimensions.get('window');
-
-// const Header = ({
-//     title = '',
-//     showLeftIcon = false,
-//     leftIcon,
-//     onLeftPress,
-//     showRightIcon1 = false,
-//     rightIcon1,
-//     onRightPress1,
-//     showRightIcon2 = false,
-//     rightIcon2,
-//     onRightPress2,
-// }) => {
-//     return (
-//         <View style={styles.header}>
-//             <View style={styles.headerContent}>
-
-
-//                 <View style={styles.left}>
-//                     {showLeftIcon && leftIcon && (
-//                         <TouchableOpacity onPress={onLeftPress} style={styles.leftIconWrapper}>
-//                             <Image source={leftIcon} style={styles.leftIcon} />
-//                         </TouchableOpacity>
-//                     )}
-//                 </View>
-
-//                 {/* Title */}
-//                 <View style={styles.center}>
-//                     <Text style={styles.title}>{title}</Text>
-//                 </View>
-
-//                 {/* Right Icons */}
-//                 <View style={styles.right}>
-//                     {showRightIcon1 && rightIcon1 && (
-//                         <TouchableOpacity onPress={onRightPress1}>
-//                             <Image source={rightIcon1} style={styles.rightIcon} />
-//                         </TouchableOpacity>
-//                     )}
-//                     {showRightIcon2 && rightIcon2 && (
-//                         <TouchableOpacity onPress={onRightPress2}>
-//                             <Image source={rightIcon2} style={styles.rightIcon} />
-//                         </TouchableOpacity>
-//                     )}
-//                 </View>
-
-//             </View>
-//         </View>
-//     );
-// };
-
-// export default Header;
-
-// const styles = StyleSheet.create({
-//     header: {
-//         width: '100%',
-//         paddingVertical: 15,
-//         backgroundColor: Colors.LightPink,
-//     },
-//     headerContent: {
-//         flexDirection: 'row',
-//         alignItems: 'center',
-//         justifyContent: 'space-between',
-//         paddingHorizontal: 15,
-//     },
-//     left: {
-//         flex: 1,
-//     },
-//     center: {
-//         flex: 2,
-//         alignItems: 'center',
-//     },
-//     right: {
-//         flex: 1,
-//         flexDirection: 'row',
-//         justifyContent: 'flex-end',
-//     },
-//     leftIconWrapper: {
-//         backgroundColor: Colors.pink,
-//         borderRadius: 20,
-//         padding: 8,
-//         alignSelf: 'flex-start',
-//     },
-//     leftIcon: {
-//         width: 20,
-//         height: 20,
-//         resizeMode: 'contain',
-//         tintColor: Colors.White,
-//     },
-//     title: {
-//         fontSize: 16,
-//         fontWeight: '600',
-//         color: Colors.lightGray1,
-//     },
-//     rightIcon: {
-//         width: 20,
-//         height: 20,
-//         marginLeft: 15,
-//         resizeMode: 'contain',
-//         tintColor: Colors.lightGray1,
-//     },
-// });
-
-
-
-
-import React, { useState } from 'react';
+import React from 'react';
 import {
-    Dimensions,
-    Image,
-    StyleSheet,
-    Text,
-    View,
-    TouchableOpacity,
-    TextInput
+  View,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Text,
+  Dimensions,
 } from 'react-native';
-import img from '../assets/Images/img';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import Colors from '../constants/Colors';
 
 const { width } = Dimensions.get('window');
+const scaleFactor = width / 375;
+const scale = (size) => size * scaleFactor;
+const scaleFont = (size) => Math.round(size * (Math.min(width, 375) / 375));
 
 const Header = ({
-    title = '',
-    isSearch = false,
-    searchValue = '',
-    onSearchChange = () => { },
-    searchPlaceholder = 'Search Here',
-    showLeftIcon = false,
-    leftIcon,
-    onLeftPress,
-    showRightIcon1 = false,
-    rightIcon1,
-    onRightPress1,
-    showRightIcon2 = false,
-    rightIcon2,
-    onRightPress2,
+  isSearch = false,
+  searchValue = '',
+  onSearchChange = () => {},
+  showLeftIcon = false,
+  leftIcon = 'menu',
+  onLeftPress = () => {},
+  showRightIcon1 = false,
+  rightIcon1 = 'notifications-outline',
+  onRightPress1 = () => {},
+  showRightIcon2 = false,
+  rightIcon2 = 'add',
+  onRightIcon2Press = () => {},
+  title = '',
+  isAbsolute = false,
+  onBackPress = () => {},
 }) => {
-    return (
-        <View style={styles.header}>
-            <View style={styles.headerContent}>
-                <View style={styles.left}>
-                    {showLeftIcon && leftIcon && (
-                        <TouchableOpacity onPress={onLeftPress} style={styles.leftIconWrapper}>
-                            <Image source={leftIcon} style={styles.leftIcon} />
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                <View style={styles.center}>
-                    {isSearch ? (
-                        <View style={styles.searchBox}>
-                            <TextInput
-                                value={searchValue}
-                                onChangeText={onSearchChange}
-                                placeholder={searchPlaceholder}
-                                style={styles.searchInput}
-                                placeholderTextColor="#666"
-                            />
-                            <Image source={img.search} style={styles.searchIcon} />
-                        </View>
-                    ) : (
-                        <Text style={styles.title}>{title}</Text>
-                    )}
-                </View>
-
-                {/* Right Icons */}
-                <View style={styles.right}>
-                    {showRightIcon1 && rightIcon1 && (
-                        <TouchableOpacity onPress={onRightPress1}>
-                            <Image source={rightIcon1} style={styles.rightIcon} />
-                        </TouchableOpacity>
-                    )}
-                    {showRightIcon2 && rightIcon2 && (
-                        <TouchableOpacity onPress={onRightPress2}>
-                            <Image source={rightIcon2} style={styles.rightIcon} />
-                        </TouchableOpacity>
-                    )}
-                </View>
+  return (
+    <View style={[styles.container, isAbsolute && styles.absoluteContainer]}>
+      {showLeftIcon || title ? (
+        <View style={styles.headerRow}>
+          {showLeftIcon ? (
+            <TouchableOpacity onPress={onLeftPress} style={styles.iconButton}>
+              <Ionicons name={leftIcon} size={scale(20)} color={Colors.lightPurple} />
+            </TouchableOpacity>
+          ) : title ? (
+            <TouchableOpacity onPress={onBackPress} style={styles.iconButton}>
+              <Ionicons name="arrow-back" size={scale(28)} color="#FFFFFF" />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.placeholder} />
+          )}
+          {title ? (
+            <Text style={styles.title}>{title}</Text>
+          ) : (
+            <View style={styles.searchContainer}>
+              {isSearch && (
+                <>
+                  <Ionicons
+                    name="search"
+                    size={scale(20)}
+                    color={Colors.White}
+                    style={styles.searchIcon}
+                  />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search"
+                    placeholderTextColor="#A0A0A0"
+                    value={searchValue}
+                    onChangeText={onSearchChange}
+                  />
+                </>
+              )}
             </View>
+          )}
+          {showRightIcon1 || showRightIcon2 ? (
+            <View style={styles.rightIcons}>
+              {showRightIcon1 && (
+                <TouchableOpacity onPress={onRightPress1} style={styles.iconButton}>
+                  <Ionicons name={rightIcon1} size={scale(20)} color={Colors.lightPurple} />
+                </TouchableOpacity>
+              )}
+              {showRightIcon2 && (
+                <TouchableOpacity
+                  onPress={onRightIcon2Press}
+                  style={styles.iconButton}
+                >
+                  <Ionicons name={rightIcon2} size={scale(28)} color="#7B61FF" />
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <View style={styles.placeholder} />
+          )}
         </View>
-    );
+      ) : null}
+    </View>
+  );
 };
 
-export default Header;
-
 const styles = StyleSheet.create({
-    header: {
-        width: '100%',
-        paddingVertical: 10,
-        backgroundColor: Colors.lightPurple,
-    },
-    headerContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 15,
-    },
-    left: {
-        flex: 1,
-    },
-    center: {
-        flex: 3,
-        alignItems: 'center',
-    },
-    right: {
-        flex: 1,
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-    },
-    leftIconWrapper: {
-        backgroundColor: Colors.pink,
-        borderRadius: 25,
-        padding: 10,
-        alignSelf: 'flex-start',
-    },
-    leftIcon: {
-        width: 20,
-        height: 20,
-        resizeMode: 'contain',
-        tintColor: Colors.White,
-    },
-    title: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: Colors.lightGray1,
-    },
-    rightIcon: {
-        width: 20,
-        height: 20,
-        marginLeft: 15,
-        resizeMode: 'contain',
-        tintColor: Colors.lightGray1,
-    },
-    searchBox: {
-        backgroundColor: '#f1f1f1',
-        borderRadius: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 10,
-        width: width * 0.6,
-        height: 40,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 14,
-        color: '#333',
-    },
-    searchIcon: {
-        width: 18,
-        height: 18,
-        tintColor: '#000',
-        resizeMode: 'contain',
-    },
+  container: {
+    backgroundColor: 'rgba(10, 10, 30, 0.9)',
+    paddingHorizontal: scale(15),
+    paddingVertical: scale(7),
+  },
+  absoluteContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  iconButton: {
+    padding: scale(5),
+    borderRadius: scale(20),
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  searchContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: scale(10),
+    paddingHorizontal: scale(10),
+    marginHorizontal: scale(10),
+  },
+  searchIcon: {
+    marginRight: scale(8),
+  },
+  searchInput: {
+    flex: 1,
+    color: Colors.White,
+    fontSize: scaleFont(16),
+    paddingVertical: scale(8),
+  },
+  rightIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  title: {
+    flex: 1,
+    fontSize: scaleFont(22),
+    fontWeight: '800',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  placeholder: {
+    width: scale(44), // Matches iconButton size
+  },
 });
+
+export default Header;

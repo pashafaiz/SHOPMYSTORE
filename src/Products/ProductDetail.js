@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   ScrollView,
   View,
@@ -7,283 +6,834 @@ import {
   Image,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   FlatList,
-  ActivityIndicator,
-  RefreshControl,
   Dimensions,
+  RefreshControl,
+  Animated,
+  AppState,
+  ActivityIndicator,
 } from 'react-native';
 import Video from 'react-native-video';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import IconCommunity from 'react-native-vector-icons/MaterialCommunityIcons';
+import Toast from 'react-native-toast-message';
 import Colors from '../constants/Colors';
-import { deleteProductApi, getProductApi, getRelatedProductsApi } from '../../apiClient';
+import img from '../assets/Images/img';
+import Trace from '../utils/Trace';
+import Header from '../Components/Header';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  fetchProductDetails,
+  toggleLike,
+  addToCart,
+  removeFromCart,
+  loadRecentlyViewed,
+  saveRecentlyViewed,
+  clearRecentlyViewed,
+  setCurrentMediaIndex,
+  setVideoProgress,
+  setVideoDuration,
+  clearError,
+  setRefreshing,
+} from '../redux/slices/productDetailSlice';
+
+const { width, height } = Dimensions.get('window');
+const scaleFactor = width / 375;
+const scale = (size) => size * scaleFactor;
+const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375));
+
+// Configuration: Choose the clearing behavior for recently viewed products
+const CLEAR_RECENTLY_VIEWED_ON_APP_KILL = false;
+const CLEAR_RECENTLY_VIEWED_AFTER_HOUR = true;
 
 const ProductDetail = ({ route, navigation }) => {
-  const { productId } = route.params;
-  const [product, setProduct] = useState("");
-  const [relatedProducts, setRelatedProducts] = useState([]);
-  const [userId, setUserId] = useState('');
-  const [token, setToken] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const fetchData = async () => {
-    try {
-      setLoading(true);
+  const { productId } = route.params || {};
+  const dispatch = useDispatch();
+  const {
+    product,
+    user,
+    relatedProducts,
+    recentlyViewed,
+    userId,
+    token,
+    loading,
+    refreshing,
+    isActionLoading,
+    currentMediaIndex,
+    isLiked,
+    isInCart,
+    videoProgress,
+    videoDuration,
+    error,
+  } = useSelector((state) => state.productDetail);
+  const scrollY = new Animated.Value(0);
+  const appState = useRef(AppState.currentState);
 
-      const storedUser = await AsyncStorage.getItem('user');
-      const userToken = await AsyncStorage.getItem('userToken');
-      if (storedUser && userToken) {
-        const parsedUser = JSON.parse(storedUser);
-        setUserId(parsedUser.id);
-        setToken(userToken);
-      }
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 50],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
 
-      const productResponse = await getProductApi(productId);
-      
-      if (productResponse) {
-        setProduct(productResponse.data.product);
-      } else {
-        Alert.alert('Error', productResponse.data.msg || 'Failed to fetch product details');
-        navigation.goBack();
-      }
+  useEffect(() => {
+    if (!CLEAR_RECENTLY_VIEWED_ON_APP_KILL) return;
 
-      const relatedResponse = await getRelatedProductsApi(productId);
-      if (relatedResponse.ok) {
-        setRelatedProducts(relatedResponse.data.products || []);
-      } else {
-        console.warn('No related products found');
-        setRelatedProducts([]);
+    const handleAppStateChange = async (nextAppState) => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === 'active'
+      ) {
+        Trace('App has been reopened, clearing recently viewed');
+        dispatch(clearRecentlyViewed());
       }
-    } catch (error) {
-      Alert.alert('Error', 'Something went wrong while fetching data');
-    } finally {
-      setLoading(false);
+      appState.current = nextAppState;
+      Trace('AppState changed:', appState.current);
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
+  }, [dispatch]);
+
+  useEffect(() => {
+    Trace('Component mounted with productId:', productId);
+    if (productId) {
+      dispatch(fetchProductDetails({ productId }));
+      dispatch(loadRecentlyViewed());
+    }
+  }, [productId, dispatch]);
+
+  useEffect(() => {
+    if (product && !loading && !error) {
+      dispatch(saveRecentlyViewed({ productId, product }));
+    }
+  }, [product, productId, loading, error, dispatch]);
+
+  useEffect(() => {
+    if (error) {
+      setTimeout(() => navigation.goBack(), 2000);
+    }
+  }, [error, navigation]);
+
+  const onRefresh = async () => {
+    dispatch(setRefreshing(true));
+    if (productId) {
+      await dispatch(fetchProductDetails({ productId }));
+    }
+    dispatch(setRefreshing(false));
+  };
+
+  const handleAddToCart = async () => {
+    if (!userId) {
+      Toast.show({
+        type: 'error',
+        text1: 'Please login to add items to cart',
+        position: 'top',
+        topOffset: scale(20),
+      });
+      return;
+    }
+
+    if (!token || !productId) {
+      Trace('Missing token or productId:', { token, productId });
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid request parameters',
+        position: 'top',
+        topOffset: scale(20),
+      });
+      return;
+    }
+
+    if (isInCart) {
+      dispatch(removeFromCart({ productId, token }));
+    } else {
+      dispatch(addToCart({ productId, token }));
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [productId]);
+  const handleToggleLike = async () => {
+    if (!userId) {
+      Toast.show({
+        type: 'error',
+        text1: 'Please login to like products',
+        position: 'top',
+        topOffset: scale(20),
+      });
+      return;
+    }
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchData();
-    setRefreshing(false);
+    if (!token || !productId) {
+      Trace('Missing token or productId:', { token, productId });
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid request parameters',
+        position: 'top',
+        topOffset: scale(20),
+      });
+      return;
+    }
+
+    dispatch(toggleLike({ productId, token }));
   };
 
-  const handleDelete = async () => {
-    Alert.alert(
-      'Delete Product',
-      'Are you sure you want to delete this product?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const { ok, data } = await deleteProductApi(token, productId);
-            if (ok) {
-              Alert.alert('Success', 'Product deleted successfully');
-              navigation.goBack();
-            } else {
-              Alert.alert('Error', data.msg || 'Failed to delete product');
-            }
-          },
-        },
-      ]
-    );
+  const handleVideoProgress = (data) => {
+    dispatch(setVideoProgress(data.currentTime / data.seekableDuration));
   };
 
-  const handleEdit = () => {
-    navigation.navigate('EditProduct', { product });
+  const handleVideoLoad = (data) => {
+    dispatch(setVideoDuration(data.duration));
   };
 
-  const renderMediaItem = ({ item }) => (
-    <View style={styles.mediaItem}>
-      {item.mediaType === 'video' ? (
-        <Video
-          source={{ uri: item.url }}
-          style={styles.media}
-          resizeMode="contain"
-          muted
-          repeat
-        />
-      ) : (
-        <Image source={{ uri: item.url }} style={styles.media} resizeMode="contain" />
-      )}
-    </View>
-  );
+  const renderMediaItem = ({ item, index }) => {
+    try {
+      const mediaUrl = typeof item.url === 'string' ? item.url : (item.url?.[0] || 'https://via.placeholder.com/150');
+      Trace(`Rendering media item ${index}:`, { item, mediaUrl });
 
-  const renderRelatedProduct = ({ item }) => (
-    <TouchableOpacity
-      style={styles.relatedProductCard}
-      onPress={() => navigation.push('ProductDetail', { productId: item.id })}
-    >
-      <Image
-        source={{ uri: item.media[0]?.url || 'https://via.placeholder.com/100' }}
-        style={styles.relatedProductImage}
-      />
-      <Text style={styles.relatedProductName}>{item.name}</Text>
-      <Text style={styles.relatedProductPrice}>₹{item.price}</Text>
-    </TouchableOpacity>
-  );
+      return (
+        <View style={styles.mediaItem}>
+          {item.mediaType === 'video' ? (
+            <>
+              <Video
+                source={{ uri: mediaUrl }}
+                style={styles.media}
+                resizeMode="contain"
+                muted
+                repeat
+                onProgress={handleVideoProgress}
+                onLoad={handleVideoLoad}
+              />
+              <View style={styles.progressBarContainer}>
+                <View style={styles.progressBackground}>
+                  <LinearGradient
+                    colors={['#7B61FF', '#A78BFA']}
+                    style={[styles.progressFill, { width: `${videoProgress * 100}%` }]}
+                  />
+                </View>
+              </View>
+            </>
+          ) : (
+            <Image
+              source={{ uri: mediaUrl }}
+              style={styles.media}
+              resizeMode="contain"
+              defaultSource={{ uri: 'https://via.placeholder.com/150' }}
+            />
+          )}
+        </View>
+      );
+    } catch (error) {
+      Trace(`Error rendering media item ${index}:`, error);
+      return (
+        <View style={styles.mediaItem}>
+          <Text style={styles.errorText}>Failed to load media</Text>
+        </View>
+      );
+    }
+  };
 
-  if (loading && !refreshing) {
+  const renderRelatedProduct = ({ item }) => {
+    try {
+      const scaleAnim = new Animated.Value(1);
+
+      const onPressIn = () => {
+        Animated.spring(scaleAnim, {
+          toValue: 0.95,
+          useNativeDriver: true,
+        }).start();
+      };
+
+      const onPressOut = () => {
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+        }).start();
+      };
+
+      const mediaUrl = typeof item.media === 'string' ? item.media : 'https://via.placeholder.com/100';
+      Trace(`Rendering related product ${item._id || item.id}:`, { item, mediaUrl });
+
+      return (
+        <Animated.View style={[styles.relatedProductCard, { transform: [{ scale: scaleAnim }] }]}>
+          <TouchableOpacity
+            onPressIn={onPressIn}
+            onPressOut={onPressOut}
+            onPress={() => {
+              if (!item._id && !item.id) {
+                Trace('Missing product ID for related product:', item);
+                Toast.show({
+                  type: 'error',
+                  text1: 'Missing Product ID',
+                  position: 'top',
+                  topOffset: scale(20),
+                });
+                return;
+              }
+              navigation.push('ProductDetail', { productId: item._id || item.id });
+            }}
+            activeOpacity={0.95}
+            disabled={isActionLoading}
+          >
+            <Image
+              source={{ uri: mediaUrl }}
+              style={styles.relatedProductImage}
+              resizeMode="contain"
+              defaultSource={{ uri: 'https://via.placeholder.com/100' }}
+            />
+            <View style={styles.relatedProductInfo}>
+              <Text style={styles.relatedProductName} numberOfLines={1}>
+                {item.name || 'Unknown Product'}
+              </Text>
+              <Text style={styles.relatedProductPrice}>₹{item.price || 'N/A'}</Text>
+              {item.category && (
+                <Text style={styles.relatedProductCategory} numberOfLines={1}>
+                  {item.category}
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+      );
+    } catch (error) {
+      Trace(`Error rendering related product ${item._id || item.id}:`, error);
+      return (
+        <View style={styles.relatedProductCard}>
+          <Text style={styles.errorText}>Failed to load product</Text>
+        </View>
+      );
+    }
+  };
+
+  const renderSkeleton = () => {
+    try {
+      return (
+        <View style={styles.skeletonContainer}>
+          <View style={styles.skeletonMedia} />
+          <View style={styles.skeletonDetails}>
+            <View style={styles.skeletonUserInfo}>
+              <View style={styles.skeletonUserImage} />
+              <View style={[styles.skeletonText, { width: '40%' }]} />
+            </View>
+            <View style={[styles.skeletonText, { width: '60%' }]} />
+            <View style={[styles.skeletonText, { width: '20%', marginVertical: scale(10) }]} />
+            <View style={[styles.skeletonText, { width: '80%' }]} />
+            <View style={[styles.skeletonText, { width: '70%' }]} />
+          </View>
+        </View>
+      );
+    } catch (error) {
+      Trace('Error rendering skeleton:', error);
+      return (
+        <View style={styles.skeletonContainer}>
+          <Text style={styles.errorText}>Loading...</Text>
+        </View>
+      );
+    }
+  };
+
+  const renderActionLoader = () => {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.blue} />
-        <Text>Loading...</Text>
+      <View style={styles.loaderOverlay}>
+        <ActivityIndicator size="large" color="#7B61FF" />
+        <Text style={styles.loaderText}>Loading...</Text>
       </View>
     );
+  };
+
+  const handleMediaScroll = (event) => {
+    const contentOffset = event.nativeEvent.contentOffset.x;
+    const index = Math.round(contentOffset / width);
+    dispatch(setCurrentMediaIndex(index));
+  };
+
+  const navigateToUserProfile = () => {
+    if (user?._id) {
+      navigation.navigate('UserProfile', { userId: user._id });
+    }
+  };
+
+  Trace('Rendering ProductDetail with states:', { loading, refreshing, isActionLoading, product });
+
+  if (loading && !refreshing) {
+    return renderSkeleton();
   }
 
   if (!product) {
-    return null;
+    return (
+      <LinearGradient colors={['#0A0A1E', '#1E1E3F']} style={styles.errorContainer}>
+        <Header
+          showLeftIcon={true}
+          leftIcon="arrow-back"
+          onLeftPress={() => navigation.goBack()}
+          isSearch={false}
+          title="Product"
+          showRightIcon1={false}
+          showRightIcon2={false}
+        />
+        <Icon name="error-outline" size={scale(50)} color="#FF3E6D" />
+        <Text style={styles.errorText}>Product not found</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={() => navigation.goBack()}>
+          <Text style={styles.retryButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </LinearGradient>
+    );
   }
 
+  const userProfileImage = typeof user?.profileImage === 'string' ? user.profileImage : 'https://via.placeholder.com/40';
+  Trace('User profile image:', userProfileImage);
+
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      <FlatList
-        data={product.media}
-        renderItem={renderMediaItem}
-        keyExtractor={(item, index) => index.toString()}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        style={styles.mediaList}
+    <LinearGradient colors={['#0A0A1E', '#1E1E3F']} style={styles.container}>
+      <Header
+        showLeftIcon={true}
+        leftIcon="arrow-back"
+        onLeftPress={() => navigation.goBack()}
+        isSearch={false}
+        title={product.name || "Product"}
+        showRightIcon1={false}
+        showRightIcon2={false}
       />
-
-      <View style={styles.detailsContainer}>
-        <Text style={styles.name}>{product.name}</Text>
-        <Text style={styles.price}>₹{product.price}</Text>
-        <Text style={styles.description}>{product.description}</Text>
-      </View>
-
-      {userId === product.createdBy && (
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
-            <Text style={styles.buttonText}>Edit Product</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-            <Text style={styles.buttonText}>Delete Product</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {relatedProducts.length > 0 && (
-        <View style={styles.relatedProductsContainer}>
-          <Text style={styles.relatedProductsTitle}>Related Products</Text>
-          <FlatList
-            data={relatedProducts}
-            renderItem={renderRelatedProduct}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.relatedProductsList}
+      <ScrollView
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#7B61FF']}
+            tintColor="#7B61FF"
           />
+        }
+        scrollEnabled={!isActionLoading}
+      >
+        <View style={styles.mediaContainer}>
+          <FlatList
+            data={product.media || []}
+            renderItem={renderMediaItem}
+            keyExtractor={(_, index) => index.toString()}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={handleMediaScroll}
+            scrollEventThrottle={16}
+          />
+          {product.media && product.media.length > 1 && (
+            <View style={styles.mediaIndicator}>
+              <Text style={styles.mediaIndicatorText}>
+                {currentMediaIndex + 1}/{product.media.length}
+              </Text>
+            </View>
+          )}
         </View>
-      )}
-    </ScrollView>
+
+        <View style={styles.detailsContainer}>
+          <TouchableOpacity
+            style={styles.userInfo}
+            onPress={navigateToUserProfile}
+            activeOpacity={0.7}
+            disabled={isActionLoading}
+          >
+            <Image
+              source={userProfileImage ? { uri: userProfileImage } : img.user}
+              style={styles.userImage}
+            />
+            <Text style={styles.userName}>@{user?.userName || 'unknown'}</Text>
+            <Icon name="chevron-right" size={scale(20)} color="#A0A0A0" />
+          </TouchableOpacity>
+
+          <View style={styles.titleRow}>
+            <Text style={styles.name}>{product.name || 'Product'}</Text>
+            <View style={styles.priceContainer}>
+              <Text style={styles.price}>₹{product.price || 'N/A'}</Text>
+              {product.originalPrice && (
+                <Text style={styles.originalPrice}>₹{product.originalPrice}</Text>
+              )}
+            </View>
+          </View>
+
+          {product.category && (
+            <View style={styles.categoryContainer}>
+              <Text style={styles.categoryText}>{product.category}</Text>
+            </View>
+          )}
+
+          <Text style={styles.description}>{product.description || 'No description available'}</Text>
+
+          <View style={styles.actionBar}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.likeButton, isLiked && styles.likedButton]}
+              onPress={handleToggleLike}
+              disabled={isActionLoading}
+            >
+              <Icon
+                name={isLiked ? 'favorite' : 'favorite-border'}
+                size={scale(20)}
+                color={isLiked ? '#FF3E6D' : '#A0A0A0'}
+              />
+              <Text style={styles.actionButtonText}>
+                {isLiked ? 'In WishList' : 'Add to Wishlist'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.cartButton]}
+              onPress={handleAddToCart}
+              disabled={isActionLoading}
+            >
+              <IconCommunity
+                name={isInCart ? 'cart-check' : 'cart-plus'}
+                size={scale(20)}
+                color="#A0A0A0"
+              />
+              <Text style={styles.actionButtonText}>
+                {isInCart ? 'In Cart' : 'Add to Cart'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {product.tags && product.tags.length > 0 && (
+            <View style={styles.tagsContainer}>
+              {product.tags.map((tag, index) => (
+                <View key={index} style={styles.tag}>
+                  <Text style={styles.tagText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {relatedProducts.length > 0 && (
+          <View style={styles.relatedProductsContainer}>
+            <Text style={styles.sectionTitle}>You May Also Like</Text>
+            <FlatList
+              data={relatedProducts}
+              renderItem={renderRelatedProduct}
+              keyExtractor={(item) => item._id || item.id || Math.random().toString()}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.relatedProductsList}
+            />
+          </View>
+        )}
+
+        {recentlyViewed.length > 0 && (
+          <View style={styles.recentlyViewedContainer}>
+            <Text style={styles.sectionTitle}>Recently Viewed</Text>
+            <FlatList
+              data={recentlyViewed.filter((item) => item.id !== productId)}
+              renderItem={renderRelatedProduct}
+              keyExtractor={(item) => item.id || Math.random().toString()}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.relatedProductsList}
+            />
+          </View>
+        )}
+      </ScrollView>
+
+      {isActionLoading && renderActionLoader()}
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
-  loadingContainer: {
+  skeletonContainer: {
+    flex: 1,
+    backgroundColor: '#0A0A1E',
+  },
+  skeletonMedia: {
+    width: width,
+    height: width * 0.9,
+    backgroundColor: '#1A1A2E',
+  },
+  skeletonDetails: {
+    padding: scale(20),
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    margin: scale(15),
+    borderRadius: scale(12),
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  skeletonUserInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: scale(15),
+  },
+  skeletonUserImage: {
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginRight: scale(10),
+  },
+  skeletonText: {
+    height: scale(14),
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: scale(4),
+    marginBottom: scale(5),
+  },
+  errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: scale(20),
   },
-  mediaList: {
-    height: 300,
+  errorText: {
+    marginTop: scale(15),
+    fontSize: scaleFont(18),
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  retryButton: {
+    marginTop: scale(20),
+    paddingVertical: scale(12),
+    paddingHorizontal: scale(30),
+    backgroundColor: '#7B61FF',
+    borderRadius: scale(8),
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: scaleFont(16),
+    fontWeight: '600',
+  },
+  mediaContainer: {
+    height: width * 0.9,
+    position: 'relative',
+    backgroundColor: '#000',
   },
   mediaItem: {
-    width: Dimensions.get('window').width,
-    height: 300,
+    width: width,
+    height: width * 0.9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
   },
   media: {
     width: '100%',
     height: '100%',
   },
+  progressBarContainer: {
+    position: 'absolute',
+    bottom: scale(15),
+    left: scale(15),
+    right: scale(15),
+    height: scale(4),
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: scale(2),
+  },
+  progressBackground: {
+    flex: 1,
+    borderRadius: scale(2),
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+  },
+  mediaIndicator: {
+    position: 'absolute',
+    bottom: scale(15),
+    right: scale(15),
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: scale(10),
+    paddingVertical: scale(5),
+    borderRadius: scale(10),
+  },
+  mediaIndicatorText: {
+    color: '#FFFFFF',
+    fontSize: scaleFont(12),
+  },
+  actionBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    paddingVertical: scale(10),
+    marginBottom: scale(10),
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: scale(8),
+    paddingHorizontal: scale(15),
+    borderRadius: scale(8),
+    marginRight: scale(10),
+  },
+  likeButton: {
+    backgroundColor: 'transparent',
+  },
+  likedButton: {
+    backgroundColor: 'transparent',
+  },
+  cartButton: {
+    backgroundColor: 'transparent',
+  },
+  actionButtonText: {
+    color: '#E5E7EB',
+    fontSize: scaleFont(14),
+    fontWeight: '500',
+    marginLeft: scale(6),
+  },
   detailsContainer: {
-    padding: 20,
+    padding: scale(20),
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    margin: scale(15),
+    borderRadius: scale(12),
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: scale(15),
+  },
+  userImage: {
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
+    marginRight: scale(10),
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  userName: {
+    fontSize: scaleFont(14),
+    fontWeight: '600',
+    color: '#E5E7EB',
+    flex: 1,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: scale(10),
   },
   name: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontSize: scaleFont(22),
+    fontWeight: '700',
+    color: '#FFFFFF',
+    flex: 1,
+    marginRight: scale(10),
+  },
+  priceContainer: {
+    alignItems: 'flex-end',
   },
   price: {
-    fontSize: 20,
-    color: Colors.pink,
-    fontWeight: 'bold',
-    marginBottom: 15,
+    fontSize: scaleFont(22),
+    color: '#7B61FF',
+    fontWeight: '700',
+  },
+  originalPrice: {
+    fontSize: scaleFont(16),
+    color: '#A0A0A0',
+    textDecorationLine: 'line-through',
+  },
+  categoryContainer: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(123, 97, 255, 0.2)',
+    paddingHorizontal: scale(10),
+    paddingVertical: scale(5),
+    borderRadius: scale(15),
+    marginBottom: scale(15),
+  },
+  categoryText: {
+    fontSize: scaleFont(12),
+    color: '#7B61FF',
+    fontWeight: '600',
   },
   description: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: scaleFont(15),
+    lineHeight: scaleFont(22),
+    color: '#E5E7EB',
+    marginBottom: scale(15),
   },
-  actionsContainer: {
+  tagsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 20,
+    flexWrap: 'wrap',
+    marginBottom: scale(15),
   },
-  editButton: {
-    backgroundColor: Colors.blue,
-    padding: 15,
-    borderRadius: 5,
+  tag: {
+    backgroundColor: 'rgba(123, 97, 255, 0.2)',
+    paddingHorizontal: scale(12),
+    paddingVertical: scale(6),
+    borderRadius: scale(15),
+    marginRight: scale(8),
+    marginBottom: scale(8),
   },
-  deleteButton: {
-    backgroundColor: Colors.pink,
-    padding: 15,
-    borderRadius: 5,
+  tagText: {
+    fontSize: scaleFont(12),
+    color: '#7B61FF',
   },
-  buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
+  sectionTitle: {
+    fontSize: scaleFont(18),
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: scale(15),
+    marginHorizontal: scale(20),
   },
   relatedProductsContainer: {
-    padding: 20,
+    paddingVertical: scale(15),
   },
-  relatedProductsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 15,
+  recentlyViewedContainer: {
+    paddingVertical: scale(15),
+    marginBottom: scale(20),
   },
   relatedProductsList: {
-    paddingVertical: 10,
+    paddingLeft: scale(20),
   },
   relatedProductCard: {
-    width: 150,
-    marginRight: 15,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 10,
-    padding: 10,
-    alignItems: 'center',
+    width: scale(150),
+    marginRight: scale(15),
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: scale(10),
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   relatedProductImage: {
-    width: 100,
-    height: 100,
-    resizeMode: 'contain',
-    marginBottom: 10,
+    width: '100%',
+    height: scale(120),
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  relatedProductInfo: {
+    padding: scale(10),
   },
   relatedProductName: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontSize: scaleFont(14),
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: scale(5),
   },
   relatedProductPrice: {
-    fontSize: 14,
-    color: Colors.pink,
-    marginTop: 5,
+    fontSize: scaleFont(15),
+    color: '#7B61FF',
+    fontWeight: '700',
+  },
+  relatedProductCategory: {
+    fontSize: scaleFont(12),
+    color: '#A0A0A0',
+    marginTop: scale(4),
+  },
+  loaderOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 200,
+  },
+  loaderText: {
+    marginTop: scale(10),
+    fontSize: scaleFont(16),
+    color: '#FFFFFF',
+    fontWeight: '500',
   },
 });
 

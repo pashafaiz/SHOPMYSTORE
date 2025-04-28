@@ -19,60 +19,113 @@ import Video from 'react-native-video';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Share from 'react-native-share';
 import LinearGradient from 'react-native-linear-gradient';
-import { postCommentApi, getCommentsApi, BASE_URL } from '../../apiClient';
 import { useNavigation } from '@react-navigation/native';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  fetchComments,
+  postComment,
+  toggleLike,
+  toggleSave,
+  setReelData,
+  clearMessages,
+} from '../redux/slices/reelSlice';
+import Trace from '../utils/Trace';
+import {
+  BASE_URL,
+  BASE_WIDTH,
+  BASE_HEIGHT,
+  PRIMARY_COLOR,
+  TEXT_COLOR,
+  REELS_LOADER_COLOR,
+  REELS_MODAL_BG_COLOR,
+  REELS_MODAL_TEXT_COLOR,
+  REELS_BUTTON_COLOR,
+  ANIMATION_DELAY,
+  DEFAULT_IMAGE_URL,
+} from '../constants/GlobalConstants';
 
-const { height, width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+const scaleFactor = width / BASE_WIDTH;
+const scale = size => Math.round(size * scaleFactor);
+const scaleFont = size => Math.round(size * (Math.min(width, height) / BASE_HEIGHT));
 
 const ReelView = ({ route }) => {
   const { reel } = route.params;
   const navigation = useNavigation();
-  const [liked, setLiked] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const dispatch = useDispatch();
+  const {
+    comments,
+    liked,
+    saved,
+    likesCount,
+    commentsCount,
+    loadingComments,
+    errorMessage,
+    successMessage,
+  } = useSelector((state) => state.reel);
   const [muted, setMuted] = useState(true);
+  const [paused, setPaused] = useState(false);
   const [commentModalVisible, setCommentModalVisible] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
-  const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [buffering, setBuffering] = useState(false);
+  const [showMuteIcon, setShowMuteIcon] = useState(false);
+  const [videoAspectRatio, setVideoAspectRatio] = useState(width / height);
   const videoRef = useRef(null);
   const likeAnim = useRef(new Animated.Value(1)).current;
   const doubleTapAnim = useRef(new Animated.Value(0)).current;
+  const muteIconOpacity = useRef(new Animated.Value(0)).current;
+  const tapTimeoutRef = useRef(null);
   const lastTapRef = useRef({ time: 0 });
 
-  // Fetch comments for the reel
-  const fetchComments = useCallback(async () => {
-    try {
-      const { ok, data } = await getCommentsApi(reel._id);
-      if (ok) {
-        setComments(data.comments || []);
-      } else {
-        console.warn('Failed to fetch comments:', data.msg);
-      }
-    } catch (error) {
-      console.error('Comments fetch error:', error);
+  // Initialize reel data
+  useEffect(() => {
+    dispatch(setReelData({ likes: reel.likes || 0, comments: reel.comments || 0 }));
+    dispatch(fetchComments(reel._id));
+  }, [dispatch, reel._id, reel.likes, reel.comments]);
+
+  // Clear messages after display
+  useEffect(() => {
+    if (successMessage || errorMessage) {
+      const timer = setTimeout(() => {
+        dispatch(clearMessages());
+      }, 3000);
+      return () => clearTimeout(timer);
     }
-  }, [reel._id]);
+  }, [successMessage, errorMessage, dispatch]);
+
+  // Show mute/unmute icon with animation
+  const showMuteIconAnimation = useCallback(() => {
+    setShowMuteIcon(true);
+    Animated.sequence([
+      Animated.timing(muteIconOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(muteIconOpacity, {
+        toValue: 0,
+        duration: 200,
+        delay: 800,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setShowMuteIcon(false));
+  }, [muteIconOpacity]);
 
   // Post a comment
-  const postComment = useCallback(async () => {
+  const handlePostComment = useCallback(() => {
     if (!newComment.trim()) return;
-    try {
-      const { ok, data } = await postCommentApi(reel._id, { text: newComment });
-      if (ok) {
-        fetchComments();
+    dispatch(postComment({ reelId: reel._id, text: newComment })).then((result) => {
+      if (result.meta.requestStatus === 'fulfilled') {
         setNewComment('');
-      } else {
-        console.warn('Failed to post comment:', data.msg);
+        dispatch(fetchComments(reel._id));
       }
-    } catch (error) {
-      console.error('Post comment error:', error);
-    }
-  }, [newComment, reel._id, fetchComments]);
+    });
+  }, [newComment, reel._id, dispatch]);
 
   // Handle like
   const handleLike = useCallback(() => {
-    setLiked((prev) => !prev);
+    dispatch(toggleLike());
     Animated.sequence([
       Animated.timing(likeAnim, {
         toValue: 1.4,
@@ -85,47 +138,68 @@ const ReelView = ({ route }) => {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [likeAnim]);
+  }, [likeAnim, dispatch]);
 
   // Handle tap (single tap for mute/unmute, double tap for like)
   const handleTap = useCallback(() => {
     const now = Date.now();
     const DOUBLE_PRESS_DELAY = 300;
-    const UNMUTE_DELAY = 2000;
 
     if (now - lastTapRef.current.time < DOUBLE_PRESS_DELAY) {
+      // Double tap: Like the reel
       if (!liked) {
         handleLike();
         Animated.sequence([
           Animated.timing(doubleTapAnim, {
             toValue: 1,
-            duration: 200,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(doubleTapAnim, {
+            toValue: 1,
+            duration: 500,
             useNativeDriver: true,
           }),
           Animated.timing(doubleTapAnim, {
             toValue: 0,
-            duration: 200,
+            duration: 500,
             useNativeDriver: true,
           }),
         ]).start();
       }
+      clearTimeout(tapTimeoutRef.current);
       lastTapRef.current = { time: now };
     } else {
-      if (!muted) {
-        setMuted(true);
-      } else {
-        setTimeout(() => {
-          setMuted(false);
-        }, UNMUTE_DELAY);
-      }
+      // Single tap: Schedule mute/unmute after delay
       lastTapRef.current = { time: now };
+      tapTimeoutRef.current = setTimeout(() => {
+        setMuted(prev => {
+          const newMuted = !prev;
+          showMuteIconAnimation();
+          Trace('Mute Toggled', { muted: newMuted });
+          return newMuted;
+        });
+      }, DOUBLE_PRESS_DELAY);
     }
-  }, [liked, handleLike, doubleTapAnim, muted]);
+  }, [liked, handleLike, doubleTapAnim, showMuteIconAnimation]);
+
+  // Handle long press to pause
+  const handleLongPress = useCallback(() => {
+    setPaused(true);
+    Trace('Video Paused');
+  }, []);
+
+  // Handle release to resume
+  const handlePressOut = useCallback(() => {
+    setPaused(false);
+    Trace('Video Resumed');
+  }, []);
 
   // Handle save
   const handleSave = useCallback(() => {
-    setSaved((prev) => !prev);
-  }, []);
+    dispatch(toggleSave());
+    Trace('Save Toggled', { saved: !saved });
+  }, [dispatch, saved]);
 
   // Share reel
   const handleShare = useCallback(async () => {
@@ -135,15 +209,20 @@ const ReelView = ({ route }) => {
         url: reel.videoUrl,
       };
       await Share.open(shareOptions);
+      Trace('Reel Shared');
     } catch (error) {
-      console.error('Share error:', error);
+      Trace('Share Error', { error: error.message });
     }
     setShareModalVisible(false);
   }, [reel]);
 
-  useEffect(() => {
-    fetchComments();
-  }, [fetchComments]);
+  // Handle video load to get natural dimensions
+  const handleVideoLoad = useCallback(({ naturalSize }) => {
+    if (naturalSize.width && naturalSize.height) {
+      setVideoAspectRatio(naturalSize.width / naturalSize.height);
+      Trace('Video Loaded', { aspectRatio: naturalSize.width / naturalSize.height });
+    }
+  }, []);
 
   const videoUri = reel.videoUrl.startsWith('http')
     ? reel.videoUrl
@@ -151,18 +230,29 @@ const ReelView = ({ route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableWithoutFeedback onPress={handleTap}>
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => navigation.goBack()}
+      >
+        <Ionicons name="arrow-back" size={scale(28)} color={TEXT_COLOR} />
+      </TouchableOpacity>
+      <TouchableWithoutFeedback
+        onPress={handleTap}
+        onLongPress={handleLongPress}
+        onPressOut={handlePressOut}
+      >
         <View style={styles.reelContainer}>
           <Video
             ref={videoRef}
             source={{ uri: videoUri }}
-            style={styles.video}
-            resizeMode="cover"
+            style={[styles.video, { aspectRatio: videoAspectRatio }]}
+            resizeMode="contain"
             repeat
             muted={muted}
-            paused={false}
+            paused={paused}
             onBuffer={({ isBuffering }) => setBuffering(isBuffering)}
-            onError={(e) => console.log('Video error:', e)}
+            onError={e => Trace('Video Error', { error: e })}
+            onLoad={handleVideoLoad}
             bufferConfig={{
               minBufferMs: 2000,
               maxBufferMs: 5000,
@@ -173,12 +263,29 @@ const ReelView = ({ route }) => {
           />
           {buffering && (
             <ActivityIndicator
-              size="large"
-              color="white"
+              size={scale(40)}
+              color={REELS_LOADER_COLOR}
               style={styles.bufferIndicator}
             />
           )}
 
+          {/* Mute/Unmute Icon */}
+          {showMuteIcon && (
+            <Animated.View
+              style={[
+                styles.muteIconContainer,
+                { opacity: muteIconOpacity },
+              ]}
+            >
+              <Ionicons
+                name={muted ? 'volume-mute' : 'volume-high'}
+                size={scale(40)}
+                color={TEXT_COLOR}
+              />
+            </Animated.View>
+          )}
+
+          {/* Double-tap like animation */}
           <Animated.View
             style={[
               styles.doubleTapHeart,
@@ -188,7 +295,7 @@ const ReelView = ({ route }) => {
               },
             ]}
           >
-            <Ionicons name="heart" size={80} color="white" />
+            <Ionicons name="heart" size={scale(80)} color={TEXT_COLOR} />
           </Animated.View>
 
           <LinearGradient
@@ -199,10 +306,10 @@ const ReelView = ({ route }) => {
               <View style={styles.userInfo}>
                 <TouchableOpacity
                   style={{ flexDirection: 'row', alignItems: 'center' }}
-                  onPress={() => navigation.goBack()}
+                  onPress={() => navigation.navigate('UserProfile', { userId: reel.user?._id })}
                 >
                   <Image
-                    source={{ uri: reel.user?.avatar || 'https://via.placeholder.com/40' }}
+                    source={{ uri: reel.user?.avatar || DEFAULT_IMAGE_URL }}
                     style={styles.avatar}
                   />
                   <Text style={styles.username}>
@@ -215,8 +322,7 @@ const ReelView = ({ route }) => {
               </View>
               <Text style={styles.caption}>{reel.caption || ''}</Text>
               <Text style={styles.stats}>
-                {liked ? reel.likes + 1 : reel.likes || 0} Likes ·{' '}
-                {reel.comments || 0} Comments
+                {likesCount} Likes · {commentsCount} Comments
               </Text>
             </View>
 
@@ -229,53 +335,55 @@ const ReelView = ({ route }) => {
               >
                 <Ionicons
                   name={liked ? 'heart' : 'heart-outline'}
-                  size={30}
-                  color={liked ? 'red' : 'white'}
+                  size={scale(30)}
+                  color={liked ? '#FF3E6D' : TEXT_COLOR}
                   onPress={handleLike}
                 />
-                <Text style={styles.iconText}>
-                  {(liked ? reel.likes + 1 : reel.likes || 0).toString()}
-                </Text>
+                <Text style={styles.iconText}>{likesCount.toString()}</Text>
               </Animated.View>
 
               <Pressable
                 onPress={() => {
-                  fetchComments();
+                  dispatch(fetchComments(reel._id));
                   setCommentModalVisible(true);
                 }}
                 style={styles.iconContainer}
               >
-                <Ionicons name="chatbubble-outline" size={26} color="white" />
-                <Text style={styles.iconText}>{(reel.comments || 0).toString()}</Text>
+                <Ionicons name="chatbubble-outline" size={scale(26)} color={TEXT_COLOR} />
+                <Text style={styles.iconText}>{commentsCount.toString()}</Text>
               </Pressable>
 
               <Pressable
                 onPress={() => setShareModalVisible(true)}
                 style={styles.iconContainer}
               >
-                <Ionicons name="paper-plane-outline" size={26} color="white" />
+                <Ionicons name="paper-plane-outline" size={scale(26)} color={TEXT_COLOR} />
                 <Text style={styles.iconText}>Share</Text>
               </Pressable>
 
-              <Pressable
-                onPress={handleSave}
-                style={styles.iconContainer}
-              >
+              <Pressable onPress={handleSave} style={styles.iconContainer}>
                 <Ionicons
                   name={saved ? 'bookmark' : 'bookmark-outline'}
-                  size={26}
-                  color="white"
+                  size={scale(26)}
+                  color={TEXT_COLOR}
                 />
               </Pressable>
 
               <Pressable
-                onPress={() => setMuted((prev) => !prev)}
+                onPress={() => {
+                  setMuted(prev => {
+                    const newMuted = !prev;
+                    showMuteIconAnimation();
+                    Trace('Mute Toggled', { muted: newMuted });
+                    return newMuted;
+                  });
+                }}
                 style={styles.iconContainer}
               >
                 <Ionicons
                   name={muted ? 'volume-mute' : 'volume-high'}
-                  size={26}
-                  color="white"
+                  size={scale(26)}
+                  color={TEXT_COLOR}
                 />
               </Pressable>
             </View>
@@ -287,26 +395,30 @@ const ReelView = ({ route }) => {
         <View style={styles.modalContainer}>
           <View style={styles.commentBox}>
             <Text style={styles.modalTitle}>Comments</Text>
-            <FlatList
-              data={comments}
-              renderItem={({ item }) => (
-                <View style={styles.commentItem}>
-                  <Text style={styles.commentUser}>{item.userName}</Text>
-                  <Text style={styles.commentText}>{item.text}</Text>
-                </View>
-              )}
-              keyExtractor={(item) => item._id}
-              style={styles.commentList}
-            />
+            {loadingComments ? (
+              <ActivityIndicator size={scale(30)} color={PRIMARY_COLOR} />
+            ) : (
+              <FlatList
+                data={comments}
+                renderItem={({ item }) => (
+                  <View style={styles.commentItem}>
+                    <Text style={styles.commentUser}>{item.userName}</Text>
+                    <Text style={styles.commentText}>{item.text}</Text>
+                  </View>
+                )}
+                keyExtractor={item => item._id}
+                style={styles.commentList}
+              />
+            )}
             <View style={styles.commentInputContainer}>
               <TextInput
                 style={styles.commentInput}
                 value={newComment}
                 onChangeText={setNewComment}
                 placeholder="Add a comment..."
-                placeholderTextColor="gray"
+                placeholderTextColor="#A0A0A0"
               />
-              <Pressable onPress={postComment} style={styles.postButton}>
+              <Pressable onPress={handlePostComment} style={styles.postButton}>
                 <Text style={styles.postButtonText}>Post</Text>
               </Pressable>
             </View>
@@ -321,14 +433,12 @@ const ReelView = ({ route }) => {
         <View style={styles.centeredModalContainer}>
           <View style={styles.shareBox}>
             <Text style={styles.modalTitle}>Share Reel</Text>
-            <Pressable
-              onPress={handleShare}
-              style={styles.shareOption}
-            >
+            <Pressable onPress={handleShare} style={styles.shareOption}>
               <Text style={styles.shareOptionText}>Share via...</Text>
             </Pressable>
             <Pressable
               onPress={() => {
+                Trace('Copy Link Clicked');
                 setShareModalVisible(false);
               }}
               style={styles.shareOption}
@@ -348,177 +458,204 @@ const ReelView = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'black',
+    backgroundColor: '#000000',
+  },
+  backButton: {
+    position: 'absolute',
+    top: scale(20),
+    left: scale(15),
+    zIndex: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: scale(20),
+    padding: scale(8),
   },
   reelContainer: {
-    height: height - 50,
+    flex: 1,
     width,
-    backgroundColor: 'black',
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   video: {
-    height: '100%',
     width: '100%',
-    position: 'absolute',
+    maxHeight: '100%',
   },
   bufferIndicator: {
     position: 'absolute',
     top: '50%',
     left: '50%',
-    transform: [{ translateX: -20 }, { translateY: -20 }],
+    transform: [{ translateX: -scale(20) }, { translateY: -scale(20) }],
+  },
+  muteIconContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -scale(20) }, { translateY: -scale(20) }],
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   overlay: {
-    flex: 1,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
     justifyContent: 'flex-end',
-    padding: 16,
+    padding: scale(16),
   },
   bottomLeft: {
     position: 'absolute',
-    bottom: 80,
-    left: 10,
+    bottom: scale(80),
+    left: scale(10),
     width: '70%',
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: scale(8),
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 8,
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
+    marginRight: scale(8),
     borderWidth: 1,
-    borderColor: 'white',
+    borderColor: TEXT_COLOR,
   },
   username: {
-    color: 'white',
+    color: TEXT_COLOR,
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: scaleFont(16),
   },
   followButton: {
-    marginLeft: 10,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
+    marginLeft: scale(10),
+    paddingVertical: scale(4),
+    paddingHorizontal: scale(10),
     borderWidth: 1,
-    borderColor: 'white',
-    borderRadius: 12,
+    borderColor: TEXT_COLOR,
+    borderRadius: scale(12),
   },
   followText: {
-    color: 'white',
-    fontSize: 12,
+    color: TEXT_COLOR,
+    fontSize: scaleFont(12),
   },
   caption: {
-    color: 'white',
-    fontSize: 14,
-    marginBottom: 4,
+    color: TEXT_COLOR,
+    fontSize: scaleFont(14),
+    marginBottom: scale(4),
   },
   stats: {
-    color: 'white',
-    fontSize: 12,
+    color: TEXT_COLOR,
+    fontSize: scaleFont(12),
     opacity: 0.8,
   },
   rightButtons: {
     position: 'absolute',
-    right: 10,
-    bottom: 80,
+    right: scale(10),
+    bottom: scale(80),
     alignItems: 'center',
   },
   iconContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: scale(20),
   },
   iconText: {
-    color: 'white',
-    fontSize: 12,
-    marginTop: 4,
+    color: TEXT_COLOR,
+    fontSize: scaleFont(12),
+    marginTop: scale(4),
   },
   doubleTapHeart: {
     position: 'absolute',
     top: '50%',
     left: '50%',
-    transform: [{ translateX: -40 }, { translateY: -40 }],
+    transform: [{ translateX: -scale(40) }, { translateY: -scale(40) }],
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: REELS_MODAL_BG_COLOR,
   },
   commentBox: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: '#FFFFFF',
+    padding: scale(20),
+    borderTopLeftRadius: scale(20),
+    borderTopRightRadius: scale(20),
     maxHeight: height * 0.7,
   },
   commentList: {
     maxHeight: height * 0.5,
   },
   commentItem: {
-    marginBottom: 10,
+    marginBottom: scale(10),
   },
   commentUser: {
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: scaleFont(14),
   },
   commentText: {
-    fontSize: 14,
-    color: 'gray',
+    fontSize: scaleFont(14),
+    color: '#666666',
   },
   commentInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: scale(10),
     borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingTop: 10,
+    borderTopColor: '#EEEEEE',
+    paddingTop: scale(10),
   },
   commentInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 20,
-    padding: 10,
-    marginRight: 10,
+    borderColor: '#DDDDDD',
+    borderRadius: scale(20),
+    padding: scale(10),
+    marginRight: scale(10),
+    fontSize: scaleFont(14),
+    color: '#000000',
   },
   postButton: {
-    padding: 10,
+    padding: scale(10),
   },
   postButtonText: {
-    color: 'blue',
+    color: REELS_BUTTON_COLOR,
     fontWeight: 'bold',
+    fontSize: scaleFont(14),
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: scaleFont(18),
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: scale(10),
+    color: '#000000',
   },
   closeBtn: {
-    marginTop: 20,
-    color: 'blue',
+    marginTop: scale(20),
+    color: REELS_BUTTON_COLOR,
     fontWeight: 'bold',
+    fontSize: scaleFont(14),
     textAlign: 'center',
   },
   centeredModalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: REELS_MODAL_BG_COLOR,
   },
   shareBox: {
-    backgroundColor: 'white',
-    padding: 25,
-    borderRadius: 15,
+    backgroundColor: '#FFFFFF',
+    padding: scale(25),
+    borderRadius: scale(15),
     width: '80%',
     alignItems: 'center',
   },
   shareOption: {
-    padding: 10,
+    padding: scale(10),
     width: '100%',
     alignItems: 'center',
   },
   shareOptionText: {
-    fontSize: 16,
-    color: 'black',
+    fontSize: scaleFont(16),
+    color: '#000000',
   },
 });
 

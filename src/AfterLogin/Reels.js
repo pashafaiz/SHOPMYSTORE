@@ -1,6 +1,4 @@
-
-
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import {
   View,
   FlatList,
@@ -12,64 +10,101 @@ import {
   Pressable,
   Modal,
   ActivityIndicator,
-  RefreshControl,
   TextInput,
   Image,
   TouchableOpacity,
   SafeAreaView,
+  RefreshControl,
 } from 'react-native';
 import Video from 'react-native-video';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Share from 'react-native-share';
 import LinearGradient from 'react-native-linear-gradient';
-import { getReelsApi, BASE_URL, postCommentApi, getCommentsApi } from '../../apiClient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  fetchReels,
+  fetchComments,
+  postComment,
+  setRefreshing,
+} from '../redux/slices/reelsSlice';
+import {
+  BASE_URL,
+  ALLOWED_ASPECT_RATIOS,
+  REELS_LOADER_COLOR,
+  REELS_REFRESH_TINT_COLOR,
+  REELS_MODAL_BG_COLOR,
+  REELS_MODAL_TEXT_COLOR,
+  REELS_BUTTON_COLOR,
+  EMPTY_REELS_TEXT,
+} from '../constants/GlobalConstants';
 
 const { height, width } = Dimensions.get('window');
 
 const Reels = () => {
   const navigation = useNavigation();
-  const [reelsData, setReelsData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const insets = useSafeAreaInsets();
+  const dispatch = useDispatch();
+  const { reels, comments, loading, refreshing, error } = useSelector((state) => state.reels);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [likedReels, setLikedReels] = useState({});
   const [savedReels, setSavedReels] = useState({});
   const [muted, setMuted] = useState(true);
+  const [pausedReels, setPausedReels] = useState({});
   const [commentModalVisible, setCommentModalVisible] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
-  const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [selectedReelId, setSelectedReelId] = useState(null);
   const [buffering, setBuffering] = useState({});
   const [isScreenFocused, setIsScreenFocused] = useState(true);
+  const [showMuteIcon, setShowMuteIcon] = useState(false);
+  const [videoAspectRatios, setVideoAspectRatios] = useState({});
   const flatListRef = useRef(null);
   const videoRefs = useRef({});
   const likeAnim = useRef(new Animated.Value(1)).current;
   const doubleTapAnim = useRef(new Animated.Value(0)).current;
+  const muteIconOpacity = useRef(new Animated.Value(0)).current;
+  const tapTimeoutRef = useRef(null);
   const lastTapRef = useRef({ time: 0, id: null });
 
+  // Show mute/unmute icon with animation
+  const showMuteIconAnimation = useCallback(() => {
+    setShowMuteIcon(true);
+    Animated.sequence([
+      Animated.timing(muteIconOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(muteIconOpacity, {
+        toValue: 0,
+        duration: 200,
+        delay: 800,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setShowMuteIcon(false));
+  }, [muteIconOpacity]);
+
   // Fetch reels
-  const fetchReels = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { ok, data } = await getReelsApi();
-      if (ok && Array.isArray(data.reels)) {
-        setReelsData(data.reels);
-      } else {
-        console.error('Invalid reels format:', data);
-        setReelsData([]);
+  const fetchReelsData = useCallback(
+    (isRefresh = false) => {
+      if (isRefresh) {
+        dispatch(setRefreshing(true));
       }
-    } catch (error) {
-      console.error('Reels fetch error:', error);
-    }
-    setLoading(false);
-    setRefreshing(false);
-  }, []);
+      dispatch(fetchReels());
+    },
+    [dispatch]
+  );
 
   useEffect(() => {
-    fetchReels();
-  }, [fetchReels]);
+    fetchReelsData();
+  }, [fetchReelsData]);
+
+  // Handle pull-to-refresh
+  const onRefresh = useCallback(() => {
+    fetchReelsData(true);
+  }, [fetchReelsData]);
 
   // Pause all reels when screen loses focus
   useFocusEffect(
@@ -83,36 +118,6 @@ const Reels = () => {
       };
     }, [])
   );
-
-  // Fetch comments for a reel
-  const fetchComments = useCallback(async (reelId) => {
-    try {
-      const { ok, data } = await getCommentsApi(reelId);
-      if (ok) {
-        setComments(data.comments || []);
-      } else {
-        console.warn('Failed to fetch comments:', data.msg);
-      }
-    } catch (error) {
-      console.error('Comments fetch error:', error);
-    }
-  }, []);
-
-  // Post a comment
-  const postComment = useCallback(async () => {
-    if (!newComment.trim() || !selectedReelId) return;
-    try {
-      const { ok, data } = await postCommentApi(selectedReelId, { text: newComment });
-      if (ok) {
-        fetchComments(selectedReelId);
-        setNewComment('');
-      } else {
-        console.warn('Failed to post comment:', data.msg);
-      }
-    } catch (error) {
-      console.error('Post comment error:', error);
-    }
-  }, [newComment, selectedReelId, fetchComments]);
 
   // Handle like
   const handleLike = useCallback(
@@ -139,7 +144,6 @@ const Reels = () => {
     (id) => {
       const now = Date.now();
       const DOUBLE_PRESS_DELAY = 300;
-      const UNMUTE_DELAY = 2000; // 2 seconds for unmute
 
       if (
         lastTapRef.current.id === id &&
@@ -151,32 +155,52 @@ const Reels = () => {
           Animated.sequence([
             Animated.timing(doubleTapAnim, {
               toValue: 1,
-              duration: 200,
+              duration: 500,
+              useNativeDriver: true,
+            }),
+            Animated.timing(doubleTapAnim, {
+              toValue: 1,
+              duration: 500,
               useNativeDriver: true,
             }),
             Animated.timing(doubleTapAnim, {
               toValue: 0,
-              duration: 200,
+              duration: 500,
               useNativeDriver: true,
             }),
           ]).start();
         }
+        clearTimeout(tapTimeoutRef.current);
         lastTapRef.current = { time: now, id };
       } else {
-        // Single tap: Mute or schedule unmute
-        if (!muted) {
-          // Mute immediately
-          setMuted(true);
-        } else {
-          // Already muted, schedule unmute after 2 seconds
-          setTimeout(() => {
-            setMuted(false);
-          }, UNMUTE_DELAY);
-        }
+        // Single tap: Schedule mute/unmute after delay
         lastTapRef.current = { time: now, id };
+        tapTimeoutRef.current = setTimeout(() => {
+          setMuted((prev) => {
+            const newMuted = !prev;
+            showMuteIconAnimation();
+            return newMuted;
+          });
+        }, DOUBLE_PRESS_DELAY);
       }
     },
-    [likedReels, handleLike, doubleTapAnim, muted]
+    [likedReels, handleLike, doubleTapAnim, showMuteIconAnimation]
+  );
+
+  // Handle long press to pause
+  const handleLongPress = useCallback(
+    (id) => {
+      setPausedReels((prev) => ({ ...prev, [id]: true }));
+    },
+    []
+  );
+
+  // Handle release to resume
+  const handlePressOut = useCallback(
+    (id) => {
+      setPausedReels((prev) => ({ ...prev, [id]: false }));
+    },
+    []
   );
 
   const handleSave = useCallback((id) => {
@@ -184,76 +208,140 @@ const Reels = () => {
   }, []);
 
   // Share reel
-  const handleShare = useCallback(async (reel) => {
-    try {
-      const shareOptions = {
-        message: `Check out this reel: ${reel.caption}`,
-        url: reel.videoUrl,
-      };
-      await Share.open(shareOptions);
-    } catch (error) {
-      console.error('Share error:', error);
-    }
-    setShareModalVisible(false);
-  }, []);
-
-  // Handle scroll to update current index and reset video position
-  const onViewableItemsChanged = useRef(({ viewableItems, changed }) => {
-    if (viewableItems.length > 0) {
-      const newIndex = viewableItems[0].index;
-      setCurrentIndex(newIndex);
-
-      // Reset video position for the newly visible reel
-      if (videoRefs.current[reelsData[newIndex]?._id]) {
-        videoRefs.current[reelsData[newIndex]._id].seek(0);
+  const handleShare = useCallback(
+    async (reel) => {
+      try {
+        const shareOptions = {
+          message: `Check out this reel: ${reel.caption}`,
+          url: reel.videoUrl,
+        };
+        await Share.open(shareOptions);
+      } catch (error) {
+        console.error('Share error:', error);
       }
+      setShareModalVisible(false);
+    },
+    []
+  );
 
-      // Reset position of videos that are no longer visible
-      changed.forEach(({ item, isViewable }) => {
-        if (!isViewable && videoRefs.current[item._id]) {
-          videoRefs.current[item._id].seek(0);
+  // Handle viewable items changed for updating currentIndex
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }) => {
+      if (viewableItems.length > 0) {
+        const newIndex = viewableItems[0].index;
+        if (newIndex !== currentIndex && newIndex >= 0 && newIndex < reels.length) {
+          setCurrentIndex(newIndex);
+          console.log('Snapped to index:', newIndex);
+          if (videoRefs.current[reels[newIndex]?._id]) {
+            videoRefs.current[reels[newIndex]._id].seek(0);
+          }
         }
-      });
-    }
-  }).current;
+      }
+    },
+    [currentIndex, reels]
+  );
+
+  const viewabilityConfig = useMemo(
+    () => ({
+      itemVisiblePercentThreshold: 80,
+      minimumViewTime: 100,
+    }),
+    []
+  );
+
+  // Define item layout for FlatList
+  const getItemLayout = useCallback(
+    (data, index) => ({
+      length: height - insets.top - insets.bottom,
+      offset: (height - insets.top - insets.bottom) * index,
+      index,
+    }),
+    [insets]
+  );
 
   // Render each reel
   const renderItem = useCallback(
     ({ item, index }) => {
       const isActive = currentIndex === index && isScreenFocused;
-      const videoUri = item.videoUrl.startsWith('http')
-        ? item.videoUrl
-        : `${BASE_URL.replace('/api', '')}/${item.videoUrl.replace(/^\/+/, '')}`;
+      const isPaused = pausedReels[item._id] || false;
+      const videoUri = item.videoUrl;
+
+      // Calculate video dimensions
+      const aspectRatio = videoAspectRatios[item._id] || 9 / 16;
+      const videoHeight = Math.min(width / aspectRatio, height - insets.top - insets.bottom);
+      const videoWidth = videoHeight * aspectRatio;
+      const offsetX = (width - videoWidth) / 2;
+      const offsetY = (height - insets.top - insets.bottom - videoHeight) / 2;
 
       return (
-        <TouchableWithoutFeedback onPress={() => handleTap(item._id)}>
-          <View style={styles.reelContainer}>
+        <TouchableWithoutFeedback
+          onPress={() => handleTap(item._id)}
+          onLongPress={() => handleLongPress(item._id)}
+          onPressOut={() => handlePressOut(item._id)}
+        >
+          <View style={[styles.reelContainer, { height: height - insets.top - insets.bottom }]}>
             <Video
               ref={(ref) => (videoRefs.current[item._id] = ref)}
               source={{ uri: videoUri }}
-              style={styles.video}
-              resizeMode="cover"
+              style={[
+                styles.video,
+                {
+                  width: videoWidth,
+                  height: videoHeight,
+                  left: offsetX,
+                  top: offsetY,
+                },
+              ]}
+              resizeMode="contain"
               repeat
               muted={muted}
-              paused={!isActive}
+              paused={!isActive || isPaused}
+              onLoad={({ naturalSize }) => {
+                const { width: videoWidth, height: videoHeight } = naturalSize;
+                const naturalAspectRatio = videoWidth / videoHeight;
+                const closestAspectRatio = ALLOWED_ASPECT_RATIOS.reduce((prev, curr) =>
+                  Math.abs(curr - naturalAspectRatio) < Math.abs(prev - naturalAspectRatio)
+                    ? curr
+                    : prev
+                );
+                setVideoAspectRatios((prev) => ({
+                  ...prev,
+                  [item._id]: closestAspectRatio,
+                }));
+              }}
               onBuffer={({ isBuffering }) => {
                 setBuffering((prev) => ({ ...prev, [item._id]: isBuffering }));
               }}
-              onError={(e) => console.log('Video error:', e)}
+              onError={(e) => {
+                console.error('Video error for', item._id, ':', e);
+              }}
               bufferConfig={{
                 minBufferMs: 2000,
                 maxBufferMs: 5000,
                 bufferForPlaybackMs: 1000,
                 bufferForPlaybackAfterRebufferMs: 1500,
               }}
-              quality="high"
             />
             {buffering[item._id] && (
               <ActivityIndicator
                 size="large"
-                color="white"
+                color={REELS_LOADER_COLOR}
                 style={styles.bufferIndicator}
               />
+            )}
+            {showMuteIcon && (
+              <Animated.View
+                style={[
+                  styles.muteIconContainer,
+                  { opacity: muteIconOpacity },
+                ]}
+              >
+                <Ionicons
+                  name={muted ? 'volume-mute' : 'volume-high'}
+                  size={40}
+                  color={REELS_MODAL_TEXT_COLOR}
+                />
+              </Animated.View>
             )}
 
             {/* Double-tap like animation */}
@@ -266,66 +354,63 @@ const Reels = () => {
                 },
               ]}
             >
-              <Ionicons name="heart" size={80} color="white" />
+              <Ionicons name="heart" size={80} color={REELS_MODAL_TEXT_COLOR} />
             </Animated.View>
 
             <LinearGradient
               colors={['transparent', 'rgba(0,0,0,0.6)']}
-              style={styles.overlay}
+              style={[styles.overlay, { paddingBottom: insets.bottom + 16 }]}
             >
-              <View style={styles.bottomLeft}>
+              <View style={[styles.bottomLeft, { bottom: insets.bottom + 80 }]}>
                 <View style={styles.userInfo}>
                   <TouchableOpacity
                     style={{ flexDirection: 'row', alignItems: 'center' }}
-                    onPress={() => navigation.navigate('UploadReel')}
+                    onPress={() => navigation.navigate('UserProfile', { userId: item.user?._id })}
                   >
                     <Image
-                      source={{ uri: item.user?.avatar || 'https://via.placeholder.com/40' }}
+                      source={{ uri: item.user?.avatar }}
                       style={styles.avatar}
                     />
                     <Text style={styles.username}>
-                      @{item.user?.userName || 'unknown'}
+                      @{item.user?.userName}
                     </Text>
                   </TouchableOpacity>
                   <Pressable style={styles.followButton}>
                     <Text style={styles.followText}>Follow</Text>
                   </Pressable>
                 </View>
-                <Text style={styles.caption}>{item.caption || ''}</Text>
+                <Text style={styles.caption}>{item.caption}</Text>
                 <Text style={styles.stats}>
-                  {likedReels[item._id] ? item.likes + 1 : item.likes || 0} Likes ·{' '}
-                  {item.comments || 0} Comments
+                  {likedReels[item._id] ? item.likes + 1 : item.likes} Likes ·{' '}
+                  {item.comments} Comments
                 </Text>
               </View>
 
-              <View style={styles.rightButtons}>
+              <View style={[styles.rightButtons, { bottom: insets.bottom + 80 }]}>
                 <Animated.View
-                  style={[
-                    styles.iconContainer,
-                    { transform: [{ scale: likeAnim }] },
-                  ]}
+                  style={[styles.iconContainer, { transform: [{ scale: likeAnim }] }]}
                 >
                   <Ionicons
                     name={likedReels[item._id] ? 'heart' : 'heart-outline'}
                     size={30}
-                    color={likedReels[item._id] ? 'red' : 'white'}
+                    color={likedReels[item._id] ? 'red' : REELS_MODAL_TEXT_COLOR}
                     onPress={() => handleLike(item._id)}
                   />
                   <Text style={styles.iconText}>
-                    {(likedReels[item._id] ? item.likes + 1 : item.likes || 0).toString()}
+                    {(likedReels[item._id] ? item.likes + 1 : item.likes).toString()}
                   </Text>
                 </Animated.View>
 
                 <Pressable
                   onPress={() => {
                     setSelectedReelId(item._id);
-                    fetchComments(item._id);
+                    dispatch(fetchComments(item._id));
                     setCommentModalVisible(true);
                   }}
                   style={styles.iconContainer}
                 >
-                  <Ionicons name="chatbubble-outline" size={26} color="white" />
-                  <Text style={styles.iconText}>{(item.comments || 0).toString()}</Text>
+                  <Ionicons name="chatbubble-outline" size={26} color={REELS_MODAL_TEXT_COLOR} />
+                  <Text style={styles.iconText}>{item.comments.toString()}</Text>
                 </Pressable>
 
                 <Pressable
@@ -335,7 +420,7 @@ const Reels = () => {
                   }}
                   style={styles.iconContainer}
                 >
-                  <Ionicons name="paper-plane-outline" size={26} color="white" />
+                  <Ionicons name="paper-plane-outline" size={26} color={REELS_MODAL_TEXT_COLOR} />
                   <Text style={styles.iconText}>Share</Text>
                 </Pressable>
 
@@ -346,18 +431,24 @@ const Reels = () => {
                   <Ionicons
                     name={savedReels[item._id] ? 'bookmark' : 'bookmark-outline'}
                     size={26}
-                    color="white"
+                    color={REELS_MODAL_TEXT_COLOR}
                   />
                 </Pressable>
 
                 <Pressable
-                  onPress={() => setMuted((prev) => !prev)}
+                  onPress={() => {
+                    setMuted((prev) => {
+                      const newMuted = !prev;
+                      showMuteIconAnimation();
+                      return newMuted;
+                    });
+                  }}
                   style={styles.iconContainer}
                 >
                   <Ionicons
                     name={muted ? 'volume-mute' : 'volume-high'}
                     size={26}
-                    color="white"
+                    color={REELS_MODAL_TEXT_COLOR}
                   />
                 </Pressable>
               </View>
@@ -371,29 +462,38 @@ const Reels = () => {
       likedReels,
       savedReels,
       muted,
+      pausedReels,
       buffering,
       handleLike,
       handleTap,
+      handleLongPress,
+      handlePressOut,
       handleSave,
       likeAnim,
       doubleTapAnim,
-      fetchComments,
+      dispatch,
       isScreenFocused,
-      reelsData,
+      reels,
+      navigation,
+      videoAspectRatios,
+      showMuteIcon,
+      muteIconOpacity,
+      showMuteIconAnimation,
+      insets,
     ]
   );
 
-  // Optimize FlatList rendering
-  const getItemLayout = (data, index) => ({
-    length: height - 50,
-    offset: (height - 50) * index,
-    index,
-  });
+  // Post a comment
+  const handlePostComment = useCallback(() => {
+    if (!newComment.trim() || !selectedReelId) return;
+    dispatch(postComment({ reelId: selectedReelId, text: newComment }));
+    setNewComment('');
+  }, [dispatch, newComment, selectedReelId]);
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="white" />
+        <ActivityIndicator size="large" color={REELS_LOADER_COLOR} />
       </SafeAreaView>
     );
   }
@@ -402,26 +502,46 @@ const Reels = () => {
     <SafeAreaView style={styles.container}>
       <FlatList
         ref={flatListRef}
-        data={reelsData}
+        data={reels}
         renderItem={renderItem}
         keyExtractor={(item) => item._id}
-        pagingEnabled
         showsVerticalScrollIndicator={false}
-        snapToInterval={height - 50}
+        pagingEnabled
+        snapToInterval={height - insets.top - insets.bottom}
         snapToAlignment="start"
         decelerationRate="fast"
-        initialNumToRender={1} // Render one reel at a time
-        maxToRenderPerBatch={2}
-        windowSize={3} // Reduced to minimize overlap
-        getItemLayout={getItemLayout}
+        scrollEventThrottle={16}
         onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={{
-          itemVisiblePercentThreshold: 90, // Stricter snapping
-        }}
+        viewabilityConfig={viewabilityConfig}
+        getItemLayout={getItemLayout}
+        removeClippedSubviews={true}
+        initialNumToRender={2}
+        maxToRenderPerBatch={3}
+        windowSize={5}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={fetchReels} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={REELS_REFRESH_TINT_COLOR}
+            colors={[REELS_REFRESH_TINT_COLOR]}
+            progressBackgroundColor="black"
+          />
         }
-        snapToOffsets={reelsData.map((_, index) => index * (height - 50))} // Explicit snap points
+        ListEmptyComponent={
+          !loading && !refreshing && (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                {error ? `Error: ${error}` : EMPTY_REELS_TEXT}
+              </Text>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={() => fetchReelsData()}
+              >
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          )
+        }
       />
 
       {/* Comment Modal */}
@@ -430,7 +550,7 @@ const Reels = () => {
           <View style={styles.commentBox}>
             <Text style={styles.modalTitle}>Comments</Text>
             <FlatList
-              data={comments}
+              data={comments[selectedReelId] || []}
               renderItem={({ item }) => (
                 <View style={styles.commentItem}>
                   <Text style={styles.commentUser}>{item.userName}</Text>
@@ -448,7 +568,7 @@ const Reels = () => {
                 placeholder="Add a comment..."
                 placeholderTextColor="gray"
               />
-              <Pressable onPress={postComment} style={styles.postButton}>
+              <Pressable onPress={handlePostComment} style={styles.postButton}>
                 <Text style={styles.postButtonText}>Post</Text>
               </Pressable>
             </View>
@@ -465,14 +585,13 @@ const Reels = () => {
           <View style={styles.shareBox}>
             <Text style={styles.modalTitle}>Share Reel</Text>
             <Pressable
-              onPress={() => handleShare(reelsData.find((reel) => reel._id === selectedReelId))}
+              onPress={() => handleShare(reels.find((reel) => reel._id === selectedReelId))}
               style={styles.shareOption}
             >
               <Text style={styles.shareOptionText}>Share via...</Text>
             </Pressable>
             <Pressable
               onPress={() => {
-                // Copy link logic (use react-native-clipboard)
                 setShareModalVisible(false);
               }}
               style={styles.shareOption}
@@ -495,13 +614,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'black',
   },
   reelContainer: {
-    height: height - 50,
     width,
     backgroundColor: 'black',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   video: {
-    height: '100%',
-    width: '100%',
     position: 'absolute',
   },
   bufferIndicator: {
@@ -510,14 +628,22 @@ const styles = StyleSheet.create({
     left: '50%',
     transform: [{ translateX: -20 }, { translateY: -20 }],
   },
+  muteIconContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -20 }, { translateY: -20 }],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
     padding: 16,
+    width: '100%',
   },
   bottomLeft: {
     position: 'absolute',
-    bottom: 80,
     left: 10,
     width: '70%',
   },
@@ -564,7 +690,6 @@ const styles = StyleSheet.create({
   rightButtons: {
     position: 'absolute',
     right: 10,
-    bottom: 80,
     alignItems: 'center',
   },
   iconContainer: {
@@ -585,7 +710,7 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: REELS_MODAL_BG_COLOR,
   },
   commentBox: {
     backgroundColor: 'white',
@@ -628,7 +753,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   postButtonText: {
-    color: 'blue',
+    color: REELS_BUTTON_COLOR,
     fontWeight: 'bold',
   },
   modalTitle: {
@@ -638,7 +763,7 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     marginTop: 20,
-    color: 'blue',
+    color: REELS_BUTTON_COLOR,
     fontWeight: 'bold',
     textAlign: 'center',
   },
@@ -646,7 +771,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: REELS_MODAL_BG_COLOR,
   },
   shareBox: {
     backgroundColor: 'white',
@@ -669,6 +794,29 @@ const styles = StyleSheet.create({
     backgroundColor: 'black',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: height * 0.8,
+  },
+  emptyText: {
+    color: REELS_MODAL_TEXT_COLOR,
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: REELS_BUTTON_COLOR,
+    borderRadius: 10,
+  },
+  retryButtonText: {
+    color: REELS_MODAL_TEXT_COLOR,
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
 
