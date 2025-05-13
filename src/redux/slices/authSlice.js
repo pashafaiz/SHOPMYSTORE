@@ -117,14 +117,6 @@ const authSlice = createSlice({
     clearErrors: (state) => {
       state.errors = {};
     },
-    logout: (state) => {
-      state.token = null;
-      state.user = null;
-      state.email = null;
-      state.isAuthenticated = false;
-      AsyncStorage.removeItem('userToken');
-      AsyncStorage.removeItem('user');
-    },
   },
   extraReducers: (builder) => {
     builder
@@ -192,9 +184,16 @@ const authSlice = createSlice({
       })
       .addCase(checkAuth.rejected, (state) => {
         state.isAuthenticated = false;
+      })
+      // Handle profile/logout from profileSlice
+      .addCase('profile/logout/fulfilled', (state) => {
+        state.token = null;
+        state.user = null;
+        state.email = null;
+        state.isAuthenticated = false;
       });
   },
 });
 
-export const { setOtp, setOtpTimer, clearErrors, logout } = authSlice.actions;
+export const { setOtp, setOtpTimer, clearErrors } = authSlice.actions;
 export default authSlice.reducer;

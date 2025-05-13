@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "176825143733",
+    "project_id": "luxe-store-74e03",
+    "storage_bucket": "luxe-store-74e03.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:176825143733:android:c328726ae6a144466ec9fc",
+        "android_client_info": {
+          "package_name": "com.shopmystore"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "176825143733-3rc603ui81flsokrso4uqctg0rje045g.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.shopmystore",
+            "certificate_hash": "a445d1ccdf2fbfd8ddd1d8706a7fc6e7bdd5efd7"
+          }
+        },
+        {
+          "client_id": "176825143733-v9jrtn0g0b77n2e0ia02hkjmn4ughvre.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDKCg0jBVPvDveuz0jO4BQV6_KIKEyv5UA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "176825143733-v9jrtn0g0b77n2e0ia02hkjmn4ughvre.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

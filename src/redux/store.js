@@ -9,6 +9,14 @@ import uploadReelSlice from './slices/uploadReelSlice';
 import productDetailSlice from './slices/productDetailSlice';
 import userProfileReducer from './slices/userProfileSlice';
 import productModalReducer from './slices/productModalSlice';
+import supportReducer from './slices/supportSlice';
+import checkoutReducer from './slices/checkoutSlice';
+import ordersReducer from './slices/ordersSlice';
+import notificationsReducer from './slices/notificationsSlice'
+import notificationScreenReducer from './slices/notificationScreenSlice'
+import chatReducer from './slices/chatSlice';
+
+
 
 export const store = configureStore({
   reducer: {
@@ -22,7 +30,13 @@ export const store = configureStore({
     productDetail: productDetailSlice,
     userProfile: userProfileReducer,
     productModal: productModalReducer,
-  },
+    support: supportReducer, 
+    checkout: checkoutReducer,
+    orders: ordersReducer,
+    notifications: notificationsReducer,
+    NotificationsScreen: notificationScreenReducer,
+    chat: chatReducer
+    },
 });
 
 export default store;

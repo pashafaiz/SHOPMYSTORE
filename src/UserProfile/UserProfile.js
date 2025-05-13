@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,13 @@ import {
   Pressable,
   StatusBar,
   Image,
+  Modal,
+  TextInput,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import AntDesign from 'react-native-vector-icons/AntDesign';
+import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -32,6 +35,7 @@ import {
   setRefreshing,
   selectUserProfile,
 } from '../redux/slices/userProfileSlice';
+import Toast from 'react-native-toast-message';
 import img from '../assets/Images/img';
 import Trace from '../utils/Trace';
 import {
@@ -75,7 +79,15 @@ const RenderItem = ({ item, index, isProduct, navigation }) => {
   const imageUri = isProduct
     ? (typeof item.media === 'string' && item.media ? item.media : FALLBACK_IMAGE_URL)
     : (item.thumbnail || FALLBACK_IMAGE_URL);
-  Trace('Image URI', { imageUri, itemId: item._id || item.id, isProduct });
+  
+  const likesCount = item.likes?.length || 0;
+  const commentsCount = item.comments?.length || 0;
+  Trace('Reel Stats', {
+    itemId: item._id || item.id,
+    likesCount,
+    commentsCount,
+    isProduct,
+  });
 
   return (
     <Animated.View
@@ -98,6 +110,8 @@ const RenderItem = ({ item, index, isProduct, navigation }) => {
             styles.itemCard,
             !isProduct && styles.reelCard,
           ]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
         >
           <Image
             source={{ uri: imageUri }}
@@ -108,18 +122,40 @@ const RenderItem = ({ item, index, isProduct, navigation }) => {
           {!isProduct && (
             <>
               <LinearGradient
-                colors={['rgba(0, 0, 0, 0.2)', 'rgba(0, 0, 0, 0.5)']}
+                colors={['rgba(0, 0, 0, 0.2)', 'rgba(0, 0, 0, 0.7)']}
                 style={styles.imageOverlay}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
               />
               <View style={styles.playIcon}>
                 <MaterialCommunityIcons name="play" size={scale(24)} color="#FFFFFF" />
               </View>
+              <View style={styles.reelStats}>
+                <View style={styles.reelStat}>
+                  <AntDesign name="heart" size={scale(12)} color="#FFFFFF" />
+                  <Text style={styles.reelStatText}>{likesCount}</Text>
+                </View>
+                <View style={styles.reelStat}>
+                  <FontAwesome name="comment" size={scale(12)} color="#FFFFFF" />
+                  <Text style={styles.reelStatText}>{commentsCount}</Text>
+                </View>
+              </View>
             </>
           )}
           {isProduct && (
-            <View style={styles.priceTag}>
-              <Text style={styles.priceText}>₹{item.price || 'N/A'}</Text>
-            </View>
+            <>
+              <View style={styles.priceTag}>
+                <Text style={styles.priceText}>₹{item.price || 'N/A'}</Text>
+                {item.originalPrice && (
+                  <Text style={styles.originalPriceText}>₹{item.originalPrice}</Text>
+                )}
+              </View>
+              {item.discount && (
+                <View style={styles.discountBadge}>
+                  <Text style={styles.discountText}>{item.discount}% OFF</Text>
+                </View>
+              )}
+            </>
           )}
         </LinearGradient>
       </TouchableOpacity>
@@ -140,6 +176,11 @@ const UserProfile = ({ route }) => {
     errorMessage,
     refreshing,
   } = useSelector(selectUserProfile);
+  
+  const [messageModalVisible, setMessageModalVisible] = useState(false);
+  const [messageText, setMessageText] = useState('');
+  const [isFollowing, setIsFollowing] = useState(false);
+  const messageInputRef = useRef(null);
 
   const onRefresh = useCallback(async () => {
     Trace('Refreshing User Profile Data', { userId });
@@ -170,14 +211,54 @@ const UserProfile = ({ route }) => {
     }
   }, [userId, onRefresh]);
 
+  useEffect(() => {
+    if (!messageModalVisible) {
+      setMessageText('');
+      messageInputRef.current?.clear();
+    }
+  }, [messageModalVisible]);
+
   const handleTabChange = (tab) => {
     dispatch(setActiveTab(tab));
+  };
+
+  const toggleFollow = () => {
+    setIsFollowing(!isFollowing);
+  };
+
+  const handleSendMessage = () => {
+    if (!messageText.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Input',
+        text2: 'Please enter a message.',
+        position: 'top',
+      });
+      return;
+    }
+
+    setMessageText('');
+    messageInputRef.current?.clear();
+    messageInputRef.current?.blur();
+    setTimeout(() => {
+      messageInputRef.current?.clear();
+      setMessageText('');
+    }, 100);
+    
+    setMessageModalVisible(false);
+    Toast.show({
+      type: 'success',
+      text1: 'Message sent!',
+      position: 'top',
+    });
   };
 
   const renderHeaderSkeleton = () => (
     <LinearGradient
       colors={['#1A1A3A', '#2A2A5A']}
       style={styles.headerContainer}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
     >
       <View style={styles.profileHeader}>
         <ShimmerPlaceholder style={styles.profileImage} />
@@ -199,6 +280,8 @@ const UserProfile = ({ route }) => {
     <LinearGradient
       colors={['#2A2A5A', '#3A3A7A']}
       style={styles.tabContainer}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
     >
       <View style={styles.tabBar}>
         {[...Array(2)].map((_, index) => (
@@ -217,6 +300,8 @@ const UserProfile = ({ route }) => {
         <LinearGradient
           colors={['#1A1A3A', '#2A2A5A']}
           style={styles.headerContainer}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
         >
           <TouchableOpacity
             style={styles.backButton}
@@ -224,14 +309,46 @@ const UserProfile = ({ route }) => {
           >
             <AntDesign name="arrowleft" size={scale(24)} color="#FFFFFF" />
           </TouchableOpacity>
+          
           <View style={styles.profileHeader}>
-            <Image
-              source={user?.profileImage ? { uri: user.profileImage } : img.user}
-              style={styles.profileImage}
-              resizeMode="cover"
-            />
+            <View style={styles.profileImageContainer}>
+              <Image
+                source={user?.profileImage ? { uri: user.profileImage } : img.user}
+                style={styles.profileImage}
+                resizeMode="cover"
+              />
+              {user?.isVerified && (
+                <View style={styles.verifiedBadge}>
+                  <MaterialCommunityIcons name="check-decagram" size={scale(14)} color="#7B61FF" />
+                </View>
+              )}
+            </View>
+            
             <Text style={styles.profileName}>{user?.fullName || 'Unknown User'}</Text>
             <Text style={styles.profileUsername}>@{user?.userName || 'unknown'}</Text>
+            
+            {user?.bio && (
+              <Text style={styles.profileBio}>{user.bio}</Text>
+            )}
+            
+            <View style={styles.actionButtons}>
+              <TouchableOpacity 
+                style={[styles.actionButton, isFollowing ? styles.followingButton : styles.followButton]}
+                onPress={toggleFollow}
+              >
+                <Text style={styles.actionButtonText}>
+                  {isFollowing ? 'Following' : 'Follow'}
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.messageButton}
+                onPress={() => setMessageModalVisible(true)}
+              >
+                <MaterialCommunityIcons name="message-text-outline" size={scale(18)} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            
             <View style={styles.statsRow}>
               <View style={styles.stat}>
                 <Text style={styles.statValue}>
@@ -241,22 +358,25 @@ const UserProfile = ({ route }) => {
                   {activeTab === 'products' ? 'Products' : 'Reels'}
                 </Text>
               </View>
-              <View style={styles.stat}>
+              <TouchableOpacity style={styles.stat} onPress={() => navigation.navigate('Followers')}>
                 <Text style={styles.statValue}>{user?.followers || 0}</Text>
                 <Text style={styles.statLabel}>Followers</Text>
-              </View>
-              <View style={styles.stat}>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.stat} onPress={() => navigation.navigate('Following')}>
                 <Text style={styles.statValue}>{user?.following || 0}</Text>
                 <Text style={styles.statLabel}>Following</Text>
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
         </LinearGradient>
       )}
+      
       {loading ? renderTabSkeleton() : (
         <LinearGradient
           colors={['#2A2A5A', '#3A3A7A']}
           style={styles.tabContainer}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
         >
           <View style={styles.tabBar}>
             <TouchableOpacity
@@ -298,6 +418,7 @@ const UserProfile = ({ route }) => {
           </View>
         </LinearGradient>
       )}
+      
       {errorMessage ? (
         <Pressable
           style={styles.errorMessage}
@@ -348,8 +469,9 @@ const UserProfile = ({ route }) => {
   Trace('FlatList Data', { activeTab, data, user, loading, refreshing });
 
   return (
-    <LinearGradient colors={['#1A1A3A', '#2A2A5A']} style={styles.container}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1A1A3A" />
+      
       <FlatList
         data={data}
         renderItem={({ item, index }) => (
@@ -377,13 +499,50 @@ const UserProfile = ({ route }) => {
           />
         }
       />
-    </LinearGradient>
+      
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={messageModalVisible}
+        onRequestClose={() => setMessageModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Send Message</Text>
+              <TouchableOpacity onPress={() => setMessageModalVisible(false)}>
+                <AntDesign name="close" size={scale(24)} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            <TextInput
+              ref={messageInputRef}
+              style={styles.messageInput}
+              multiline
+              placeholder={`Write a message to @${user?.userName || 'user'}`}
+              placeholderTextColor="#999"
+              value={messageText}
+              onChangeText={setMessageText}
+            />
+            
+            <TouchableOpacity 
+              style={[styles.sendButton, { opacity: messageText.trim() ? 1 : 0.5 }]}
+              onPress={handleSendMessage}
+              disabled={!messageText.trim()}
+            >
+              <Text style={styles.sendButtonText}>Send</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#1A1A3A',
   },
   listContent: {
     paddingHorizontal: ITEM_SPACING,
@@ -395,12 +554,16 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: scale(30),
     borderBottomRightRadius: scale(30),
     elevation: 5,
+    shadowColor: '#A855F7',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
   },
   backButton: {
     position: 'absolute',
     top: scale(10),
     left: scale(15),
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(168, 85, 247, 0.2)',
     borderRadius: scale(20),
     padding: scale(8),
     zIndex: 1,
@@ -409,14 +572,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: scale(20),
   },
+  profileImageContainer: {
+    position: 'relative',
+    marginBottom: scale(10),
+  },
   profileImage: {
-    width: scale(80),
-    height: scale(80),
-    borderRadius: scale(40),
+    width: scale(100),
+    height: scale(100),
+    borderRadius: scale(50),
     borderWidth: 2,
     borderColor: '#A855F7',
-    marginBottom: scale(10),
-    backgroundColor: '#2A2A5A',
+  },
+  verifiedBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderRadius: scale(12),
+    padding: scale(2),
   },
   profileName: {
     fontSize: scaleFont(22),
@@ -427,25 +600,67 @@ const styles = StyleSheet.create({
   profileUsername: {
     fontSize: scaleFont(14),
     color: '#B0B0D0',
-    marginBottom: scale(10),
+    marginBottom: scale(5),
+  },
+  profileBio: {
+    fontSize: scaleFont(14),
+    color: '#D0D0E0',
+    textAlign: 'center',
+    marginBottom: scale(15),
+    paddingHorizontal: scale(30),
+    lineHeight: scaleFont(20),
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: scale(15),
+  },
+  actionButton: {
+    borderRadius: scale(25),
+    paddingVertical: scale(8),
+    paddingHorizontal: scale(25),
+    marginHorizontal: scale(5),
+  },
+  followButton: {
+    backgroundColor: '#7B61FF',
+  },
+  followingButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: '#7B61FF',
+  },
+  messageButton: {
+    backgroundColor: 'rgba(168, 85, 247, 0.2)',
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionButtonText: {
+    fontSize: scaleFont(14),
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    width: '80%',
+    width: '100%',
     marginTop: scale(5),
   },
   stat: {
     alignItems: 'center',
+    paddingHorizontal: scale(10),
   },
   statValue: {
-    fontSize: scaleFont(16),
-    fontWeight: '600',
+    fontSize: scaleFont(18),
+    fontWeight: '700',
     color: '#A855F7',
   },
   statLabel: {
     fontSize: scaleFont(12),
     color: '#B0B0D0',
+    marginTop: scale(2),
   },
   tabContainer: {
     paddingVertical: scale(10),
@@ -453,6 +668,10 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: scale(20),
     borderTopRightRadius: scale(20),
     elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
   },
   tabBar: {
     flexDirection: 'row',
@@ -578,6 +797,26 @@ const styles = StyleSheet.create({
     borderRadius: scale(20),
     padding: scale(8),
   },
+  reelStats: {
+    position: 'absolute',
+    bottom: scale(10),
+    left: scale(10),
+    flexDirection: 'row',
+  },
+  reelStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: scale(10),
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: scale(10),
+    paddingHorizontal: scale(6),
+    paddingVertical: scale(2),
+  },
+  reelStatText: {
+    fontSize: scaleFont(10),
+    color: '#FFFFFF',
+    marginLeft: scale(3),
+  },
   priceTag: {
     position: 'absolute',
     bottom: scale(10),
@@ -589,6 +828,26 @@ const styles = StyleSheet.create({
   },
   priceText: {
     fontSize: scaleFont(12),
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  originalPriceText: {
+    fontSize: scaleFont(10),
+    color: '#E0E0E0',
+    textDecorationLine: 'line-through',
+    marginLeft: scale(3),
+  },
+  discountBadge: {
+    position: 'absolute',
+    top: scale(10),
+    right: scale(10),
+    backgroundColor: '#FF3E6D',
+    borderRadius: scale(10),
+    paddingHorizontal: scale(6),
+    paddingVertical: scale(2),
+  },
+  discountText: {
+    fontSize: scaleFont(10),
     fontWeight: '600',
     color: '#FFFFFF',
   },
@@ -609,6 +868,50 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: scale(5),
     paddingHorizontal: scale(20),
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '90%',
+    backgroundColor: '#2A2A5A',
+    borderRadius: scale(15),
+    padding: scale(20),
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: scale(15),
+  },
+  modalTitle: {
+    fontSize: scaleFont(18),
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  messageInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: scale(10),
+    padding: scale(15),
+    minHeight: scale(120),
+    color: '#FFFFFF',
+    fontSize: scaleFont(14),
+    marginBottom: scale(15),
+    textAlignVertical: 'top',
+  },
+  sendButton: {
+    backgroundColor: '#7B61FF',
+    borderRadius: scale(25),
+    padding: scale(12),
+    alignItems: 'center',
+  },
+  sendButtonText: {
+    fontSize: scaleFont(16),
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
 

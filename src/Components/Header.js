@@ -82,7 +82,7 @@ const Header = ({
                   onPress={onRightIcon2Press}
                   style={styles.iconButton}
                 >
-                  <Ionicons name={rightIcon2} size={scale(28)} color="#7B61FF" />
+                  <Ionicons name={rightIcon2} size={scale(20)} color={Colors.lightPurple} />
                 </TouchableOpacity>
               )}
             </View>
@@ -97,7 +97,7 @@ const Header = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: 'rgba(10, 10, 30, 0.9)',
+    backgroundColor:'#1A0B3B',
     paddingHorizontal: scale(15),
     paddingVertical: scale(7),
   },
@@ -117,6 +117,7 @@ const styles = StyleSheet.create({
     padding: scale(5),
     borderRadius: scale(20),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginHorizontal:2
   },
   searchContainer: {
     flex: 1,
@@ -142,7 +143,7 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    fontSize: scaleFont(22),
+    fontSize: scaleFont(15),
     fontWeight: '800',
     color: '#FFFFFF',
     textAlign: 'center',

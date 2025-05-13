@@ -124,7 +124,7 @@ const Filterbar = ({
         <Icon 
           name={modalVisible ? 'arrow-drop-up' : 'arrow-drop-down'} 
           size={scale(20)} 
-          color={Colors.white} 
+          color={Colors.White} 
         />
       </TouchableOpacity>
 

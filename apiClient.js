@@ -40,36 +40,33 @@ const request = async (config, retries = 3) => {
   }
 };
 
-export const createProductApi = async (token, productData) => {
-  if (
-    !productData?.name ||
-    !productData?.price ||
-    !productData?.createdBy ||
-    !productData?.category ||
-    !productData?.media?.length
-  ) {
-    Trace('Invalid Product Data', { productData });
-    return { ok: false, data: { msg: 'Missing required fields or media' } };
-  }
 
+export const createProductApi = async (token, productData) => {
   const formData = new FormData();
+  
+  // Append all product fields
   formData.append('name', productData.name);
   formData.append('description', productData.description || '');
   formData.append('price', productData.price.toString());
+  formData.append('originalPrice', productData.originalPrice.toString());
+  formData.append('discount', productData.discount.toString());
   formData.append('category', productData.category);
   formData.append('createdBy', productData.createdBy);
+  
+  // Append arrays as JSON strings
+  if (productData.sizes) formData.append('sizes', JSON.stringify(productData.sizes));
+  if (productData.colors) formData.append('colors', JSON.stringify(productData.colors));
+  if (productData.highlights) formData.append('highlights', JSON.stringify(productData.highlights));
+  if (productData.specifications) formData.append('specifications', JSON.stringify(productData.specifications));
+  if (productData.tags) formData.append('tags', JSON.stringify(productData.tags));
 
+  // Append media files
   productData.media.forEach((media, index) => {
-    if (media.uri && !media.uri.startsWith('http')) {
-      const file = {
-        uri: Platform.OS === 'android' ? media.uri : media.uri.replace('file://', ''),
-        name: media.fileName || `media_${Date.now()}_${index}.${media.mediaType === 'video' ? 'mp4' : 'jpg'}`,
-        type: media.type || (media.mediaType === 'video' ? 'video/mp4' : 'image/jpeg'),
-      };
-      formData.append('media', file);
-    } else if (media.uri && media.uri.startsWith('http')) {
-      formData.append('existingMedia', media.uri);
-    }
+    formData.append('media', {
+      uri: media.uri,
+      name: media.fileName || `media_${Date.now()}_${index}.${media.type?.split('/')[1] || 'jpg'}`,
+      type: media.type || 'image/jpeg'
+    });
   });
 
   return request({
@@ -77,56 +74,56 @@ export const createProductApi = async (token, productData) => {
     url: `${BASE_URL}/products`,
     headers: {
       'Content-Type': 'multipart/form-data',
+      'Authorization': `Bearer ${token}`
     },
     data: formData,
-    timeout: 60000,
+    timeout: 60000
   });
 };
 
 export const updateProductApi = async (token, id, productData) => {
-  if (
-    !id ||
-    !productData?.name ||
-    !productData?.price ||
-    !productData?.createdBy ||
-    !productData?.category
-  ) {
-    Trace('Invalid Update Product Data', { id, productData });
-    return { ok: false, data: { msg: 'Missing required fields or ID' } };
-  }
-
   const formData = new FormData();
+  
+  // Append all product fields
   formData.append('name', productData.name);
   formData.append('description', productData.description || '');
   formData.append('price', productData.price.toString());
+  formData.append('originalPrice', productData.originalPrice.toString());
+  formData.append('discount', productData.discount.toString());
   formData.append('category', productData.category);
-  formData.append('createdBy', productData.createdBy);
+  
+  // Append arrays as JSON strings
+  if (productData.sizes) formData.append('sizes', JSON.stringify(productData.sizes));
+  if (productData.colors) formData.append('colors', JSON.stringify(productData.colors));
+  if (productData.highlights) formData.append('highlights', JSON.stringify(productData.highlights));
+  if (productData.specifications) formData.append('specifications', JSON.stringify(productData.specifications));
+  if (productData.tags) formData.append('tags', JSON.stringify(productData.tags));
 
-  if (productData.media && productData.media.length > 0) {
-    productData.media.forEach((media, index) => {
-      if (media.uri && !media.uri.startsWith('http')) {
-        const file = {
-          uri: Platform.OS === 'android' ? media.uri : media.uri.replace('file://', ''),
-          name: media.fileName || `media_${Date.now()}_${index}.${media.mediaType === 'video' ? 'mp4' : 'jpg'}`,
-          type: media.type || (media.mediaType === 'video' ? 'video/mp4' : 'image/jpeg'),
-        };
-        formData.append('media', file);
-      } else if (media.url || (media.uri && media.uri.startsWith('http'))) {
-        formData.append('existingMedia', media.url || media.uri);
-      }
-    });
-  }
+  // Append media files
+  productData.media.forEach((media, index) => {
+    if (media.uri.startsWith('file://')) {
+      formData.append('media', {
+        uri: media.uri,
+        name: media.fileName || `media_${Date.now()}_${index}.${media.type?.split('/')[1] || 'jpg'}`,
+        type: media.type || 'image/jpeg'
+      });
+    } else {
+      formData.append('existingMedia', media.uri);
+    }
+  });
 
   return request({
     method: 'PUT',
     url: `${BASE_URL}/products/${id}`,
     headers: {
       'Content-Type': 'multipart/form-data',
+      'Authorization': `Bearer ${token}`
     },
     data: formData,
-    timeout: 60000,
+    timeout: 60000
   });
 };
+
 
 export const getAllProductsApi = async () => {
   return request({

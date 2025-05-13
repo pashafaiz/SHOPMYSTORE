@@ -118,9 +118,13 @@ export const fetchUserProducts = createAsyncThunk(
         throw new Error(data.msg || FETCH_PRODUCTS_ERROR);
       }
 
-      const userProducts = (data.products || []).filter(
-        (product) => product.createdBy === userId
-      ).map((product) => {
+      const userProducts = data.products
+      .filter((product) => {
+        const createdById = typeof product.createdBy === 'object' && product.createdBy?._id
+          ? product.createdBy._id
+          : product.createdBy;
+        return createdById === userId;
+      }).map((product) => {
         let imageUrl = FALLBACK_IMAGE_URL;
         if (product.media) {
           if (typeof product.media === 'string') {

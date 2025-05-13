@@ -14,6 +14,7 @@ import {
   getWishlistApi,
   removeFromWishlistApi,
 } from '../../../apiClient';
+import { DEFAULT_IMAGE_URL } from '../../constants/GlobalConstants';
 
 // Async thunk for fetching user data
 export const fetchUser = createAsyncThunk(
@@ -27,7 +28,7 @@ export const fetchUser = createAsyncThunk(
         Trace('User Data Fetched', { user: parsedUser });
         return parsedUser;
       } else {
-        Trace('No User Data Found');
+        // Trace('No User Data Found');
         return rejectWithValue('No user data found');
       }
     } catch (err) {
@@ -45,19 +46,53 @@ export const fetchUserProducts = createAsyncThunk(
       const { user } = getState().profile;
       if (user?.userType !== 'seller') return [];
       Trace('Fetching User Products', { userId });
+
       const { ok, data } = await getAllProductsApi();
-      if (ok && data.products) {
-        const userProducts = data.products.filter(
-          (product) => product.createdBy === userId
-        );
-        Trace('Filtered User Products', { count: userProducts.length });
+      Trace('Products API Response', { ok, data });
+
+      if (ok && Array.isArray(data.products)) {
+        const userProducts = data.products
+          .filter((product) => {
+            // Handle cases where createdBy might be a string or object
+            const createdById = typeof product.createdBy === 'object' && product.createdBy?._id
+              ? product.createdBy._id
+              : product.createdBy;
+            return createdById === userId;
+          })
+          .map((product) => ({
+            // Normalize product structure
+            id: product._id || product.id || '',
+            _id: product._id || product.id || '',
+            name: product.name || 'Unknown Product',
+            price: product.price || 0,
+            originalPrice: product.originalPrice || null,
+            discount: product.discount || null,
+            brand: product.brand || 'Unknown Brand',
+            rating: product.rating || 0,
+            reviewCount: product.reviewCount || 0,
+            media: Array.isArray(product.media) && product.media.length > 0
+              ? product.media
+              : [DEFAULT_IMAGE_URL],
+            mediaType: product.mediaType || (/\.(mp4|mov|avi)$/i.test(product.media?.[0]) ? 'video' : 'image'),
+            isNew: product.isNew || false,
+            category: product.category || 'Unknown',
+            createdBy: product.createdBy || userId,
+            sizes: product.sizes || [],
+            colors: product.colors || [],
+            highlights: product.highlights || [],
+            specifications: product.specifications || [],
+            tags: product.tags || [],
+          }));
+
+        Trace('Filtered and Normalized User Products', { count: userProducts.length });
         return userProducts;
       } else {
+        Trace('Invalid Products Response', { data });
         return rejectWithValue(data.msg || 'Failed to fetch products');
       }
     } catch (err) {
-      Trace('Fetch Products Error', { error: err.message });
-      return rejectWithValue('Something went wrong');
+      Trace('Fetch Products Error', { error: err.message, stack: err.stack });
+      return rejectWithValue(err.message || 'Something went wrong');
     }
   }
 );
@@ -69,16 +104,19 @@ export const fetchUserReels = createAsyncThunk(
     try {
       Trace('Fetching User Reels', { userId });
       const { ok, data } = await getReelsApi();
+      Trace('Reels API Response', { ok, data });
+
       if (ok && Array.isArray(data.reels)) {
         const userReels = data.reels.filter((reel) => reel.user?._id === userId);
         Trace('Filtered User Reels', { count: userReels.length });
         return userReels;
       } else {
+        Trace('Invalid Reels Response', { data });
         return rejectWithValue(data.msg || 'Failed to fetch reels');
       }
     } catch (err) {
       Trace('Fetch Reels Error', { error: err.message });
-      return rejectWithValue('Something went wrong');
+      return rejectWithValue(err.message || 'Something went wrong');
     }
   }
 );
@@ -168,44 +206,35 @@ export const updateProfile = createAsyncThunk(
       }
     } catch (err) {
       Trace('Update Profile Error', { error: err.message });
-      return rejectWithValue('Something went wrong');
+      return rejectWithValue(err.message || 'Something went wrong');
     }
   }
 );
 
-// Async thunk for creating or updating a product
+// Async thunk for submitting a product
 export const submitProduct = createAsyncThunk(
   'profile/submitProduct',
   async ({ productData, currentProduct }, { rejectWithValue }) => {
     try {
-      Trace('Submitting Product', { productData, currentProduct });
       const token = await AsyncStorage.getItem('userToken');
       if (!token) {
-        Trace('No Token Found');
         return rejectWithValue('No token found');
       }
-      const formattedProductData = {
-        name: productData.name,
-        description: productData.description || '',
-        price: parseFloat(productData.price).toFixed(2),
-        category: productData.category || 'Clothes',
-        createdBy: productData.createdBy,
-        media: productData.media || [],
-      };
-      const { ok, data } = currentProduct
-        ? await updateProductApi(token, currentProduct.id, formattedProductData)
-        : await createProductApi(token, formattedProductData);
-      Trace('Product Submit Response', { ok, data });
-      if (ok) {
+
+      const response = currentProduct
+        ? await updateProductApi(token, currentProduct.id, productData)
+        : await createProductApi(token, productData);
+
+      if (response.ok) {
         return {
-          message: data?.msg || (currentProduct ? 'Product updated successfully' : 'Product added successfully'),
+          message: response.data?.msg || 
+            (currentProduct ? 'Product updated successfully' : 'Product added successfully')
         };
       } else {
-        return rejectWithValue(data?.msg || 'Failed to manage product');
+        return rejectWithValue(response.data?.msg || 'Failed to manage product');
       }
     } catch (err) {
-      Trace('Submit Product Error', { error: err.message });
-      return rejectWithValue('Something went wrong');
+      return rejectWithValue(err.message || 'Something went wrong');
     }
   }
 );
@@ -230,7 +259,7 @@ export const deleteProduct = createAsyncThunk(
       }
     } catch (err) {
       Trace('Delete Product Error', { error: err.message });
-      return rejectWithValue('Something went wrong');
+      return rejectWithValue(err.message || 'Something went wrong');
     }
   }
 );
@@ -255,7 +284,7 @@ export const removeFromCart = createAsyncThunk(
       }
     } catch (err) {
       Trace('Remove from Cart Error', { error: err.message });
-      return rejectWithValue('Something went wrong');
+      return rejectWithValue(err.message || 'Something went wrong');
     }
   }
 );
@@ -275,7 +304,7 @@ export const removeFromWishlist = createAsyncThunk(
       }
     } catch (err) {
       Trace('Remove from Wishlist Error', { error: err.message });
-      return rejectWithValue('Something went wrong');
+      return rejectWithValue(err.message || 'Something went wrong');
     }
   }
 );
@@ -345,6 +374,7 @@ const profileSlice = createSlice({
       // Fetch User Products
       .addCase(fetchUserProducts.pending, (state) => {
         state.loadingProducts = true;
+        state.errorMessage = '';
       })
       .addCase(fetchUserProducts.fulfilled, (state, action) => {
         state.loadingProducts = false;
@@ -353,6 +383,7 @@ const profileSlice = createSlice({
       .addCase(fetchUserProducts.rejected, (state, action) => {
         state.loadingProducts = false;
         state.errorMessage = action.payload;
+        state.products = [];
         Toast.show({
           type: 'error',
           text1: 'Error',

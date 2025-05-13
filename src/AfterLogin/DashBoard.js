@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react'
 import {
   FlatList,
   StyleSheet,
@@ -20,7 +20,7 @@ import { categoryData, sliderData } from '../constants/Dummy_Data';
 import Colors from '../constants/Colors';
 import Filterbar from '../Components/Filterbar';
 import Strings from '../constants/Strings';
-import ProductModal from '../Products/ProductModal';
+// import ProductModal from '../Products/ProductModal';
 import Toast from 'react-native-toast-message';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import AntDesign from 'react-native-vector-icons/AntDesign';
@@ -45,6 +45,7 @@ import {
   setUserData,
 } from '../redux/slices/dashboardSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 
 const { width, height } = Dimensions.get('window');
 const scaleFactor = width / 375;
@@ -52,8 +53,9 @@ const scale = (size) => size * scaleFactor;
 const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375));
 const numColumns = 3;
 const itemSize = width / numColumns - scale(20);
+const trendingItemSize = width * 0.4; // Size for trending products to show at least 2.4 items
 
-const DashBoard = ({ navigation }) => {
+const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
   const dispatch = useDispatch();
   const {
     search,
@@ -76,10 +78,19 @@ const DashBoard = ({ navigation }) => {
     error,
   } = useSelector((state) => state.dashboard);
 
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    console.log('Navigation Object:', navigation);
+    console.log('Has openDrawer:', typeof navigation.openDrawer === 'function');
+  }, [navigation]);
+
   // Refs
   const flatListRef = useRef(null);
+  const sliderInterval = useRef(null);
+  const productsLoaded = useRef(false);
 
-  // Animation values
+  // Animation values for header
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerTranslateY = scrollY.interpolate({
     inputRange: [0, 100],
@@ -91,7 +102,6 @@ const DashBoard = ({ navigation }) => {
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
-  const categoryAnimations = categoryData.map(() => new Animated.Value(0));
 
   // Handle refresh
   const onRefresh = async () => {
@@ -135,33 +145,40 @@ const DashBoard = ({ navigation }) => {
     };
 
     loadUserData();
-    Trace('Fetching Products on Mount');
-    dispatch(fetchProducts());
+    
+    if (!productsLoaded.current) {
+      Trace('Fetching Products on Mount#pragma once');
+      dispatch(fetchProducts());
+      productsLoaded.current = true;
+    }
 
-    const animations = categoryData.map((_, index) => {
-      return Animated.spring(categoryAnimations[index], {
-        toValue: 1,
-        delay: index * 100,
-        useNativeDriver: true,
-        friction: 5,
-      });
-    });
-
-    Animated.stagger(50, animations).start();
+    return () => {
+      if (sliderInterval.current) {
+        clearInterval(sliderInterval.current);
+      }
+    };
   }, [dispatch]);
 
   // Auto-scroll slider
   useEffect(() => {
-    const interval = setInterval(() => {
+    if (sliderData.length === 0) return;
+
+    sliderInterval.current = setInterval(() => {
       const nextIndex = (currentIndex + 1) % sliderData.length;
-      flatListRef.current?.scrollToIndex({
-        index: nextIndex,
-        animated: true,
-      });
+      if (flatListRef.current) {
+        flatListRef.current.scrollToIndex({
+          index: nextIndex,
+          animated: true,
+        });
+      }
       dispatch(setCurrentIndex(nextIndex));
     }, 3000);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (sliderInterval.current) {
+        clearInterval(sliderInterval.current);
+      }
+    };
   }, [currentIndex, dispatch]);
 
   // Handle error with Toast
@@ -181,55 +198,19 @@ const DashBoard = ({ navigation }) => {
 
   // Render product item
   const RenderProductList = ({ item, index }) => {
-    const scaleAnim = useRef(new Animated.Value(1)).current;
-    const opacityAnim = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-      Animated.timing(opacityAnim, {
-        toValue: 1,
-        duration: 500,
-        delay: index * 100,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }).start();
-    }, []);
-
-    const onPressIn = () => {
-      Animated.spring(scaleAnim, {
-        toValue: 0.95,
-        friction: 5,
-        useNativeDriver: true,
-      }).start();
-    };
-
-    const onPressOut = () => {
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 5,
-        useNativeDriver: true,
-      }).start();
-    };
-
     const mediaUrl = item.media || 'https://via.placeholder.com/120';
-    const isNew = new Date(item.createdAt) > new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    const hasDiscount = item.discount > 0;
+    const originalPrice = item.originalPrice || item.price;
+    const discountedPrice = item.price;
+    const discountPercentage = Math.round(((originalPrice - discountedPrice) / originalPrice) * 100);
 
     return (
-      <Animated.View 
-        style={[
-          styles.itemBox, 
-          { 
-            opacity: opacityAnim,
-            transform: [{ scale: scaleAnim }],
-          }
-        ]}
-      >
+      <View style={styles.itemBox}>
         <TouchableOpacity
           activeOpacity={0.9}
-          onPressIn={onPressIn}
-          onPressOut={onPressOut}
           onPress={() => {
             Trace('Product Clicked', { productId: item.id });
-            navigation.navigate('ProductDetail', { 
+            stackNavigation.navigate('ProductDetail', { 
               productId: item.id,
               product: item
             });
@@ -243,33 +224,94 @@ const DashBoard = ({ navigation }) => {
               resizeMode={FastImage.resizeMode.cover}
               defaultSource={{ uri: 'https://via.placeholder.com/120' }}
             />
-            {isNew && (
-              <View style={styles.productBadge}>
-                <Text style={styles.badgeText}>New</Text>
+            {hasDiscount && (
+              <View style={styles.discountBadge}>
+                <Text style={styles.badgeText}>{discountPercentage}% OFF</Text>
               </View>
             )}
           </View>
           <View style={styles.productInfo}>
             <Text style={styles.itemText} numberOfLines={1}>{item.name}</Text>
-            <Text style={styles.priceText}>₹{item.price || 'N/A'}</Text>
+            <View style={styles.priceContainer}>
+              <Text style={styles.priceText}>₹{discountedPrice || 'N/A'}</Text>
+              {hasDiscount && (
+                <Text style={styles.originalPriceText}>₹{originalPrice}</Text>
+              )}
+            </View>
             <View style={styles.ratingContainer}>
-              {[1,2,3,4,5].map((star) => (
+              {[1, 2, 3, 4, 5].map((star) => (
                 <Icon 
                   key={star} 
-                  name={star <= 4 ? 'star' : 'star-border'} 
+                  name={star <= Math.round(item.rating || 0) ? 'star' : 'star-border'} 
                   size={scale(12)} 
                   color="#FFD700" 
                 />
               ))}
-              <Text style={styles.ratingText}>(24)</Text>
             </View>
           </View>
         </TouchableOpacity>
-      </Animated.View>
+      </View>
     );
   };
 
-  // Render slider item
+  // Render trending product item
+  const RenderTrendingProduct = ({ item, index }) => {
+    const mediaUrl = item.media || 'https://via.placeholder.com/120';
+    const hasDiscount = item.discount > 0;
+    const originalPrice = item.originalPrice || item.price;
+    const discountedPrice = item.price;
+    const discountPercentage = Math.round(((originalPrice - discountedPrice) / originalPrice) * 100);
+
+    return (
+      <TouchableOpacity style={styles.trendingItemBox}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => {
+            Trace('Trending Product Clicked', { productId: item.id });
+            stackNavigation.navigate('ProductDetail', { 
+              productId: item.id,
+              product: item
+            });
+          }}
+          disabled={isActionLoading}
+        >
+          <View style={styles.trendingProductImg}>
+            <FastImage
+              source={{ uri: mediaUrl }}
+              style={styles.trendingProductImage}
+              resizeMode={FastImage.resizeMode.cover}
+              defaultSource={{ uri: 'https://via.placeholder.com/120' }}
+            />
+            {hasDiscount && (
+              <View style={styles.discountBadge}>
+                <Text style={styles.badgeText}>{discountPercentage}% OFF</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.trendingProductInfo}>
+            <Text style={styles.trendingItemText} numberOfLines={1}>{item.name}</Text>
+            <View style={styles.priceContainer}>
+              <Text style={styles.priceText}>₹{discountedPrice || 'N/A'}</Text>
+              {hasDiscount && (
+                <Text style={styles.originalPriceText}>₹{originalPrice}</Text>
+              )}
+            </View>
+            <View style={styles.ratingContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Icon 
+                  key={star} 
+                  name={star <= Math.round(item.rating || 0) ? 'star' : 'star-border'} 
+                  size={scale(12)} 
+                  color="#FFD700" 
+                />
+              ))}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  };
+
   const RenderSliderList = ({ item }) => {
     const translateX = useRef(new Animated.Value(width)).current;
     
@@ -300,7 +342,7 @@ const DashBoard = ({ navigation }) => {
             style={styles.shopNowButton}
             onPress={() => {
               Trace('Shop Now Clicked');
-              navigation.navigate('Categories');
+              stackNavigation.navigate('Categories');
             }}
           >
             <Text style={styles.shopNowText}>SHOP NOW</Text>
@@ -310,130 +352,68 @@ const DashBoard = ({ navigation }) => {
     );
   };
 
-  // Render category item
-  const RenderCategoryList = ({ item }) => {
-    const scaleAnim = new Animated.Value(1);
-
-    const onPressIn = () => {
-      Animated.spring(scaleAnim, {
-        toValue: 0.9,
-        useNativeDriver: true,
-      }).start();
-    };
-
-    const onPressOut = () => {
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-      }).start();
-    };
-
-    const handleCategoryPress = () => {
-      Trace('Category Clicked', { category: item.name });
-      navigation.navigate('Categories', { category: item.name, products });
-    };
-
-    return (
-      <Animated.View style={[styles.itemContainer, { transform: [{ scale: scaleAnim }] }]}>
-        <TouchableOpacity
-          onPressIn={onPressIn}
-          onPressOut={onPressOut}
-          onPress={handleCategoryPress}
-          disabled={isActionLoading}
-        >
-          <View style={styles.imageWrapper}>
-            {item.gif ? (
-              <FastImage
-                source={item.gif}
-                style={styles.categoryImage}
-                resizeMode={FastImage.resizeMode.cover}
-              />
-            ) : (
-              <FastImage
-                source={item.image}
-                style={styles.categoryImage}
-                resizeMode={FastImage.resizeMode.contain}
-              />
-            )}
-          </View>
-          <Text style={styles.label} numberOfLines={1}>
-            {item.name}
-          </Text>
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  };
-
-  // Handle header icon press
   const handleHeaderIconPress = (iconName) => {
-    Trace(`${iconName === 'menu' ? 'Menu' : 'Notifications'} icon pressed`);
+    if (iconName === 'menu') {
+      Trace('Opening Drawer');
+      if (typeof navigation.openDrawer === 'function') {
+        navigation.openDrawer();
+      } else {
+        console.error('Cannot open drawer: openDrawer is not available');
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Unable to open menu. Please try again.',
+          position: 'top',
+          topOffset: scale(20),
+        });
+      }
+    } else if (iconName === "notifications") {
+       navigation.navigate("Notifications")
+    }
+    else{
+      navigation.navigate("NotificationsScreen")
+    }
   };
 
-  // Loading state
-  if (loading && !refreshing) {
-    return (
-      <LinearGradient colors={['#0A0A1E', '#1E1E3F']} style={styles.container}>
-        <View style={styles.skeletonContainer}>
-          <View style={styles.skeletonSlider} />
-          <View style={styles.skeletonCategoryContainer}>
-            {[...Array(3)].map((_, index) => (
-              <View key={index} style={styles.skeletonCategoryItem}>
-                <View style={styles.skeletonCategoryImage} />
-                <View style={styles.skeletonCategoryText} />
-              </View>
-            ))}
-          </View>
-          <View style={styles.skeletonProductContainer}>
-            {[...Array(6)].map((_, index) => (
-              <View key={index} style={styles.skeletonProductItem}>
-                <View style={styles.skeletonProductImage} />
-                <View style={[styles.skeletonText, { width: '60%', marginTop: scale(10) }]} />
-                <View style={[styles.skeletonText, { width: '40%', marginTop: scale(5) }]} />
-              </View>
-            ))}
-          </View>
-        </View>
-      </LinearGradient>
-    );
-  }
-
-  // Main render
   return (
-    <LinearGradient colors={['#0A0A1E', '#1E1E3F']} style={styles.container}>
-      <Animated.View style={[styles.headerContainer, {
-        transform: [{ translateY: headerTranslateY }],
-        opacity: headerOpacity
-      }]}>
-        <Header
-          isSearch={true}
-          searchValue={search}
-          onSearchChange={(text) => dispatch(setSearch(text))}
-          showLeftIcon={true}
-          leftIcon="menu"
-          onLeftIconPress={() => handleHeaderIconPress('menu')}
-          showRightIcon1={true}
-          rightIcon1="notifications-outline"
-          onRightIcon1Press={() => handleHeaderIconPress('notifications')}
-        />
-      </Animated.View>
-
+    <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.container}>
       <ScrollView
         refreshControl={
           <RefreshControl 
-            refreshing={refreshing} 
+            refreshing={refreshing || loading}
             onRefresh={onRefresh} 
             colors={['#7B61FF']} 
             tintColor="#7B61FF" 
+            progressViewOffset={scale(100)} 
           />
         }
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } }}],
           { useNativeDriver: false }
-        )}
+        ) && onScroll}
         scrollEnabled={!isActionLoading}
         contentContainerStyle={styles.scrollContainer}
       >
-        {/* Search suggestions */}
+        <Animated.View style={[styles.headerContainer, {
+          transform: [{ translateY: headerTranslateY }],
+          opacity: headerOpacity
+        }]}>
+          <Header
+            isSearch={true}
+            searchValue={search}
+            onSearchChange={(text) => dispatch(setSearch(text))}
+            showLeftIcon={true}
+            leftIcon="menu"
+            onLeftPress={() => handleHeaderIconPress('menu')}
+            showRightIcon1={true}
+            rightIcon1="notifications-outline"
+            onRightPress1={() => handleHeaderIconPress('notifications')}
+            showRightIcon2={true}
+            rightIcon2='chatbubble-ellipses-outline'
+            onRightIcon2Press={()=>handleHeaderIconPress("message")}
+          />
+        </Animated.View>
+
         {suggestions.length > 0 && (
           <View style={styles.suggestionsContainer}>
             <ScrollView
@@ -462,7 +442,6 @@ const DashBoard = ({ navigation }) => {
           </View>
         )}
 
-        {/* Filters */}
         <View style={styles.filtersWrapper}>
           <View style={styles.filterContainer}>
             <View style={styles.filterItem}>
@@ -517,56 +496,65 @@ const DashBoard = ({ navigation }) => {
           )}
         </View>
 
-        {/* Slider */}
-        <View style={styles.sliderContainer}>
-          <FlatList
-            ref={flatListRef}
-            data={sliderData}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
-            renderItem={({ item }) => <RenderSliderList item={item} />}
-          />
-          <View style={styles.pagination}>
-            {sliderData.map((_, index) => (
-              <View 
-                key={index} 
-                style={[
-                  styles.paginationDot,
-                  currentIndex === index && styles.paginationDotActive
-                ]} 
-              />
-            ))}
+        {sliderData.length > 0 && (
+          <View style={styles.sliderContainer}>
+            <FlatList
+              ref={flatListRef}
+              data={sliderData}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item, index) => `slider-${index}`}
+              renderItem={({ item }) => <RenderSliderList item={item} />}
+              snapToInterval={width - scale(40)}
+              decelerationRate="fast"
+              onScrollToIndexFailed={({ index }) => {
+                flatListRef.current?.scrollToOffset({
+                  offset: index * (width - scale(40)),
+                  animated: true,
+                });
+              }}
+            />
+            <View style={styles.pagination}>
+              {sliderData.map((_, index) => (
+                <View 
+                  key={index} 
+                  style={[
+                    styles.paginationDot,
+                    currentIndex === index && styles.paginationDotActive
+                  ]} 
+                />
+              ))}
+            </View>
           </View>
-        </View>
+        )}
 
-        {/* Categories */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Categories</Text>
+          <Text style={styles.sectionTitle}>Trending Products</Text>
           <TouchableOpacity onPress={() => {
-            Trace('See All Categories Clicked');
-            navigation.navigate('Categories');
+            Trace('See All Trending Products Clicked');
+            stackNavigation.navigate('Categories');
           }}>
             <Text style={styles.seeAll}>See All</Text>
           </TouchableOpacity>
         </View>
 
         <FlatList
-          data={categoryData}
-          keyExtractor={(item, index) => `category-${index}`}
-          renderItem={({ item }) => <RenderCategoryList item={item} />}
-          numColumns={numColumns}
-          contentContainerStyle={styles.flatListContainer}
-          scrollEnabled={false}
+          data={filteredProducts.slice(0, 10)}
+          keyExtractor={(item, index) => `trending-${item.id}-${index}`}
+          renderItem={({ item, index }) => <RenderTrendingProduct item={item} index={index} />}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.trendingListContainer}
+          snapToInterval={trendingItemSize + scale(10)}
+          decelerationRate="fast"
         />
 
-        {/* Products */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Featured Products</Text>
           <TouchableOpacity onPress={() => {
             Trace('View All Products Clicked');
-            navigation.navigate('Categories', { products });
+            stackNavigation.navigate('Categories', { products });
           }}>
             <AntDesign name="arrowsalt" size={scale(20)} color="#7B61FF" />
           </TouchableOpacity>
@@ -585,54 +573,35 @@ const DashBoard = ({ navigation }) => {
           </View>
         )}
 
-        {/* {filteredProducts.length > 6 && (
-          <TouchableOpacity
-            style={styles.viewAllButton}
-            onPress={() => {
-              Trace('View All Products Clicked');
-              navigation.navigate('Categories', { products });
-            }}
-          >
-            <LinearGradient
-              colors={['#A855F7', '#7B61FF']}
-              style={styles.viewAllButtonGradient}
-            >
-              <Text style={styles.viewAllButtonText}>View All Products</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        )} */}
-
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
       {/* Product Modal */}
-      <ProductModal
+      {/* <ProductModal
         visible={modalVisible}
         onClose={() => dispatch(setModalVisible(false))}
         onSubmit={handleSubmitProduct}
         product={currentProduct}
         onDelete={handleDeleteProduct}
-      />
+      /> */}
 
       {/* Loading overlay */}
-      {isActionLoading && (
+      {/* {isActionLoading && (
         <View style={styles.loaderOverlay}>
           <ActivityIndicator size="large" color="#7B61FF" />
           <Text style={styles.loaderText}>Loading...</Text>
         </View>
-      )}
+      )} */}
     </LinearGradient>
   );
 };
 
-// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
   scrollContainer: {
     paddingTop: scale(60),
-    paddingBottom: scale(30),
   },
   headerContainer: {
     position: 'absolute',
@@ -641,7 +610,6 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 100,
     backgroundColor: 'rgba(10, 10, 30, 0.9)',
-    paddingTop: Platform.OS === 'ios' ? scale(40) : scale(10),
   },
   sliderContainer: {
     height: height * 0.25,
@@ -736,41 +704,44 @@ const styles = StyleSheet.create({
     color: '#7B61FF',
     fontWeight: '600',
   },
-  flatListContainer: {
-    paddingHorizontal: scale(10),
+  trendingListContainer: {
+    paddingHorizontal: scale(15),
     paddingBottom: scale(10),
   },
-  itemContainer: {
-    width: itemSize,
-    margin: scale(10),
-    alignItems: 'center',
-  },
-  imageWrapper: {
-    width: scale(70),
-    height: scale(70),
-    borderRadius: scale(35),
-    backgroundColor: 'rgba(123, 97, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: scale(10),
+  trendingItemBox: {
+    width: trendingItemSize,
+    marginRight: scale(10),
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: scale(12),
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(123, 97, 255, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowRadius: scale(10),
   },
-  categoryImage: {
-    width: '60%',
-    height: '60%',
+  trendingProductImg: {
+    width: '100%',
+    height: scale(140),
+    position: 'relative',
   },
-  label: {
+  trendingProductImage: {
+    width: '100%',
+    height: '100%',
+  },
+  trendingProductInfo: {
+    padding: scale(10),
+  },
+  trendingItemText: {
     fontSize: scaleFont(12),
-    color: '#E5E7EB',
-    fontWeight: '500',
-    textAlign: 'center',
+    color: '#FFFFFF',
+    fontWeight: '600',
+    marginBottom: scale(5),
   },
   productsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    paddingHorizontal: scale(15),
+    padding: scale(15),
   },
   itemBox: {
     width: itemSize,
@@ -781,10 +752,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: scale(5) },
-    shadowOpacity: 0.2,
     shadowRadius: scale(10),
-    elevation: 3,
   },
   product_Img: {
     width: '100%',
@@ -795,7 +763,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  productBadge: {
+  discountBadge: {
     position: 'absolute',
     top: scale(10),
     left: scale(10),
@@ -818,20 +786,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: scale(5),
   },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: scale(5),
+  },
   priceText: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(11),
     fontWeight: '700',
     color: '#7B61FF',
-    marginBottom: scale(5),
+  },
+  originalPriceText: {
+    fontSize: scaleFont(8),
+    color: '#B0B0D0',
+    textDecorationLine: 'line-through',
+    marginLeft: scale(5),
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  ratingText: {
-    fontSize: scaleFont(10),
-    color: 'rgba(255, 255, 255, 0.6)',
-    marginLeft: scale(5),
   },
   bottomSpacer: {
     height: scale(30),
@@ -916,7 +889,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'red',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 2000,
@@ -927,82 +900,6 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(16),
     color: '#FFFFFF',
     fontWeight: '500',
-  },
-  skeletonContainer: {
-    flex: 1,
-    paddingTop: scale(10),
-  },
-  skeletonSlider: {
-    height: height * 0.2,
-    width: width * 0.9,
-    alignSelf: 'center',
-    borderRadius: scale(20),
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginBottom: scale(20),
-  },
-  skeletonCategoryContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: scale(10),
-  },
-  skeletonCategoryItem: {
-    alignItems: 'center',
-    width: itemSize,
-    marginVertical: scale(10),
-  },
-  skeletonCategoryImage: {
-    width: scale(65),
-    height: scale(65),
-    borderRadius: scale(35),
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  skeletonCategoryText: {
-    width: '60%',
-    height: scale(14),
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: scale(4),
-    marginTop: scale(5),
-  },
-  skeletonProductContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    paddingHorizontal: scale(15),
-  },
-  skeletonProductItem: {
-    width: itemSize,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: scale(10),
-    margin: scale(6),
-    padding: scale(10),
-    alignItems: 'center',
-  },
-  skeletonProductImage: {
-    width: '100%',
-    height: scale(120),
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: scale(8),
-  },
-  skeletonText: {
-    height: scale(14),
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: scale(4),
-  },
-  viewAllButton: {
-    marginHorizontal: scale(20),
-    marginTop: scale(10),
-    borderRadius: scale(8),
-    overflow: 'hidden',
-  },
-  viewAllButtonGradient: {
-    paddingVertical: scale(12),
-    paddingHorizontal: scale(30),
-    alignItems: 'center',
-  },
-  viewAllButtonText: {
-    fontSize: scaleFont(14),
-    fontWeight: '600',
-    color: '#FFFFFF',
   },
 });
 

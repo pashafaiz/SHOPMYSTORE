@@ -13,6 +13,7 @@ import {
   TOAST_TOP_OFFSET,
   HTTP_METHODS,
   API_TIMEOUT_SHORT,
+  DEFAULT_IMAGE_URL,
 } from '../../constants/GlobalConstants';
 
 // Utility function for fetch with timeout
@@ -116,6 +117,7 @@ export const fetchProductDetails = createAsyncThunk(
       }
 
       // Fetch cart and wishlist
+      let cartItems = [];
       let isInCart = false;
       let isLiked = false;
       if (token && userId) {
@@ -140,13 +142,16 @@ export const fetchProductDetails = createAsyncThunk(
           const cartText = await cartResponse.text();
           let cartData = cartText ? JSON.parse(cartText) : { cart: [] };
           if (cartResponse.ok) {
-            isInCart = cartData.cart.some((item) => item._id === productId);
+            cartItems = cartData.cart || [];
+            isInCart = cartItems.some((item) => item.productId === productId || item._id === productId);
+          } else {
+            Trace('Cart fetch error:', cartData.msg || 'Unknown error');
           }
 
           const wishlistText = await wishlistResponse.text();
           let wishlistData = wishlistText ? JSON.parse(wishlistText) : { wishlist: [] };
           if (wishlistResponse.ok) {
-            isLiked = wishlistData.wishlist.some((item) => item._id === productId);
+            isLiked = wishlistData.wishlist.some((item) => item.productId === productId || item._id === productId);
           }
         } catch (error) {
           Trace('Cart or wishlist fetch error:', error);
@@ -157,8 +162,8 @@ export const fetchProductDetails = createAsyncThunk(
       const normalizedRelatedProducts = (relatedData.products || []).map((product) => ({
         ...product,
         media: Array.isArray(product.media) && product.media.length > 0
-          ? (typeof product.media[0] === 'string' ? product.media[0] : product.media[0]?.url || 'https://via.placeholder.com/100')
-          : 'https://via.placeholder.com/100',
+          ? (typeof product.media[0] === 'string' ? product.media[0] : product.media[0]?.url || DEFAULT_IMAGE_URL)
+          : DEFAULT_IMAGE_URL,
       }));
 
       return {
@@ -167,8 +172,10 @@ export const fetchProductDetails = createAsyncThunk(
           userName: userData.user?.userName || 'unknown',
           profileImage: typeof userData.user?.avatar === 'string' ? userData.user.avatar : null,
           _id: userData.user?._id || null,
+          phone: userData.user?.phoneNumber || null,
         },
         relatedProducts: normalizedRelatedProducts,
+        cartItems,
         userId,
         token,
         isInCart,
@@ -184,12 +191,22 @@ export const fetchProductDetails = createAsyncThunk(
 // Async thunk for toggling like
 export const toggleLike = createAsyncThunk(
   'productDetail/toggleLike',
-  async ({ productId, token }, { rejectWithValue }) => {
+  async ({ productId, token }, { rejectWithValue, getState }) => {
     try {
+      if (!token) {
+        throw new Error('Authentication token is missing');
+      }
+      if (!productId) {
+        throw new Error('Product ID is missing');
+      }
+
+      const { productDetail } = getState();
+      const isCurrentlyLiked = productDetail.isLiked;
+
       const response = await fetchWithTimeout(
         `${BASE_URL}${WISHLIST_ENDPOINT}/${productId}`,
         {
-          method: HTTP_METHODS.POST,
+          method: isCurrentlyLiked ? HTTP_METHODS.DELETE : HTTP_METHODS.POST,
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -197,6 +214,7 @@ export const toggleLike = createAsyncThunk(
         },
         API_TIMEOUT_SHORT
       );
+
       let data;
       try {
         const text = await response.text();
@@ -205,8 +223,9 @@ export const toggleLike = createAsyncThunk(
         Trace('Toggle like response parse error:', error);
         throw new Error('Invalid response format: Expected JSON');
       }
+
       if (response.ok) {
-        return { isWishlisted: data.isWishlisted };
+        return { isWishlisted: !isCurrentlyLiked };
       } else {
         throw new Error(data.msg || 'Failed to toggle like');
       }
@@ -220,8 +239,22 @@ export const toggleLike = createAsyncThunk(
 // Async thunk for adding to cart
 export const addToCart = createAsyncThunk(
   'productDetail/addToCart',
-  async ({ productId, token }, { rejectWithValue }) => {
+  async ({ productId, token, quantity, size, color }, { rejectWithValue }) => {
     try {
+      if (!token) {
+        throw new Error('Authentication token is missing');
+      }
+      if (!productId) {
+        throw new Error('Product ID is missing');
+      }
+
+      const payload = {
+        productId,
+        quantity: quantity || 1,
+        ...(size && { size }),
+        ...(color && { color }),
+      };
+
       const response = await fetchWithTimeout(
         `${BASE_URL}${CART_ENDPOINT}/${productId}`,
         {
@@ -230,22 +263,22 @@ export const addToCart = createAsyncThunk(
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
+          body: JSON.stringify(payload),
         },
         API_TIMEOUT_SHORT
       );
-      let data;
-      try {
-        const text = await response.text();
-        data = text ? JSON.parse(text) : {};
-      } catch (error) {
-        Trace('Add to cart response parse error:', error);
-        throw new Error('Invalid response format: Expected JSON');
+
+      if (response.status === 204) {
+        return { success: true };
       }
-      if (response.ok) {
-        return data;
-      } else {
-        throw new Error(data.msg || 'Failed to add to cart');
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to add to cart');
       }
+
+      return data;
     } catch (error) {
       Trace('Add to cart error:', error);
       return rejectWithValue(error.message || NETWORK_ERROR);
@@ -270,7 +303,7 @@ export const removeFromCart = createAsyncThunk(
         API_TIMEOUT_SHORT
       );
       if (response.status === 204 || response.ok) {
-        return {};
+        return { cartItems: [] };
       } else {
         let data;
         try {
@@ -292,9 +325,15 @@ export const removeFromCart = createAsyncThunk(
 // Async thunk for loading recently viewed
 export const loadRecentlyViewed = createAsyncThunk(
   'productDetail/loadRecentlyViewed',
-  async (_, { rejectWithValue }) => {
+  async ({ userId }, { rejectWithValue }) => {
     try {
-      const stored = await AsyncStorage.getItem('recentlyViewed');
+      if (!userId) {
+        Trace('No userId provided for loadRecentlyViewed');
+        return [];
+      }
+
+      const storageKey = `recentlyViewed_${userId}`;
+      const stored = await AsyncStorage.getItem(storageKey);
       if (stored) {
         let parsed;
         try {
@@ -303,15 +342,23 @@ export const loadRecentlyViewed = createAsyncThunk(
           Trace('Error parsing recently viewed:', error);
           return [];
         }
-        const oneHourInMs = 60 * 60 * 1000;
+
+        // Filter out expired items (older than 24 hours)
+        const oneDayInMs = 24 * 60 * 60 * 1000;
         const now = Date.now();
-        parsed = parsed.filter((item) => {
+
+        const filtered = parsed.filter((item) => {
           const addedAt = item.timestamp || 0;
           const timeDiff = now - addedAt;
-          return timeDiff <= oneHourInMs;
+          return timeDiff <= oneDayInMs;
         });
-        await AsyncStorage.setItem('recentlyViewed', JSON.stringify(parsed));
-        return parsed;
+
+        // If we filtered anything out, update storage
+        if (filtered.length !== parsed.length) {
+          await AsyncStorage.setItem(storageKey, JSON.stringify(filtered));
+        }
+
+        return filtered;
       }
       return [];
     } catch (error) {
@@ -328,6 +375,7 @@ const productDetailSlice = createSlice({
     user: null,
     relatedProducts: [],
     recentlyViewed: [],
+    cartItems: [],
     userId: '',
     token: '',
     loading: false,
@@ -351,30 +399,71 @@ const productDetailSlice = createSlice({
       state.videoDuration = action.payload;
     },
     saveRecentlyViewed: (state, action) => {
-      const { productId, product } = action.payload;
-      let viewed = state.recentlyViewed.filter((item) => item.id !== productId);
-      const mediaUrl = Array.isArray(product.media) && product.media.length > 0
-        ? (typeof product.media[0] === 'string' ? product.media[0] : product.media[0]?.url || 'https://via.placeholder.com/100')
-        : 'https://via.placeholder.com/100';
-      viewed.unshift({
-        id: productId,
-        name: product.name,
-        media: mediaUrl,
-        price: product.price,
-        category: product.category || 'Unknown',
-        timestamp: Date.now(),
-      });
-      viewed = viewed.slice(0, 10);
-      state.recentlyViewed = viewed;
-      AsyncStorage.setItem('recentlyViewed', JSON.stringify(viewed)).catch((error) => {
+      const { productId, product, userId } = action.payload;
+
+      // Validate inputs
+      if (!productId || !product || !userId) {
+        Trace('Invalid saveRecentlyViewed payload:', { productId, product, userId });
+        return;
+      }
+
+      // Check if product already exists in recently viewed
+      const existingIndex = state.recentlyViewed.findIndex(
+        (item) => item.id === productId || item._id === productId
+      );
+
+      if (existingIndex >= 0) {
+        // If exists, move it to the beginning and update timestamp
+        const [existingProduct] = state.recentlyViewed.splice(existingIndex, 1);
+        state.recentlyViewed.unshift({
+          ...existingProduct,
+          timestamp: Date.now(),
+        });
+      } else {
+        // Prepare the media URL
+        const mediaUrl =
+          Array.isArray(product.media) && product.media.length > 0
+            ? typeof product.media[0] === 'string'
+              ? product.media[0]
+              : product.media[0]?.url || DEFAULT_IMAGE_URL
+            : DEFAULT_IMAGE_URL;
+
+        // Add new product to the beginning of the array
+        state.recentlyViewed.unshift({
+          id: productId,
+          _id: productId,
+          name: product.name || 'Unknown Product',
+          media: mediaUrl,
+          price: product.price || 0,
+          originalPrice: product.originalPrice || null,
+          discount: product.discount || null,
+          category: product.category || 'Unknown',
+          brand: product.brand || 'Unknown Brand',
+          rating: product.rating || 4,
+          reviewCount: product.reviewCount || 0,
+          timestamp: Date.now(),
+        });
+      }
+
+      // Limit to 10 items
+      if (state.recentlyViewed.length > 10) {
+        state.recentlyViewed = state.recentlyViewed.slice(0, 10);
+      }
+
+      // Save to AsyncStorage with user-specific key
+      const storageKey = `recentlyViewed_${userId}`;
+      AsyncStorage.setItem(storageKey, JSON.stringify(state.recentlyViewed)).catch((error) => {
         Trace('Error saving recently viewed:', error);
       });
     },
     clearRecentlyViewed: (state) => {
-      state.recentlyViewed = [];
-      AsyncStorage.removeItem('recentlyViewed').catch((error) => {
-        Trace('Error clearing recently viewed:', error);
-      });
+      if (state.userId) {
+        const storageKey = `recentlyViewed_${state.userId}`;
+        state.recentlyViewed = [];
+        AsyncStorage.removeItem(storageKey).catch((error) => {
+          Trace('Error clearing recently viewed:', error);
+        });
+      }
     },
     clearError: (state) => {
       state.error = null;
@@ -396,6 +485,7 @@ const productDetailSlice = createSlice({
         state.product = action.payload.product;
         state.user = action.payload.user;
         state.relatedProducts = action.payload.relatedProducts;
+        state.cartItems = action.payload.cartItems;
         state.userId = action.payload.userId;
         state.token = action.payload.token;
         state.isInCart = action.payload.isInCart;
@@ -420,12 +510,12 @@ const productDetailSlice = createSlice({
         state.isLiked = action.payload.isWishlisted;
         if (state.product) {
           state.product.likeCount = action.payload.isWishlisted
-            ? state.product.likeCount + 1
-            : state.product.likeCount - 1;
+            ? (state.product.likeCount || 0) + 1
+            : Math.max((state.product.likeCount || 0) - 1, 0);
         }
         Toast.show({
           type: 'success',
-          text1: action.payload.isWishlisted ? 'Product liked' : 'Product unliked',
+          text1: action.payload.isWishlisted ? 'Added to wishlist' : 'Removed from wishlist',
           position: TOAST_POSITION,
           topOffset: TOAST_TOP_OFFSET,
         });
@@ -443,9 +533,10 @@ const productDetailSlice = createSlice({
       .addCase(addToCart.pending, (state) => {
         state.isActionLoading = true;
       })
-      .addCase(addToCart.fulfilled, (state) => {
+      .addCase(addToCart.fulfilled, (state, action) => {
         state.isActionLoading = false;
         state.isInCart = true;
+        state.cartItems = action.payload.cartItems;
         Toast.show({
           type: 'success',
           text1: 'Product added to cart',
@@ -466,9 +557,10 @@ const productDetailSlice = createSlice({
       .addCase(removeFromCart.pending, (state) => {
         state.isActionLoading = true;
       })
-      .addCase(removeFromCart.fulfilled, (state) => {
+      .addCase(removeFromCart.fulfilled, (state, action) => {
         state.isActionLoading = false;
         state.isInCart = false;
+        state.cartItems = action.payload.cartItems;
         Toast.show({
           type: 'success',
           text1: 'Product removed from cart',

@@ -20,6 +20,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
+import Video from 'react-native-video';
 import {
   fetchUser,
   fetchUserProducts,
@@ -45,58 +46,50 @@ import Line from '../Components/Line';
 import Toast from 'react-native-toast-message';
 import Trace from '../utils/Trace';
 import LinearGradient from 'react-native-linear-gradient';
+import FastImage from 'react-native-fast-image';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
   FadeIn,
+  Easing,
 } from 'react-native-reanimated';
 
 const { width, height } = Dimensions.get('window');
 const scaleFactor = width / 375;
 const scale = (size) => size * scaleFactor;
 const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375));
-const isTablet = width >= 768;
 const numColumns = 3;
 const itemSpacing = scale(10);
-const itemWidth = (width - (itemSpacing * (numColumns + 1))) / numColumns;
+const itemSize = (width - (itemSpacing * (numColumns + 1))) / numColumns;
 
-// Skeleton Loader Component for Products
 const SkeletonProductItem = () => {
   return (
-    <LinearGradient
-      colors={['#2A2A4A', '#1E1E3F']}
-      style={styles.productItem}
-    >
-      <View style={[styles.productImage, styles.skeletonImage]} />
-      <View style={styles.productInfo}>
-        <View style={[styles.skeletonText, { width: '80%', height: scale(16), marginBottom: scale(4) }]} />
-        <View style={[styles.skeletonText, { width: '40%', height: scale(14) }]} />
+    <View style={styles.skeletonItem}>
+      <View style={styles.skeletonImage} />
+      <View style={styles.skeletonInfo}>
+        <View style={styles.skeletonText} />
+        <View style={[styles.skeletonText, { width: '60%' }]} />
       </View>
-    </LinearGradient>
+    </View>
   );
 };
 
-// Reusable Animated Item Component
 const AnimatedItem = ({ children, onPress, onPressIn, onPressOut, index, onLongPress }) => {
-  const scaleValue = useSharedValue(0.95);
+  const scaleValue = useSharedValue(1);
   const opacityValue = useSharedValue(0);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: withSpring(scaleValue.value) }],
+    transform: [{ scale: withSpring(scaleValue.value, { damping: 10 }) }],
     opacity: opacityValue.value,
   }));
 
   useEffect(() => {
-    scaleValue.value = 1;
-    opacityValue.value = 1;
-  }, [scaleValue, opacityValue]);
+    opacityValue.value = withSpring(1, { delay: index * 100, easing: Easing.out(Easing.quad) });
+  }, [opacityValue, index]);
 
   return (
-    <Animated.View
-      entering={FadeIn.delay(index * 50)}
-      style={animatedStyle}
-    >
+    <Animated.View entering={FadeIn.delay(index * 50)} style={animatedStyle}>
       <TouchableOpacity
         activeOpacity={0.9}
         onPress={onPress}
@@ -116,20 +109,57 @@ const AnimatedItem = ({ children, onPress, onPressIn, onPressOut, index, onLongP
   );
 };
 
-const Profile = ({ onScroll }) => {
+const renderMedia = (item) => {
+  const mediaUrl = item?.media?.[0]?.url || 'https://via.placeholder.com/120';
+  const isVideo = mediaUrl?.toLowerCase().endsWith('.mp4') || mediaUrl?.toLowerCase().endsWith('.mov');
+
+  return (
+    <View style={styles.mediaContainer}>
+      {isVideo ? (
+        <Video
+          source={{ uri: mediaUrl }}
+          style={styles.mediaImage}
+          resizeMode="cover"
+          paused={true}
+          poster={item?.thumbnail || 'https://via.placeholder.com/120'}
+          posterResizeMode="cover"
+          repeat={false}
+        />
+      ) : (
+        <FastImage
+          source={{ uri: mediaUrl }}
+          style={styles.mediaImage}
+          resizeMode="cover"
+          defaultSource={{ uri: 'https://via.placeholder.com/120' }}
+        />
+      )}
+      {isVideo && (
+        <View style={styles.playIcon}>
+          <MaterialCommunityIcons name="play" size={scale(24)} color="#FFFFFF" />
+        </View>
+      )}
+    </View>
+  );
+};
+
+// Profile Component
+const Profile = ({ onScroll, route }) => {
+
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const {
     user,
     userId,
-    products,
-    reels,
-    cart,
-    wishlist,
+    products = [],
+    reels = [],
+    cart = [],
+    wishlist = [],
     loadingProducts,
     successMessage,
     errorMessage,
     refreshing,
+    removingFromCart, // Added for cart removal loader
+    removingFromWishlist, // Added for wishlist removal loader
   } = useSelector((state) => state.profile);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [imageModalVisible, setImageModalVisible] = useState(false);
@@ -143,7 +173,11 @@ const Profile = ({ onScroll }) => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [activeTab, setActiveTab] = useState('products');
 
-  // Handle Redux success and error messages with Toast
+  useEffect(() => {
+    const fromDrawer = route.params?.fromDrawer || false;
+    console.log('Profile screen - fromDrawer:', fromDrawer);
+  }, [route.params]);
+
   useEffect(() => {
     if (successMessage) {
       Toast.show({
@@ -169,15 +203,23 @@ const Profile = ({ onScroll }) => {
     }
   }, [successMessage, errorMessage, dispatch]);
 
-  // Define tabs based on user type
+  useEffect(() => {
+    if (route?.params?.cart === true) {
+      setActiveTab('cart');
+    } else {
+      const tabs = getTabs();
+      setActiveTab(tabs[0].id);
+    }
+  }, [route?.params?.cart]);
+
   const getTabs = () => {
     const tabs = [
-      { id: 'reels', icon: 'play-box', label: 'Reels' },
-      { id: 'cart', icon: 'cart', label: 'Cart' },
-      { id: 'wishlist', icon: 'heart', label: 'Wishlist' },
+      { id: 'reels', icon: 'play-box' },
+      { id: 'cart', icon: 'cart' },
+      { id: 'wishlist', icon: 'heart' },
     ];
     if (user?.userType === 'seller') {
-      tabs.unshift({ id: 'products', icon: 'shopping', label: 'Products' });
+      tabs.unshift({ id: 'products', icon: 'shopping' });
     }
     if (!tabs.some((tab) => tab.id === activeTab)) {
       setActiveTab(tabs[0].id);
@@ -187,7 +229,6 @@ const Profile = ({ onScroll }) => {
 
   const tabs = getTabs();
 
-  // Sync local inputs with Redux state
   useEffect(() => {
     if (user) {
       setFullName(user.fullName || '');
@@ -196,7 +237,6 @@ const Profile = ({ onScroll }) => {
     }
   }, [user]);
 
-  // Fetch data on focus
   useFocusEffect(
     useCallback(() => {
       dispatch(fetchUser()).then((result) => {
@@ -212,19 +252,6 @@ const Profile = ({ onScroll }) => {
     }, [dispatch, userId, user?.userType])
   );
 
-  // Fetch data when userId changes
-  useEffect(() => {
-    if (userId) {
-      dispatch(fetchUserReels(userId));
-      dispatch(fetchCart());
-      dispatch(fetchWishlist());
-      if (user?.userType === 'seller') {
-        dispatch(fetchUserProducts(userId));
-      }
-    }
-  }, [dispatch, userId, user?.userType]);
-
-  // Handle pull-to-refresh
   const onRefresh = useCallback(() => {
     dispatch(setRefreshing(true));
     Trace('Refreshing Data');
@@ -241,7 +268,6 @@ const Profile = ({ onScroll }) => {
     });
   }, [dispatch, userId, user?.userType]);
 
-  // Handle logout
   const handleLogout = () => {
     dispatch(logout()).then((result) => {
       if (result.meta.requestStatus === 'fulfilled') {
@@ -251,28 +277,29 @@ const Profile = ({ onScroll }) => {
     });
   };
 
-  const confirmLogout = () => {
-    setSidebarVisible(false);
-    Trace('Logout Confirmation Toast Shown');
-    Toast.show({
-      type: 'info',
-      text1: 'Are you sure?',
-      text2: 'Tap to confirm logout',
-      onPress: handleLogout,
-      position: 'top',
-      topOffset: scale(20),
-      visibilityTime: 5000,
-    });
-  };
+const confirmLogout = () => {
+  setSidebarVisible(false);
+  Trace('Logout Confirmation Toast Shown');
+  Toast.show({
+    type: 'info',
+    text1: 'Are you sure?',
+    text2: 'Tap to confirm logout',
+    position: 'top',
+    topOffset: scale(20),
+    visibilityTime: 5000,
+    onPress: () => {
+      handleLogout();
+      Toast.hide();
+    }
+  });
+};
 
-  // Handle profile update
   const handleUpdateProfile = () => {
     dispatch(updateProfile({ fullName, userName }));
     setEditModalVisible(false);
     setSidebarVisible(false);
   };
 
-  // Handle image selection
   const openCamera = () => {
     launchCamera({ mediaType: 'photo' }, async (response) => {
       try {
@@ -319,7 +346,6 @@ const Profile = ({ onScroll }) => {
     });
   };
 
-  // Handle product submission
   const handleSubmitProduct = (productData) => {
     dispatch(submitProduct({ productData, currentProduct })).then(() => {
       if (user?.userType === 'seller') {
@@ -329,7 +355,6 @@ const Profile = ({ onScroll }) => {
     setProductModalVisible(false);
   };
 
-  // Handle product edit
   const handleEditProduct = (product) => {
     try {
       Trace('Editing Product', { product });
@@ -348,73 +373,172 @@ const Profile = ({ onScroll }) => {
     }
   };
 
-  // Handle product deletion
   const handleDeleteProduct = (productId) => {
     dispatch(deleteProduct(productId));
     setProductOptionsModalVisible(false);
   };
 
-  // Show product options
   const showProductOptions = (product) => {
     setSelectedProduct(product);
     Trace('Product Options Modal Shown', { productId: product?.id });
     setProductOptionsModalVisible(true);
   };
 
-  // Handle remove from cart
-  const handleRemoveFromCart = (productId) => {
-    dispatch(removeFromCart(productId));
+  const handleRemoveFromCart = (productId, product) => {
+    if (productId) {
+      setSelectedProduct(product); // Set the product being removed
+      dispatch(removeFromCart(productId));
+    }
   };
 
-  // Handle remove from wishlist
-  const handleRemoveFromWishlist = (productId) => {
-    dispatch(removeFromWishlist(productId));
+  const handleRemoveFromWishlist = (productId, product) => {
+    if (productId) {
+      setSelectedProduct(product); 
+      dispatch(removeFromWishlist(productId));
+    }
   };
 
-  // Render product item
-  const renderProductItem = ({ item, index }) => {
+const renderProductItem = ({ item, index }) => {
+  const originalPrice = parseFloat(item?.originalPrice || item?.price || 0).toFixed(2);
+  const discount = parseFloat(item?.discount || 0);
+  const discountedPrice = (originalPrice - (originalPrice * discount) / 100).toFixed(2);
+  const isPremium = item?.premium || false;
+
+  let specifications = [];
+  try {
+    specifications = item.specifications ? 
+      (typeof item.specifications === 'string' ? 
+        JSON.parse(item.specifications) : 
+        item.specifications) : 
+      [];
+  } catch (err) {
+    console.error('Error parsing specifications:', err);
+  }
+
+  return (
+    <AnimatedItem
+      index={index}
+      onPress={() => navigation.navigate('ProductDetail', { 
+        productId: item.id,
+        product: {
+          ...item,
+          specifications
+        }
+      })}
+      onLongPress={() => showProductOptions(item)}
+    >
+      <View style={styles.itemContainer}>
+        {renderMedia(item)}
+        {isPremium && (
+          <View style={styles.premiumBadge}>
+            <Text style={styles.badgeText}>PREMIUM</Text>
+          </View>
+        )}
+        {discount > 0 && (
+          <View style={styles.discountBadge}>
+            <Text style={styles.badgeText}>{discount}% OFF</Text>
+          </View>
+        )}
+        <View style={styles.itemInfo}>
+          <Text style={styles.itemTitle} numberOfLines={1}>
+            {item.name || 'Unnamed Product'}
+          </Text>
+          {discount > 0 ? (
+            <View style={styles.priceContainer}>
+              <Text style={styles.discountedPrice}>₹{discountedPrice}</Text>
+              <Text style={styles.originalPrice}>₹{originalPrice}</Text>
+            </View>
+          ) : (
+            <Text style={styles.itemPrice}>₹{originalPrice}</Text>
+          )}
+        </View>
+      </View>
+    </AnimatedItem>
+  );
+};
+
+
+  const renderReelItem = ({ item, index }) => {
     return (
       <AnimatedItem
         index={index}
-        onPress={() =>
-          navigation.navigate('ProductDetail', { productId: item.id })
-        }
-        onLongPress={() => {
-          Trace('Product Long Press', { productId: item.id });
-          showProductOptions(item);
+        onPress={() => {
+          Trace('Reel Clicked', { reelId: item._id });
+          navigation.navigate('ReelView', { reel: item });
         }}
       >
-        <LinearGradient
-          colors={['#2A2A4A', '#1E1E3F']}
-          style={styles.productItem}
-        >
-          <Image
-            source={{
-              uri: item.media[0]?.url || 'https://via.placeholder.com/120',
-            }}
-            style={styles.productImage}
-            resizeMode="contain"
-            onError={(error) =>
-              Trace('Product Image Error', { error: error.nativeEvent })
-            }
-          />
-          <View style={styles.productInfo}>
-            <Text style={styles.productTitle} numberOfLines={2}>
-              {item.name}
+        <View style={styles.itemContainer}>
+          {renderMedia(item)}
+          <View style={styles.itemInfo}>
+            <Text style={styles.itemTitle} numberOfLines={1}>
+              {item.caption || 'No caption'}
             </Text>
-            <Text style={styles.productPrice}>₹{item.price}</Text>
           </View>
-        </LinearGradient>
+        </View>
       </AnimatedItem>
     );
   };
 
-  // Render skeleton loader
+  const renderCartItem = ({ item, index }) => {
+    const price = parseFloat(item?.price || 0).toFixed(2);
+
+    if (removingFromCart && item._id === selectedProduct?._id) {
+      return <SkeletonProductItem />;
+    }
+
+    return (
+      <AnimatedItem
+        index={index}
+        onPress={() => navigation.navigate('ProductDetail', { productId: item._id })}
+      >
+        <View style={styles.itemContainer}>
+          {renderMedia(item)}
+          <View style={styles.itemInfo}>
+            <Text style={styles.itemTitle} numberOfLines={1}>
+              {item.name || 'Unnamed Item'}
+            </Text>
+            <Text style={styles.itemPrice}>₹{price}</Text>
+          </View>
+          <TouchableOpacity style={styles.closeIcon} onPress={() => handleRemoveFromCart(item._id, item)}>
+            <AntDesign name="close" size={scale(16)} color="#EF4444" />
+          </TouchableOpacity>
+        </View>
+      </AnimatedItem>
+    );
+  };
+
+  const renderWishlistItem = ({ item, index }) => {
+    const price = parseFloat(item?.price || 0).toFixed(2);
+
+    if (removingFromWishlist && item._id === selectedProduct?._id) {
+      return <SkeletonProductItem />;
+    }
+
+    return (
+      <AnimatedItem
+        index={index}
+        onPress={() => navigation.navigate('ProductDetail', { productId: item._id })}
+      >
+        <View style={styles.itemContainer}>
+          {renderMedia(item)}
+          <View style={styles.itemInfo}>
+            <Text style={styles.itemTitle} numberOfLines={1}>
+              {item.name || 'Unnamed Item'}
+            </Text>
+            <Text style={styles.itemPrice}>₹{price}</Text>
+          </View>
+          <TouchableOpacity style={styles.closeIcon} onPress={() => handleRemoveFromWishlist(item._id, item)}>
+            <AntDesign name="close" size={scale(16)} color="#EF4444" />
+          </TouchableOpacity>
+        </View>
+      </AnimatedItem>
+    );
+  };
+
   const renderSkeletonLoader = () => {
     const skeletonItems = Array(6).fill({});
     return (
       <FlatList
-        key="skeleton-list"
         data={skeletonItems}
         renderItem={() => <SkeletonProductItem />}
         keyExtractor={(item, index) => `skeleton-${index}`}
@@ -425,155 +549,33 @@ const Profile = ({ onScroll }) => {
     );
   };
 
-  // Render reel item
-  const renderReelItem = ({ item, index }) => {
-    return (
-      <AnimatedItem
-        index={index}
-        onPress={() => {
-          Trace('Reel Clicked', { reelId: item._id });
-          navigation.navigate('ReelView', { reel: item });
-        }}
-      >
-        <LinearGradient
-          colors={['#2A2A4A', '#1E1E3F']}
-          style={[styles.productItem, styles.reelItem]}
-        >
-          <Image
-            source={{ uri: item.thumbnail || 'https://via.placeholder.com/120' }}
-            style={styles.productImage}
-            resizeMode="cover"
-            onError={(error) =>
-              Trace('Reel Thumbnail Error', { error: error.nativeEvent })
-            }
-          />
-          <LinearGradient
-            colors={['rgba(0, 0, 0, 0.2)', 'rgba(0, 0, 0, 0.5)']}
-            style={styles.imageOverlay}
-          />
-          <View style={styles.playIcon}>
-            <MaterialCommunityIcons name="play" size={scale(24)} color="#FFFFFF" />
-          </View>
-          <View style={styles.productInfo}>
-            <Text style={styles.productTitle} numberOfLines={2}>
-              {item.caption || 'No caption'}
-            </Text>
-          </View>
-        </LinearGradient>
-      </AnimatedItem>
-    );
-  };
-
-  // Render cart item
-  const renderCartItem = ({ item, index }) => {
-    return (
-      <AnimatedItem
-        index={index}
-        onPress={() =>
-          navigation.navigate('ProductDetail', { productId: item._id })
-        }
-      >
-        <LinearGradient
-          colors={['#2A2A4A', '#1E1E3F']}
-          style={styles.productItem}
-        >
-          <Image
-            source={{ uri: item.media[0]?.url || 'https://via.placeholder.com/120' }}
-            style={styles.productImage}
-            resizeMode="contain"
-          />
-          <View style={styles.productInfo}>
-            <Text style={styles.productTitle} numberOfLines={2}>
-              {item.name}
-            </Text>
-            <Text style={styles.productPrice}>₹{item.price}</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.closeIconContainer}
-            onPress={() => handleRemoveFromCart(item._id)}
-          >
-            <AntDesign name="close" size={scale(16)} color="#EF4444" />
-          </TouchableOpacity>
-        </LinearGradient>
-      </AnimatedItem>
-    );
-  };
-
-  // Render wishlist item
-  const renderWishlistItem = ({ item, index }) => {
-    return (
-      <AnimatedItem
-        index={index}
-        onPress={() =>
-          navigation.navigate('ProductDetail', { productId: item._id })
-        }
-      >
-        <LinearGradient
-          colors={['#2A2A4A', '#1E1E3F']}
-          style={styles.productItem}
-        >
-          <Image
-            source={{ uri: item.media[0]?.url || 'https://via.placeholder.com/120' }}
-            style={styles.productImage}
-            resizeMode="contain"
-          />
-          <View style={styles.productInfo}>
-            <Text style={styles.productTitle} numberOfLines={2}>
-              {item.name}
-            </Text>
-            <Text style={styles.productPrice}>₹{item.price}</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.closeIconContainer}
-            onPress={() => handleRemoveFromWishlist(item._id)}
-          >
-            <AntDesign name="close" size={scale(16)} color="#EF4444" />
-          </TouchableOpacity>
-        </LinearGradient>
-      </AnimatedItem>
-    );
-  };
-
   return (
-    <LinearGradient
-      colors={['#0A0A1E', '#1E1E3F']}
-      style={styles.container}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-    >
+    <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.container}>
       <ScrollView
         onScroll={onScroll}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#A855F7']}
-            tintColor="#A855F7"
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#A855F7']} tintColor="#A855F7" />
         }
       >
-        <LinearGradient
-          colors={['#1A1A3A', '#2A2A5A']}
-          style={styles.profileCard}
-        >
-          <TouchableOpacity
-            style={{ alignSelf: 'flex-end', paddingHorizontal: scale(20) }}
-            onPress={() => setSidebarVisible(true)}
-          >
-            <Icon name="settings" size={scale(24)} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Pressable
-            onPress={() => setImageModalVisible(true)}
-            style={styles.profileImageContainer}
-          >
-            <Image
+        <View style={styles.profileCard}>
+          
+        <View style={styles.iconContainer}>
+            {route?.params?.cart === true && (
+              <TouchableOpacity style={styles.backIcon} onPress={() => navigation.goBack()}>
+                <Icon name="arrow-back" size={scale(24)} color="#FFFFFF" />
+              </TouchableOpacity>
+            ) }
+            <TouchableOpacity style={[styles.settingsIcon,route?.params?.cart === true && {bottom:25}]} onPress={() => setSidebarVisible(true)}>
+                <Icon name="settings" size={scale(24)} color="#FFFFFF" />
+              </TouchableOpacity>
+          </View>
+          <Pressable onPress={() => setImageModalVisible(true)} style={styles.profileImageContainer}>
+            <FastImage
               source={profileImage ? { uri: profileImage } : img.user}
               style={styles.profileImage}
               resizeMode="cover"
-              onError={(error) =>
-                Trace('Profile Image Error', { error: error.nativeEvent })
-              }
+              onError={(error) => Trace('Profile Image Error', { error: error.nativeEvent })}
             />
             <View style={styles.editIcon}>
               <Text style={styles.editIconText}>✏️</Text>
@@ -581,8 +583,7 @@ const Profile = ({ onScroll }) => {
           </Pressable>
           <Text style={styles.name}>{user?.fullName || 'Maria May'}</Text>
           <Text style={styles.bio}>
-            Username: {user?.userName || 'N/A'} {'\n'} Email:{' '}
-            {user?.email || 'N/A'} {'\n'} Phone: {user?.phoneNumber || 'N/A'}
+            Username: {user?.userName || 'N/A'} {'\n'} Email: {user?.email || 'N/A'} {'\n'} Phone: {user?.phoneNumber || 'N/A'}
           </Text>
           <View style={styles.statsRow}>
             {user?.userType === 'seller' && (
@@ -596,13 +597,10 @@ const Profile = ({ onScroll }) => {
               <Text style={styles.statLabel}>Reels</Text>
             </View>
           </View>
-        </LinearGradient>
+        </View>
 
         <View style={styles.collectionsSection}>
-          <LinearGradient
-            colors={['#2A2A5A', '#3A3A7A']}
-            style={styles.tabsContainer}
-          >
+          <View style={styles.tabsContainer}>
             <View style={styles.tabBar}>
               {tabs.map((tab) => (
                 <TouchableOpacity
@@ -618,45 +616,35 @@ const Profile = ({ onScroll }) => {
                     size={scale(20)}
                     color={activeTab === tab.id ? '#A855F7' : '#B0B0D0'}
                   />
+                  <Text style={[styles.tabText, activeTab === tab.id && styles.activeTabText]}>
+                    {tab.label}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
-          </LinearGradient>
+          </View>
 
-          <Line
-            style={{
-              borderColor: '#B0B0D0',
-              marginBottom: scale(10),
-              width: '90%',
-              alignSelf: 'center',
-            }}
-          />
+          <Line style={styles.line} />
 
           {activeTab === 'products' && user?.userType === 'seller' ? (
             loadingProducts ? (
               renderSkeletonLoader()
             ) : products.length > 0 ? (
               <>
-                <TouchableOpacity
+                {/* <TouchableOpacity
+                  style={styles.addButton}
                   onPress={() => {
                     Trace('Add Product Clicked');
                     setCurrentProduct(null);
                     setProductModalVisible(true);
                   }}
-                  style={{
-                    paddingHorizontal: scale(20),
-                    marginBottom: scale(10),
-                  }}
                 >
                   <AntDesign name="plussquare" size={scale(20)} color="#A855F7" />
-                </TouchableOpacity>
+                </TouchableOpacity> */}
                 <FlatList
-                  key="products-list"
                   data={products}
                   renderItem={renderProductItem}
-                  keyExtractor={(item) =>
-                    item.id?.toString() || Math.random().toString()
-                  }
+                  keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
                   numColumns={numColumns}
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={styles.collectionsList}
@@ -665,9 +653,7 @@ const Profile = ({ onScroll }) => {
             ) : (
               <View style={styles.emptyStateContainer}>
                 <Image source={img.post} style={styles.emptyStateIcon} />
-                <Text style={styles.emptyStateTitle}>
-                  Create your first product
-                </Text>
+                <Text style={styles.emptyStateTitle}>Create your first product</Text>
                 <TouchableOpacity
                   style={styles.uploadButton}
                   onPress={() => {
@@ -676,10 +662,7 @@ const Profile = ({ onScroll }) => {
                     setProductModalVisible(true);
                   }}
                 >
-                  <LinearGradient
-                    colors={['#A855F7', '#7B61FF']}
-                    style={styles.uploadButtonGradient}
-                  >
+                  <LinearGradient colors={['#A855F7', '#7B61FF']} style={styles.uploadButtonGradient}>
                     <Text style={styles.uploadButtonText}>Add Product</Text>
                   </LinearGradient>
                 </TouchableOpacity>
@@ -689,16 +672,12 @@ const Profile = ({ onScroll }) => {
             reels.length > 0 ? (
               <>
                 <TouchableOpacity
+                  style={styles.addButton}
                   onPress={() => navigation.navigate('UploadReel')}
-                  style={{
-                    paddingHorizontal: scale(20),
-                    marginBottom: scale(10),
-                  }}
                 >
                   <AntDesign name="plussquare" size={scale(20)} color="#A855F7" />
                 </TouchableOpacity>
                 <FlatList
-                  key="reels-list"
                   data={reels}
                   renderItem={renderReelItem}
                   keyExtractor={(item) => item._id}
@@ -710,9 +689,7 @@ const Profile = ({ onScroll }) => {
             ) : (
               <View style={styles.emptyStateContainer}>
                 <Image source={img.camera} style={styles.emptyStateIcon} />
-                <Text style={styles.emptyStateTitle}>
-                  Capture the moment with a friend
-                </Text>
+                <Text style={styles.emptyStateTitle}>Capture the moment with a friend</Text>
                 <TouchableOpacity
                   style={styles.uploadButton}
                   onPress={() => {
@@ -720,10 +697,7 @@ const Profile = ({ onScroll }) => {
                     navigation.navigate('UploadReel');
                   }}
                 >
-                  <LinearGradient
-                    colors={['#A855F7', '#7B61FF']}
-                    style={styles.uploadButtonGradient}
-                  >
+                  <LinearGradient colors={['#A855F7', '#7B61FF']} style={styles.uploadButtonGradient}>
                     <Text style={styles.uploadButtonText}>Upload Reel</Text>
                   </LinearGradient>
                 </TouchableOpacity>
@@ -732,7 +706,6 @@ const Profile = ({ onScroll }) => {
           ) : activeTab === 'cart' ? (
             cart.length > 0 ? (
               <FlatList
-                key="cart-list"
                 data={cart}
                 renderItem={renderCartItem}
                 keyExtractor={(item) => item._id}
@@ -749,7 +722,6 @@ const Profile = ({ onScroll }) => {
           ) : (
             wishlist.length > 0 ? (
               <FlatList
-                key="wishlist-list"
                 data={wishlist}
                 renderItem={renderWishlistItem}
                 keyExtractor={(item) => item._id}
@@ -774,17 +746,8 @@ const Profile = ({ onScroll }) => {
           onRequestClose={() => setEditModalVisible(false)}
           title="Edit Profile"
           buttons={[
-            {
-              text: 'Cancel',
-              onPress: () => setEditModalVisible(false),
-              style: styles.modalButtonCancel,
-            },
-            {
-              text: 'Save',
-              onPress: handleUpdateProfile,
-              style: styles.modalButtonSave,
-              textStyle: styles.modalButtonText,
-            },
+            { text: 'Cancel', onPress: () => setEditModalVisible(false), style: styles.modalButtonCancel },
+            { text: 'Save', onPress: handleUpdateProfile, style: styles.modalButtonSave, textStyle: styles.modalButtonText },
           ]}
         >
           <TextInput
@@ -810,21 +773,9 @@ const Profile = ({ onScroll }) => {
           onRequestClose={() => setImageModalVisible(false)}
           title="Update Profile Picture"
           buttons={[
-            {
-              text: 'Choose from Gallery',
-              onPress: openGallery,
-              style: styles.modalButton,
-            },
-            {
-              text: 'Open Camera',
-              onPress: openCamera,
-              style: styles.modalButton,
-            },
-            {
-              text: 'Cancel',
-              onPress: () => setImageModalVisible(false),
-              style: styles.modalButtonCancel,
-            },
+            { text: 'Choose from Gallery', onPress: openGallery, style: styles.modalButton },
+            { text: 'Open Camera', onPress: openCamera, style: styles.modalButton },
+            { text: 'Cancel', onPress: () => setImageModalVisible(false), style: styles.modalButtonCancel },
           ]}
         />
 
@@ -842,24 +793,9 @@ const Profile = ({ onScroll }) => {
               onRequestClose={() => setProductOptionsModalVisible(false)}
               title="Product Options"
               buttons={[
-                {
-                  text: 'Edit',
-                  onPress: () => handleEditProduct(selectedProduct),
-                  style: styles.modalButton,
-                  textStyle: { fontSize: 13 },
-                },
-                {
-                  text: 'Delete',
-                  onPress: () => handleDeleteProduct(selectedProduct?.id),
-                  style: styles.modalButtonDelete,
-                  textStyle: { fontSize: 13 },
-                },
-                {
-                  text: 'Cancel',
-                  onPress: () => setProductOptionsModalVisible(false),
-                  style: styles.modalButtonCancel,
-                  textStyle: { fontSize: 12 },
-                },
+                { text: 'Edit', onPress: () => handleEditProduct(selectedProduct), style: styles.modalButton, textStyle: { fontSize: 13 } },
+                { text: 'Delete', onPress: () => handleDeleteProduct(selectedProduct?.id), style: styles.modalButtonDelete, textStyle: { fontSize: 13 } },
+                { text: 'Cancel', onPress: () => setProductOptionsModalVisible(false), style: styles.modalButtonCancel, textStyle: { fontSize: 12 } },
               ]}
             />
           </>
@@ -872,47 +808,18 @@ const Profile = ({ onScroll }) => {
             onRequestClose={() => setSidebarVisible(false)}
             animationType="fade"
           >
-            <Pressable
-              style={styles.sidebarOverlay}
-              onPress={() => setSidebarVisible(false)}
-            >
-              <LinearGradient
-                colors={['#2A2A4A', '#1E1E3F']}
-                style={styles.sidebar}
-              >
-                <TouchableOpacity
-                  style={styles.sidebarItem}
-                  onPress={() => {
-                    Trace('Edit Profile Clicked');
-                    setEditModalVisible(true);
-                    setSidebarVisible(false);
-                  }}
-                >
+            <Pressable style={styles.sidebarOverlay} onPress={() => setSidebarVisible(false)}>
+              <View style={styles.sidebar}>
+                <TouchableOpacity style={styles.sidebarItem} onPress={() => { Trace('Edit Profile Clicked'); setEditModalVisible(true); setSidebarVisible(false); }}>
                   <Text style={styles.sidebarText}>Edit Profile</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.sidebarItem}
-                  onPress={confirmLogout}
-                >
+                <TouchableOpacity style={styles.sidebarItem} onPress={confirmLogout}>
                   <Text style={styles.sidebarText}>Logout</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.sidebarItem}
-                  onPress={() => {
-                    Trace('Settings Clicked');
-                    Toast.show({
-                      type: 'info',
-                      text1: 'Info',
-                      text2: 'Settings coming soon',
-                      position: 'top',
-                      topOffset: scale(20),
-                    });
-                    setSidebarVisible(false);
-                  }}
-                >
+                <TouchableOpacity style={styles.sidebarItem} onPress={() => { Trace('Settings Clicked'); Toast.show({ type: 'info', text1: 'Info', text2: 'Settings coming soon', position: 'top', topOffset: scale(20) }); setSidebarVisible(false); }}>
                   <Text style={styles.sidebarText}>Settings</Text>
                 </TouchableOpacity>
-              </LinearGradient>
+              </View>
             </Pressable>
           </Modal>
         )}
@@ -926,15 +833,33 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: scale(20),
+    paddingTop: scale(10),
+    paddingBottom: scale(30),
   },
   profileCard: {
     alignItems: 'center',
     paddingVertical: scale(20),
     borderRadius: scale(15),
     marginHorizontal: scale(10),
-    marginTop: scale(10),
+    backgroundColor: 'rgba(26, 26, 58, 0.9)',
     elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(5) },
+    shadowOpacity: 0.2,
+    shadowRadius: scale(10),
+  },
+  iconContainer: {
+    width: '100%',
+    alignItems: 'flex-end',
+    paddingHorizontal: scale(20),
+  },
+  settingsIcon: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: scale(0),
+  },
+  backIcon:{
+    alignSelf: 'flex-start',
+    paddingHorizontal: scale(0),
   },
   profileImageContainer: {
     position: 'relative',
@@ -979,7 +904,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     width: '80%',
-    marginTop: scale(5),
+    marginTop: scale(10),
   },
   stat: {
     alignItems: 'center',
@@ -995,10 +920,12 @@ const styles = StyleSheet.create({
   },
   collectionsSection: {
     marginTop: scale(20),
+    paddingBottom: scale(20),
   },
   tabsContainer: {
     paddingVertical: scale(10),
     paddingHorizontal: scale(20),
+    backgroundColor: 'rgba(42, 42, 90, 0.9)',
     borderTopLeftRadius: scale(20),
     borderTopRightRadius: scale(20),
     elevation: 3,
@@ -1008,7 +935,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: scale(25),
     padding: scale(5),
-    marginHorizontal: scale(10),
   },
   tab: {
     flex: 1,
@@ -1030,6 +956,24 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: '#A855F7',
     fontWeight: '600',
+  },
+  line: {
+    borderColor: '#B0B0D0',
+    marginBottom: scale(10),
+    width: '90%',
+    alignSelf: 'center',
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: scale(20),
+    marginBottom: scale(10),
+  },
+  addButtonText: {
+    color: '#A855F7',
+    fontSize: scaleFont(14),
+    marginLeft: scale(5),
+    fontWeight: '500',
   },
   emptyStateContainer: {
     alignItems: 'center',
@@ -1064,43 +1008,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  productItem: {
-    width: itemWidth,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: scale(10),
-    marginHorizontal: itemSpacing / 5,
-    marginVertical: scale(2),
-    padding: scale(10),
-    alignItems: 'center',
+  itemContainer: {
+    width: itemSize,
+    margin: scale(5),
+    backgroundColor: 'rgba(42, 42, 74, 0.9)',
+    borderRadius: scale(12),
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(5) },
+    shadowOpacity: 0.2,
+    shadowRadius: scale(10),
+    elevation: 3,
   },
-  reelItem: {
-    borderWidth: 2,
-    borderColor: 'rgba(168, 85, 247, 0.4)',
-  },
-  productImage: {
+  mediaContainer: {
     width: '100%',
-    height: itemWidth * 1.2,
-    borderRadius: scale(8),
+    height: itemSize * 1.2,
+    position: 'relative',
   },
-  skeletonImage: {
-    backgroundColor: '#3A3A5A',
-    opacity: 0.5,
-  },
-  skeletonText: {
-    backgroundColor: '#3A3A5A',
-    borderRadius: scale(4),
-    opacity: 0.5,
-  },
-  imageOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: scale(8),
+  mediaImage: {
+    width: '100%',
+    height: '100%',
+    borderTopLeftRadius: scale(12),
+    borderTopRightRadius: scale(12),
   },
   playIcon: {
     position: 'absolute',
@@ -1111,27 +1042,75 @@ const styles = StyleSheet.create({
     borderRadius: scale(20),
     padding: scale(8),
   },
-  productInfo: {
-    width: '100%',
+  itemInfo: {
+    padding: scale(10),
     alignItems: 'center',
-    marginTop: scale(5),
   },
-  productTitle: {
+  itemTitle: {
     fontSize: scaleFont(12),
     color: '#FFFFFF',
+    fontWeight: '600',
     textAlign: 'center',
-    fontWeight: '500',
-    marginBottom: scale(4),
-    height: scale(32),
+    marginBottom: scale(5),
+    height: scale(20), // Fixed height for consistency
   },
-  productPrice: {
-    fontSize: scaleFont(14),
+  itemPrice: {
+    fontSize: scaleFont(10),
     fontWeight: '700',
     color: '#A855F7',
   },
+  discountedPrice: {
+    fontSize: scaleFont(10),
+    fontWeight: '700',
+    color: '#A855F7',
+    marginRight: scale(4),
+  },
+  originalPrice: {
+    fontSize: scaleFont(8),
+    fontWeight: '500',
+    color: '#B0B0D0',
+    textDecorationLine: 'line-through',
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeIcon: {
+    position: 'absolute',
+    top: scale(5),
+    right: scale(5),
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderRadius: scale(10),
+    padding: scale(4),
+  },
+  discountBadge: {
+    position: 'absolute',
+    top: scale(8),
+    right: scale(8),
+    backgroundColor: '#FF3E6D',
+    paddingHorizontal: scale(6),
+    paddingVertical: scale(2),
+    borderRadius: scale(4),
+  },
+  premiumBadge: {
+    position: 'absolute',
+    top: scale(8),
+    left: scale(8),
+    backgroundColor: '#FFD700',
+    paddingHorizontal: scale(8),
+    paddingVertical: scale(3),
+    borderRadius: scale(12),
+  },
+  badgeText: {
+    fontSize: scaleFont(10),
+    color: '#000000',
+    fontWeight: 'bold',
+  },
   collectionsList: {
-    paddingHorizontal: itemSpacing * 1.5,
-    paddingBottom: scale(20),
+    paddingHorizontal: itemSpacing,
+    paddingBottom: scale(10),
+    alignItems: 'center', // Center items in the grid
   },
   sidebarOverlay: {
     flex: 1,
@@ -1142,6 +1121,7 @@ const styles = StyleSheet.create({
   sidebar: {
     width: width * 0.3,
     padding: scale(10),
+    backgroundColor: '#2A2A4A',
     borderBottomLeftRadius: scale(20),
   },
   sidebarItem: {
@@ -1218,6 +1198,34 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     width: '100%',
+  },
+  skeletonItem: {
+    width: itemSize,
+    margin: scale(5),
+    backgroundColor: 'rgba(42, 42, 74, 0.9)',
+    borderRadius: scale(12),
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    elevation: 3,
+  },
+  skeletonImage: {
+    width: '100%',
+    height: itemSize * 1.2,
+    backgroundColor: 'rgba(58, 58, 90, 0.5)',
+    borderTopLeftRadius: scale(12),
+    borderTopRightRadius: scale(12),
+  },
+  skeletonInfo: {
+    padding: scale(10),
+    alignItems: 'center',
+  },
+  skeletonText: {
+    width: '80%',
+    height: scale(14),
+    backgroundColor: 'rgba(58, 58, 90, 0.5)',
+    borderRadius: scale(4),
+    marginVertical: scale(4),
   },
 });
 

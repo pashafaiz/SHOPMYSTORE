@@ -29,19 +29,12 @@ import {
   setShowProgress,
   resetUploadState,
 } from '../redux/slices/uploadReelSlice';
-import Colors from '../constants/Colors';
-import Header from '../Components/Header';
-import {
-  BACKGROUND_COLORS,
-  REELS_BUTTON_COLOR,
-  REELS_MODAL_TEXT_COLOR,
-} from '../constants/GlobalConstants';
 
 const { width, height } = Dimensions.get('window');
 
 // Responsive scaling functions
-const scaleSize = size => Math.round(size * (width / 375));
-const scaleFont = size => Math.round(size * (Math.min(width, height) / 375));
+const scaleSize = (size) => Math.round(size * (width / 375));
+const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375));
 
 // Constants
 const MAX_VIDEO_DURATION = 60; // 60 seconds
@@ -109,7 +102,7 @@ const UploadReel = () => {
     }
   }, [video]);
 
-  const handleVideoPick = async type => {
+  const handleVideoPick = async (type) => {
     const options = {
       mediaType: 'video',
       videoQuality: 'high',
@@ -180,7 +173,7 @@ const UploadReel = () => {
     dispatch(setShowProgress(true));
   };
 
-  const handleProgress = progress => {
+  const handleProgress = (progress) => {
     dispatch(setCurrentTime(progress.currentTime));
     Animated.timing(progressAnim, {
       toValue: progress.currentTime / duration,
@@ -189,19 +182,21 @@ const UploadReel = () => {
     }).start();
   };
 
-  const handleLoad = meta => {
+  const handleLoad = (meta) => {
     dispatch(setDuration(meta.duration));
   };
 
   const handleEnd = () => {
     dispatch(setPaused(true));
-    videoRef.current.seek(0);
+    if (videoRef.current) {
+      videoRef.current.seek(0);
+    }
     dispatch(setCurrentTime(0));
     progressAnim.setValue(0);
   };
 
-  const handleSeek = event => {
-    if (!video || !duration) return;
+  const handleSeek = (event) => {
+    if (!video || !duration || !videoRef.current) return;
 
     const progressBarWidth = width * 0.85 - scaleSize(30);
     const touchX = event.nativeEvent.locationX;
@@ -220,11 +215,11 @@ const UploadReel = () => {
   };
 
   const handleUpload = () => {
-    if (!video) {
+    if (!video || !video.uri) {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Please select a video first',
+        text2: 'Please select a valid video first',
       });
       return;
     }
@@ -238,10 +233,19 @@ const UploadReel = () => {
       return;
     }
 
-    dispatch(uploadReel({ video, caption }));
+    dispatch(
+      uploadReel({
+        video: {
+          uri: video.uri,
+          type: video.type || 'video/mp4',
+          fileName: video.fileName || `reel_${Date.now()}.mp4`,
+        },
+        caption,
+      }),
+    );
   };
 
-  const formatTime = seconds => {
+  const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
@@ -264,17 +268,23 @@ const UploadReel = () => {
 
   return (
     <LinearGradient
-      colors={BACKGROUND_COLORS}
+      colors={['#0A0A1E', '#1E1E3F']}
       style={styles.container}
-      start={{x: 0, y: 0}}
-      end={{x: 0, y: 1}}>
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}>
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled">
-        <Header
-          title="Create Reel"
-          onBackPress={() => navigation.goBack()}
-        />
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}>
+            <Ionicons name="arrow-back" size={scaleSize(24)} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Create Reel</Text>
+          <View style={styles.headerRight} />
+        </View>
+
         <View style={styles.videoContainer}>
           {video ? (
             <Animated.View
@@ -291,7 +301,7 @@ const UploadReel = () => {
                 style={styles.videoTouchable}>
                 <Video
                   ref={videoRef}
-                  source={{uri: video.uri}}
+                  source={{ uri: video.uri }}
                   style={styles.video}
                   resizeMode="cover"
                   paused={paused}
@@ -320,7 +330,7 @@ const UploadReel = () => {
                   activeOpacity={1}>
                   <View style={styles.progressBarBackground}>
                     <Animated.View
-                      style={[styles.progressBarFill, {width: progressWidth}]}
+                      style={[styles.progressBarFill, { width: progressWidth }]}
                     />
                   </View>
                   <View style={styles.timeContainer}>
@@ -337,7 +347,7 @@ const UploadReel = () => {
                     style={[
                       styles.progressFill,
                       {
-                        transform: [{rotate: `${uploadProgress * 3.6}deg`}],
+                        transform: [{ rotate: `${uploadProgress * 3.6}deg` }],
                       },
                     ]}
                   />
@@ -350,7 +360,7 @@ const UploadReel = () => {
               <Ionicons
                 name="videocam-outline"
                 size={scaleSize(60)}
-                color={REELS_MODAL_TEXT_COLOR}
+                color="#B0B0D0"
               />
               <Text style={styles.placeholderText}>
                 Select or Record a Video
@@ -378,7 +388,7 @@ const UploadReel = () => {
             style={[styles.actionButton, styles.cameraButton]}
             onPress={() => handleVideoPick('camera')}
             disabled={loading}>
-            <Ionicons name="camera" size={scaleSize(24)} color={REELS_MODAL_TEXT_COLOR} />
+            <Ionicons name="camera" size={scaleSize(24)} color="#FFFFFF" />
             <Text style={styles.buttonText}>Record</Text>
           </TouchableOpacity>
 
@@ -386,7 +396,7 @@ const UploadReel = () => {
             style={[styles.actionButton, styles.galleryButton]}
             onPress={() => handleVideoPick('gallery')}
             disabled={loading}>
-            <Ionicons name="images" size={scaleSize(24)} color="#000" />
+            <Ionicons name="images" size={scaleSize(24)} color="#000000" />
             <Text style={[styles.buttonText, styles.galleryButtonText]}>
               Gallery
             </Text>
@@ -401,13 +411,13 @@ const UploadReel = () => {
           onPress={handleUpload}
           disabled={!video || loading || !caption.trim()}>
           {loading ? (
-            <ActivityIndicator size="small" color={REELS_MODAL_TEXT_COLOR} />
+            <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <>
               <Ionicons
                 name="cloud-upload"
                 size={scaleSize(24)}
-                color={REELS_MODAL_TEXT_COLOR}
+                color="#FFFFFF"
               />
               <Text style={styles.uploadButtonText}>Upload Reel</Text>
             </>
@@ -427,6 +437,23 @@ const styles = StyleSheet.create({
     paddingTop: scaleSize(10),
     paddingBottom: scaleSize(20),
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: scaleSize(20),
+  },
+  backButton: {
+    padding: scaleSize(5),
+  },
+  headerTitle: {
+    fontSize: scaleFont(20),
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  headerRight: {
+    width: scaleSize(34),
+  },
   videoContainer: {
     alignItems: 'center',
     marginBottom: scaleSize(15),
@@ -439,7 +466,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
     shadowColor: '#FFFFFF',
-    shadowOffset: {width: 0, height: 0},
+    shadowOffset: { width: 0, height: 0 },
     elevation: scaleSize(10),
     backgroundColor: '#000',
   },
@@ -460,7 +487,7 @@ const styles = StyleSheet.create({
   },
   removeIcon: {
     shadowColor: '#FF3E6D',
-    shadowOffset: {width: 0, height: 0},
+    shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: scaleSize(5),
   },
@@ -576,13 +603,13 @@ const styles = StyleSheet.create({
     borderRadius: scaleSize(10),
     gap: scaleSize(10),
     shadowColor: '#FFFFFF',
-    shadowOffset: {width: 0, height: 0},
+    shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: scaleSize(8),
     elevation: scaleSize(5),
   },
   cameraButton: {
-    backgroundColor: Colors.lightPurple,
+    backgroundColor: '#A855F7',
   },
   galleryButton: {
     backgroundColor: '#FFFFFF',
@@ -593,7 +620,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   galleryButtonText: {
-    color: '#000',
+    color: '#000000',
   },
   uploadButton: {
     backgroundColor: '#7B61FF',
@@ -604,7 +631,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: scaleSize(12),
     shadowColor: '#7B61FF',
-    shadowOffset: {width: 0, height: 0},
+    shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: scaleSize(10),
   },
