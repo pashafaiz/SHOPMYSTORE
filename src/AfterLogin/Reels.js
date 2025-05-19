@@ -42,19 +42,31 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   BASE_URL,
   ALLOWED_ASPECT_RATIOS,
-  REELS_LOADER_COLOR,
-  REELS_REFRESH_TINT_COLOR,
-  REELS_MODAL_BG_COLOR,
-  REELS_MODAL_TEXT_COLOR,
-  REELS_BUTTON_COLOR,
-  EMPTY_REELS_TEXT,
+  USER_TOKEN_KEY,
   TOAST_POSITION,
   TOAST_TOP_OFFSET,
-  USER_TOKEN_KEY,
-  PREMIUM_BADGE_COLOR,
 } from '../constants/GlobalConstants';
 import Toast from 'react-native-toast-message';
 import ConfettiCannon from 'react-native-confetti-cannon';
+
+// Define theme colors (move to GlobalConstants.js if possible)
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)';
+const SELECTED_CATEGORY_BG_COLOR = '#5b9cff';
+const PREMIUM_BADGE_COLOR = '#fef08a';
+const PREMIUM_TEXT_COLOR = '#1a2b4a';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
+const REELS_LOADER_COLOR = '#5b9cff';
+const REELS_REFRESH_TINT_COLOR = '#5b9cff';
+const REELS_MODAL_BG_COLOR = '#f5f9ff';
+const REELS_MODAL_TEXT_COLOR = '#1a2b4a';
+const REELS_BUTTON_COLOR = '#5b9cff';
+const EMPTY_REELS_TEXT = 'No reels available. Try again!';
 
 const { height, width } = Dimensions.get('window');
 const scaleFactor = width / 375;
@@ -111,7 +123,7 @@ const ReelItem = ({
   });
   const premiumBadgeColor = premiumBadgeAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [PREMIUM_BADGE_COLOR, '#FFD700'],
+    outputRange: [PREMIUM_BADGE_COLOR, '#e4d96f'],
   });
 
   return (
@@ -124,11 +136,12 @@ const ReelItem = ({
         {showConfetti && (
           <ConfettiCannon
             ref={confettiRef}
-            count={200}
+            count={150}
             origin={{ x: width / 2, y: height / 2 }}
-            explosionSpeed={500}
-            fallSpeed={3000}
+            explosionSpeed={400}
+            fallSpeed={2500}
             fadeOut
+            colors={[PRIMARY_THEME_COLOR, SECONDARY_THEME_COLOR, PREMIUM_BADGE_COLOR]}
           />
         )}
 
@@ -199,8 +212,8 @@ const ReelItem = ({
           >
             <Ionicons
               name={muted ? 'volume-mute' : 'volume-high'}
-              size={scale(40)}
-              color="#FFFFFF"
+              size={scale(36)}
+              color={TEXT_THEME_COLOR}
             />
           </Animated.View>
         )}
@@ -216,11 +229,11 @@ const ReelItem = ({
             },
           ]}
         >
-          <Ionicons name="heart" size={scale(100)} color="#FF3E6D" />
+          <Ionicons name="heart" size={scale(80)} color={SECONDARY_THEME_COLOR} />
         </Animated.View>
 
         <LinearGradient
-          colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)']}
+          colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.5)']}
           style={[styles.overlay, { paddingBottom: insets.bottom + scale(20) }]}
         >
           <View style={[styles.bottomLeft, { bottom: insets.bottom + scale(100) }]}>
@@ -233,25 +246,27 @@ const ReelItem = ({
                   source={{ uri: item.user?.avatar }}
                   style={styles.avatar}
                 />
-                <Text style={styles.username}>
-                  {item.user?.userName}
-                </Text>
-                {item.user?.isPremium && (
-                  <Animated.View style={[
-                    styles.premiumBadge,
-                    {
-                      transform: [{ scale: premiumBadgeScale }],
-                      backgroundColor: premiumBadgeColor,
-                    }
-                  ]}>
-                    <FontAwesome name="diamond" size={scale(12)} color="#fff" />
-                  </Animated.View>
-                )}
+                <View>
+                  <Text style={styles.username}>
+                    {item.user?.userName}
+                  </Text>
+                  {item.user?.isPremium && (
+                    <Animated.View style={[
+                      styles.premiumBadge,
+                      {
+                        transform: [{ scale: premiumBadgeScale }],
+                        backgroundColor: premiumBadgeColor,
+                      }
+                    ]}>
+                      <FontAwesome name="diamond" size={scale(10)} color={PREMIUM_TEXT_COLOR} />
+                    </Animated.View>
+                  )}
+                </View>
               </TouchableOpacity>
-              <Pressable style={styles.followButton}>
-                <Text style={styles.followText}>Follow</Text>
-              </Pressable>
             </View>
+            <Pressable style={styles.followButton}>
+              <Text style={styles.followText}>Follow</Text>
+            </Pressable>
             <Text style={styles.caption} numberOfLines={2} ellipsizeMode="tail">
               {item.caption}
             </Text>
@@ -264,12 +279,14 @@ const ReelItem = ({
             <Animated.View
               style={[styles.iconContainer, { transform: [{ scale: likeAnim }] }]}
             >
-              <Ionicons
-                name={isLiked ? 'heart' : 'heart-outline'}
-                size={scale(32)}
-                color={isLiked ? '#FF3E6D' : '#FFFFFF'}
-                onPress={() => handleLike(item._id, isLiked)}
-              />
+              <View style={styles.iconBackground}>
+                <Ionicons
+                  name={isLiked ? 'heart' : 'heart-outline'}
+                  size={scale(24)}
+                  color={isLiked ? SECONDARY_THEME_COLOR : TEXT_THEME_COLOR}
+                  onPress={() => handleLike(item._id, isLiked)}
+                />
+              </View>
               <Text style={styles.iconText}>{item.likes.toString()}</Text>
             </Animated.View>
 
@@ -277,7 +294,9 @@ const ReelItem = ({
               onPress={() => openCommentModal(item._id)}
               style={styles.iconContainer}
             >
-              <Ionicons name="chatbubble-outline" size={scale(28)} color="#FFFFFF" />
+              <View style={styles.iconBackground}>
+                <Ionicons name="chatbubble-outline" size={scale(24)} color={TEXT_THEME_COLOR} />
+              </View>
               <Text style={styles.iconText}>{item.comments.toString()}</Text>
             </Pressable>
 
@@ -288,7 +307,9 @@ const ReelItem = ({
               }}
               style={styles.iconContainer}
             >
-              <Ionicons name="paper-plane-outline" size={scale(28)} color="#FFFFFF" />
+              <View style={styles.iconBackground}>
+                <Ionicons name="paper-plane-outline" size={scale(24)} color={TEXT_THEME_COLOR} />
+              </View>
               <Text style={styles.iconText}>Share</Text>
             </Pressable>
 
@@ -296,28 +317,13 @@ const ReelItem = ({
               onPress={() => handleSave(item._id)}
               style={styles.iconContainer}
             >
-              <Ionicons
-                name={savedReels[item._id] ? 'bookmark' : 'bookmark-outline'}
-                size={scale(28)}
-                color="#FFFFFF"
-              />
-            </Pressable>
-
-            <Pressable
-              onPress={() => {
-                setMuted((prev) => {
-                  const newMuted = !prev;
-                  showMuteIconAnimation();
-                  return newMuted;
-                });
-              }}
-              style={styles.iconContainer}
-            >
-              <Ionicons
-                name={muted ? 'volume-mute' : 'volume-high'}
-                size={scale(28)}
-                color="#FFFFFF"
-              />
+              <View style={styles.iconBackground}>
+                <Ionicons
+                  name={savedReels[item._id] ? 'bookmark' : 'bookmark-outline'}
+                  size={scale(24)}
+                  color={TEXT_THEME_COLOR}
+                />
+              </View>
             </Pressable>
           </View>
         </LinearGradient>
@@ -378,7 +384,7 @@ const CommentItem = ({
           />
           {isPremiumComment && (
             <View style={styles.premiumCommentBadge}>
-              <FontAwesome name="diamond" size={scale(10)} color="#fff" />
+              <FontAwesome name="diamond" size={scale(8)} color={PREMIUM_TEXT_COLOR} />
             </View>
           )}
         </View>
@@ -395,7 +401,7 @@ const CommentItem = ({
           <Text style={styles.commentText}>{item.text}</Text>
           {item.isPending && (
             <View style={styles.pendingIndicator}>
-              <ActivityIndicator size="small" color="#7B61FF" />
+              <ActivityIndicator size="small" color={PRIMARY_THEME_COLOR} />
               <Text style={styles.pendingText}>Posting...</Text>
             </View>
           )}
@@ -430,11 +436,11 @@ const Reels = () => {
   const [currentUsername, setCurrentUsername] = useState(null);
   const [isPremiumUser, setIsPremiumUser] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
-  
+
   const flatListRef = useRef(null);
   const videoRefs = useRef({});
   const commentInputRef = useRef(null);
-  
+
   const likeAnim = useRef(new Animated.Value(1)).current;
   const doubleTapAnim = useRef(new Animated.Value(0)).current;
   const muteIconOpacity = useRef(new Animated.Value(0)).current;
@@ -442,7 +448,7 @@ const Reels = () => {
   const modalBackdropOpacity = useRef(new Animated.Value(0)).current;
   const commentInputAnim = useRef(new Animated.Value(0)).current;
   const premiumBadgeAnim = useRef(new Animated.Value(0)).current;
-  
+
   const tapTimeoutRef = useRef(null);
   const lastTapRef = useRef({ time: 0, id: null });
   const confettiRef = useRef(null);
@@ -457,7 +463,7 @@ const Reels = () => {
           setCurrentUsername(decoded.userName);
           setCurrentUserAvatar(decoded.avatar || 'https://via.placeholder.com/40');
           setIsPremiumUser(decoded.isPremium || false);
-          
+
           if (decoded.isPremium) {
             Animated.loop(
               Animated.sequence([
@@ -543,7 +549,7 @@ const Reels = () => {
   useEffect(() => {
     if (showConfetti && confettiRef.current) {
       confettiRef.current.start();
-      const timer = setTimeout(() => setShowConfetti(false), 3000);
+      const timer = setTimeout(() => setShowConfetti(false), 2500);
       return () => clearTimeout(timer);
     }
   }, [showConfetti]);
@@ -610,7 +616,7 @@ const Reels = () => {
         dispatch(likeReel(id));
         Animated.sequence([
           Animated.timing(likeAnim, {
-            toValue: 1.4,
+            toValue: 1.3,
             duration: 150,
             useNativeDriver: true,
           }),
@@ -620,7 +626,6 @@ const Reels = () => {
             useNativeDriver: true,
           }),
         ]).start();
-        
         if (isPremiumUser) {
           setShowConfetti(true);
         }
@@ -641,12 +646,12 @@ const Reels = () => {
         Animated.sequence([
           Animated.timing(doubleTapAnim, {
             toValue: 1,
-            duration: 500,
+            duration: 400,
             useNativeDriver: true,
           }),
           Animated.timing(doubleTapAnim, {
             toValue: 0,
-            duration: 500,
+            duration: 400,
             useNativeDriver: true,
           }),
         ]).start();
@@ -683,6 +688,13 @@ const Reels = () => {
 
   const handleSave = useCallback((id) => {
     setSavedReels((prev) => ({ ...prev, [id]: !prev[id] }));
+    Toast.show({
+      type: 'success',
+      text1: 'Saved',
+      text2: prev[id] ? 'Removed from saved reels' : 'Added to saved reels',
+      position: TOAST_POSITION,
+      topOffset: TOAST_TOP_OFFSET,
+    });
   }, []);
 
   const handleShare = useCallback(
@@ -873,14 +885,14 @@ const Reels = () => {
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#7B61FF" />
+        <ActivityIndicator size="large" color={REELS_LOADER_COLOR} />
         <Text style={styles.loaderText}>Loading Reels...</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.container}>
+    <LinearGradient colors={BACKGROUND_GRADIENT} style={styles.container}>
       <FlatList
         ref={flatListRef}
         data={reels}
@@ -936,15 +948,15 @@ const Reels = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#7B61FF"
-            colors={['#7B61FF']}
-            progressBackgroundColor="#1C1C2E"
+            tintColor={REELS_REFRESH_TINT_COLOR}
+            colors={[REELS_REFRESH_TINT_COLOR]}
+            progressBackgroundColor={PRODUCT_BG_COLOR}
           />
         }
         ListEmptyComponent={
           !loading && !refreshing && (
             <View style={styles.emptyContainer}>
-              <Ionicons name="sad-outline" size={scale(60)} color="#FFFFFF" />
+              <Ionicons name="sad-outline" size={scale(50)} color={SUBTEXT_THEME_COLOR} />
               <Text style={styles.emptyText}>
                 {error ? `Error: ${error}` : EMPTY_REELS_TEXT}
               </Text>
@@ -953,7 +965,7 @@ const Reels = () => {
                 onPress={() => fetchReelsData()}
               >
                 <LinearGradient
-                  colors={['#7B61FF', '#AD4DFF']}
+                  colors={[CATEGORY_BG_COLOR, PRIMARY_THEME_COLOR]}
                   style={styles.buttonGradient}
                 >
                   <Text style={styles.retryButtonText}>Try Again</Text>
@@ -978,7 +990,7 @@ const Reels = () => {
             <Animated.View
               style={[
                 styles.commentBox,
-                { 
+                {
                   transform: [{ translateY: modalSlideAnim }],
                   maxHeight: height * 0.85,
                 }
@@ -986,17 +998,17 @@ const Reels = () => {
             >
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Comments</Text>
-                <Pressable 
+                <Pressable
                   onPress={() => setCommentModalVisible(false)}
                   hitSlop={20}
                 >
-                  <Ionicons name="close" size={scale(28)} color="#7B61FF" />
+                  <Ionicons name="close" size={scale(24)} color={PRIMARY_THEME_COLOR} />
                 </Pressable>
               </View>
 
               {commentsLoading[selectedReelId] && !comments[selectedReelId]?.length ? (
                 <View style={styles.commentLoaderContainer}>
-                  <ActivityIndicator size="large" color="#7B61FF" />
+                  <ActivityIndicator size="large" color={REELS_LOADER_COLOR} />
                   <Text style={styles.loaderText}>Loading comments...</Text>
                 </View>
               ) : (
@@ -1019,14 +1031,14 @@ const Reels = () => {
                     <RefreshControl
                       refreshing={commentsRefreshing[selectedReelId] || false}
                       onRefresh={onRefreshComments}
-                      tintColor="#7B61FF"
-                      colors={['#7B61FF']}
-                      progressBackgroundColor="#1C1C2E"
+                      tintColor={REELS_REFRESH_TINT_COLOR}
+                      colors={[REELS_REFRESH_TINT_COLOR]}
+                      progressBackgroundColor={PRODUCT_BG_COLOR}
                     />
                   }
                   ListEmptyComponent={
                     <View style={styles.emptyCommentContainer}>
-                      <Ionicons name="chatbubble-outline" size={scale(50)} color="#888" />
+                      <Ionicons name="chatbubble-outline" size={scale(40)} color={SUBTEXT_THEME_COLOR} />
                       <Text style={styles.emptyCommentText}>Be the first to comment!</Text>
                     </View>
                   }
@@ -1059,7 +1071,7 @@ const Reels = () => {
                 )}
                 {isPremiumUser && (
                   <View style={styles.premiumCommentBadge}>
-                    <FontAwesome name="diamond" size={scale(10)} color="#fff" />
+                    <FontAwesome name="diamond" size={scale(8)} color={PREMIUM_TEXT_COLOR} />
                   </View>
                 )}
                 <TextInput
@@ -1071,28 +1083,28 @@ const Reels = () => {
                   value={newComment}
                   onChangeText={setNewComment}
                   placeholder="Add a comment..."
-                  placeholderTextColor="#888"
+                  placeholderTextColor={SUBTEXT_THEME_COLOR}
                   maxLength={500}
                   multiline
                 />
                 <Pressable
                   onPress={handlePostComment}
                   style={({ pressed }) => [
-                    styles.postButton, 
-                    { 
+                    styles.postButton,
+                    {
                       opacity: newComment.trim() ? (pressed ? 0.7 : 1) : 0.5,
                     }
                   ]}
                   disabled={!newComment.trim()}
                 >
                   <LinearGradient
-                    colors={['#7B61FF', '#AD4DFF']}
+                    colors={[CATEGORY_BG_COLOR, PRIMARY_THEME_COLOR]}
                     style={styles.buttonGradient}
                   >
-                    <Ionicons 
-                      name="send" 
-                      size={scale(24)} 
-                      color="#FFFFFF" 
+                    <Ionicons
+                      name="send"
+                      size={scale(20)}
+                      color={TEXT_THEME_COLOR}
                     />
                   </LinearGradient>
                 </Pressable>
@@ -1109,10 +1121,7 @@ const Reels = () => {
         onRequestClose={() => setDeleteCommentModalVisible(false)}
       >
         <View style={styles.centeredModalContainer}>
-          <LinearGradient
-            colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']}
-            style={styles.deleteCommentBox}
-          >
+          <View style={styles.deleteCommentBox}>
             <Text style={styles.modalTitle}>Delete Comment</Text>
             <Text style={styles.deleteCommentText}>
               Are you sure you want to delete this comment?
@@ -1129,14 +1138,14 @@ const Reels = () => {
                 style={[styles.deleteCommentButton, styles.deleteButton]}
               >
                 <LinearGradient
-                  colors={['#7B61FF', '#AD4DFF']}
+                  colors={[CATEGORY_BG_COLOR, SECONDARY_THEME_COLOR]}
                   style={styles.buttonGradient}
                 >
                   <Text style={styles.deleteButtonText}>Delete</Text>
                 </LinearGradient>
               </Pressable>
             </View>
-          </LinearGradient>
+          </View>
         </View>
       </Modal>
 
@@ -1147,16 +1156,13 @@ const Reels = () => {
         onRequestClose={() => setShareModalVisible(false)}
       >
         <View style={styles.centeredModalContainer}>
-          <LinearGradient
-            colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']}
-            style={styles.shareBox}
-          >
+          <View style={styles.shareBox}>
             <Text style={styles.modalTitle}>Share Reel</Text>
             <Pressable
               onPress={() => handleShare(reels.find((reel) => reel._id === selectedReelId))}
               style={styles.shareOption}
             >
-              <Ionicons name="share-social-outline" size={scale(26)} color="#7B61FF" />
+              <Ionicons name="share-social-outline" size={scale(22)} color={PRIMARY_THEME_COLOR} />
               <Text style={styles.shareOptionText}>Share via...</Text>
             </Pressable>
             <Pressable
@@ -1172,7 +1178,7 @@ const Reels = () => {
               }}
               style={styles.shareOption}
             >
-              <Ionicons name="link-outline" size={scale(26)} color="#7B61FF" />
+              <Ionicons name="link-outline" size={scale(22)} color={PRIMARY_THEME_COLOR} />
               <Text style={styles.shareOptionText}>Copy Link</Text>
             </Pressable>
             <Pressable
@@ -1181,7 +1187,7 @@ const Reels = () => {
             >
               <Text style={styles.closeBtn}>Cancel</Text>
             </Pressable>
-          </LinearGradient>
+          </View>
         </View>
       </Modal>
     </LinearGradient>
@@ -1196,11 +1202,21 @@ const styles = StyleSheet.create({
     width,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderWidth: 1,
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale(5),
+    elevation: 2,
   },
   video: {
     position: 'absolute',
-    borderRadius: scale(12),
+    borderRadius: scale(10),
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: BORDER_THEME_COLOR,
   },
   bufferIndicator: {
     position: 'absolute',
@@ -1212,122 +1228,133 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    transform: [{ translateX: -scale(30) }, { translateY: -scale(30) }],
+    transform: [{ translateX: -scale(28) }, { translateY: -scale(28) }],
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: scale(25),
-    padding: scale(12),
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(20),
+    padding: scale(10),
   },
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    padding: scale(20),
+    padding: scale(15),
     width: '100%',
   },
   bottomLeft: {
     position: 'absolute',
-    left: scale(20),
+    left: scale(15),
     width: '65%',
   },
   userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: scale(12),
+    marginBottom: scale(8),
   },
   avatar: {
-    width: scale(40),
-    height: scale(40),
-    borderRadius: scale(20),
-    marginRight: scale(10),
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
+    marginRight: scale(8),
     borderWidth: 1,
-    borderColor: '#7B61FF',
+    borderColor: PRIMARY_THEME_COLOR,
   },
   username: {
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
     fontWeight: '700',
-    fontSize: scaleFont(16),
+    fontSize: scaleFont(14),
   },
   premiumBadge: {
-    width: scale(20),
-    height: scale(20),
-    borderRadius: scale(10),
+    width: scale(18),
+    height: scale(18),
+    borderRadius: scale(9),
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: scale(8),
+    marginTop: scale(2),
   },
   followButton: {
-    marginLeft: scale(10),
-    paddingVertical: scale(6),
-    paddingHorizontal: scale(14),
-    backgroundColor: 'rgba(123,97,255,0.2)',
-    borderRadius: scale(15),
+    marginTop: scale(6),
+    paddingVertical: scale(4),
+    paddingHorizontal: scale(12),
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(12),
     borderWidth: 1,
-    borderColor: '#7B61FF',
+    borderColor: PRIMARY_THEME_COLOR,
+    alignSelf: 'flex-start',
   },
   followText: {
-    color: '#7B61FF',
-    fontSize: scaleFont(12),
-    fontWeight: '700',
+    color: PRIMARY_THEME_COLOR,
+    fontSize: scaleFont(11),
+    fontWeight: '600',
   },
   caption: {
-    color: '#FFFFFF',
-    fontSize: scaleFont(14),
-    marginBottom: scale(12),
-    lineHeight: scaleFont(20),
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(13),
+    marginBottom: scale(8),
+    lineHeight: scaleFont(18),
   },
   stats: {
-    color: '#E5E7EB',
-    fontSize: scaleFont(12),
-    fontWeight: '700',
+    color: SUBTEXT_THEME_COLOR,
+    fontSize: scaleFont(11),
+    fontWeight: '600',
     opacity: 0.9,
   },
   rightButtons: {
     position: 'absolute',
-    right: scale(20),
+    right: scale(15),
     alignItems: 'center',
   },
   iconContainer: {
     alignItems: 'center',
-    marginBottom: scale(20),
-    padding: scale(10),
+    marginBottom: scale(10),
+    padding: scale(8),
+  },
+  iconBackground: {
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(20),
+    padding: scale(8),
+    borderWidth: 1,
+    borderColor: BORDER_THEME_COLOR,
   },
   iconText: {
-    color: '#FFFFFF',
-    fontSize: scaleFont(12),
-    marginTop: scale(6),
-    fontWeight: '700',
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(10),
+    marginTop: scale(4),
+    fontWeight: '600',
   },
   doubleTapHeart: {
     position: 'absolute',
     top: '50%',
     left: '50%',
-    transform: [{ translateX: -scale(50) }, { translateY: -scale(50) }],
+    transform: [{ translateX: -scale(40) }, { translateY: -scale(40) }],
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'flex-end',
   },
   commentBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    padding: scale(16),
-    borderTopLeftRadius: scale(25),
-    borderTopRightRadius: scale(25),
+    backgroundColor: PRODUCT_BG_COLOR,
+    padding: scale(14),
+    borderTopLeftRadius: scale(20),
+    borderTopRightRadius: scale(20),
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: scale(5),
+    elevation: 3,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: scale(12),
-    paddingBottom: scale(10),
+    marginBottom: scale(10),
+    paddingBottom: scale(8),
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    borderBottomColor: BORDER_THEME_COLOR,
   },
   commentList: {
     maxHeight: height * 0.6,
@@ -1336,12 +1363,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    paddingVertical: scale(12),
-    marginBottom: scale(12),
-    borderRadius: scale(12),
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: scale(10),
+    marginBottom: scale(10),
+    borderRadius: scale(10),
+    backgroundColor: PRODUCT_BG_COLOR,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale(4),
+    elevation: 2,
   },
   commentContent: {
     flexDirection: 'row',
@@ -1351,12 +1383,12 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   commentAvatar: {
-    width: scale(44),
-    height: scale(44),
-    borderRadius: scale(22),
-    marginRight: scale(12),
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
+    marginRight: scale(10),
     borderWidth: 1,
-    borderColor: '#7B61FF',
+    borderColor: PRIMARY_THEME_COLOR,
   },
   premiumCommentAvatar: {
     borderColor: PREMIUM_BADGE_COLOR,
@@ -1364,15 +1396,15 @@ const styles = StyleSheet.create({
   premiumCommentBadge: {
     position: 'absolute',
     bottom: 0,
-    right: scale(10),
-    width: scale(16),
-    height: scale(16),
-    borderRadius: scale(8),
+    right: scale(8),
+    width: scale(14),
+    height: scale(14),
+    borderRadius: scale(7),
     backgroundColor: PREMIUM_BADGE_COLOR,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#1C1C2E',
+    borderColor: TEXT_THEME_COLOR,
   },
   commentTextContainer: {
     flex: 1,
@@ -1380,48 +1412,48 @@ const styles = StyleSheet.create({
   commentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: scale(6),
+    marginBottom: scale(4),
   },
   commentUser: {
     fontWeight: '700',
-    fontSize: scaleFont(16),
-    color: '#FFFFFF',
-    marginRight: scale(8),
+    fontSize: scaleFont(14),
+    color: TEXT_THEME_COLOR,
+    marginRight: scale(6),
   },
   premiumLabel: {
-    backgroundColor: 'rgba(255, 215, 0, 0.2)',
-    paddingHorizontal: scale(8),
+    backgroundColor: CATEGORY_BG_COLOR,
+    paddingHorizontal: scale(6),
     paddingVertical: scale(2),
     borderRadius: scale(4),
     borderWidth: 1,
     borderColor: PREMIUM_BADGE_COLOR,
   },
   premiumLabelText: {
-    color: PREMIUM_BADGE_COLOR,
-    fontSize: scaleFont(10),
-    fontWeight: 'bold',
+    color: PREMIUM_TEXT_COLOR,
+    fontSize: scaleFont(9),
+    fontWeight: '600',
   },
   commentText: {
-    fontSize: scaleFont(14),
-    color: '#E5E7EB',
-    lineHeight: scaleFont(20),
+    fontSize: scaleFont(13),
+    color: SUBTEXT_THEME_COLOR,
+    lineHeight: scaleFont(18),
   },
   commentInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: scale(12),
-    paddingTop: scale(12),
+    marginTop: scale(10),
+    paddingTop: scale(10),
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+    borderTopColor: BORDER_THEME_COLOR,
     position: 'relative',
   },
   currentUserAvatar: {
-    width: scale(40),
-    height: scale(40),
-    borderRadius: scale(20),
-    marginRight: scale(10),
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
+    marginRight: scale(8),
     borderWidth: 1,
-    borderColor: '#7B61FF',
+    borderColor: PRIMARY_THEME_COLOR,
   },
   premiumCurrentUserAvatar: {
     borderColor: PREMIUM_BADGE_COLOR,
@@ -1429,67 +1461,77 @@ const styles = StyleSheet.create({
   commentInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    borderRadius: scale(25),
-    padding: scale(12),
-    paddingTop: scale(12),
-    marginRight: scale(10),
-    fontSize: scaleFont(15),
-    color: '#FFFFFF',
-    maxHeight: scale(120),
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: BORDER_THEME_COLOR,
+    borderRadius: scale(20),
+    padding: scale(10),
+    paddingTop: scale(10),
+    marginRight: scale(8),
+    fontSize: scaleFont(14),
+    color: TEXT_THEME_COLOR,
+    maxHeight: scale(100),
+    backgroundColor: CATEGORY_BG_COLOR,
   },
   premiumCommentInput: {
     borderColor: PREMIUM_BADGE_COLOR,
   },
   postButton: {
-    padding: scale(12),
-    borderRadius: scale(20),
+    padding: scale(10),
+    borderRadius: scale(18),
   },
   buttonGradient: {
-    padding: scale(12),
-    borderRadius: scale(20),
+    padding: scale(10),
+    borderRadius: scale(18),
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalTitle: {
-    fontSize: scaleFont(24),
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontSize: scaleFont(20),
+    fontWeight: '700',
+    color: TEXT_THEME_COLOR,
   },
   closeBtn: {
-    color: '#7B61FF',
-    fontWeight: '700',
-    fontSize: scaleFont(16),
+    color: PRIMARY_THEME_COLOR,
+    fontWeight: '600',
+    fontSize: scaleFont(14),
     textAlign: 'center',
   },
   centeredModalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
   },
   shareBox: {
-    padding: scale(16),
-    borderRadius: scale(20),
-    width: '85%',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: scale(14),
+    borderRadius: scale(15),
+    width: '80%',
+    backgroundColor: PRODUCT_BG_COLOR,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale(5),
+    elevation: 3,
   },
   deleteCommentBox: {
-    padding: scale(16),
-    borderRadius: scale(20),
-    width: '85%',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: scale(14),
+    borderRadius: scale(15),
+    width: '80%',
+    backgroundColor: PRODUCT_BG_COLOR,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale(5),
+    elevation: 3,
   },
   deleteCommentText: {
-    fontSize: scaleFont(16),
-    color: '#E5E7EB',
+    fontSize: scaleFont(14),
+    color: SUBTEXT_THEME_COLOR,
     textAlign: 'center',
-    marginVertical: scale(20),
+    marginVertical: scale(15),
   },
   deleteCommentButtonContainer: {
     flexDirection: 'row',
@@ -1497,106 +1539,108 @@ const styles = StyleSheet.create({
   },
   deleteCommentButton: {
     flex: 1,
-    paddingVertical: scale(12),
+    paddingVertical: scale(10),
     alignItems: 'center',
-    borderRadius: scale(15),
-    marginHorizontal: scale(5),
+    borderRadius: scale(12),
+    marginHorizontal: scale(4),
   },
   cancelButtonText: {
-    color: '#7B61FF',
-    fontSize: scaleFont(16),
-    fontWeight: '700',
+    color: PRIMARY_THEME_COLOR,
+    fontSize: scaleFont(14),
+    fontWeight: '600',
   },
   deleteButton: {
-    borderRadius: scale(15),
+    borderRadius: scale(12),
   },
   deleteButtonText: {
-    color: '#FFFFFF',
-    fontSize: scaleFont(16),
-    fontWeight: '700',
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(14),
+    fontWeight: '600',
   },
   shareOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: scale(15),
-    paddingHorizontal: scale(12),
+    paddingVertical: scale(12),
+    paddingHorizontal: scale(10),
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    borderBottomColor: BORDER_THEME_COLOR,
   },
   cancelOption: {
     borderBottomWidth: 0,
     justifyContent: 'center',
-    marginTop: scale(10),
+    marginTop: scale(8),
   },
   shareOptionText: {
-    fontSize: scaleFont(16),
-    color: '#FFFFFF',
-    fontWeight: '700',
-    marginLeft: scale(12),
+    fontSize: scaleFont(14),
+    color: TEXT_THEME_COLOR,
+    fontWeight: '600',
+    marginLeft: scale(10),
   },
   loaderContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: PRODUCT_BG_COLOR,
   },
   commentLoaderContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: scale(40),
-    minHeight: scale(200),
+    paddingVertical: scale(30),
+    minHeight: scale(180),
   },
   loaderText: {
-    color: '#FFFFFF',
-    fontSize: scaleFont(16),
-    marginTop: scale(10),
-    fontWeight: '700',
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(14),
+    marginTop: scale(8),
+    fontWeight: '600',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     height: height * 0.8,
+    backgroundColor: PRODUCT_BG_COLOR,
   },
   emptyText: {
-    color: '#FFFFFF',
-    fontSize: scaleFont(18),
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(16),
     textAlign: 'center',
-    marginBottom: scale(20),
-    marginHorizontal: scale(20),
-    fontWeight: '700',
+    marginBottom: scale(15),
+    marginHorizontal: scale(15),
+    fontWeight: '600',
   },
   emptyCommentContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: scale(20),
+    paddingVertical: scale(15),
   },
   emptyCommentText: {
-    color: '#888',
-    fontSize: scaleFont(16),
+    color: SUBTEXT_THEME_COLOR,
+    fontSize: scaleFont(14),
     textAlign: 'center',
-    marginTop: scale(10),
-    fontWeight: '700',
+    marginTop: scale(8),
+    fontWeight: '600',
   },
   retryButton: {
-    borderRadius: scale(25),
+    borderRadius: scale(20),
   },
   retryButtonText: {
-    color: '#FFFFFF',
-    fontSize: scaleFont(16),
-    fontWeight: '700',
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(14),
+    fontWeight: '600',
   },
   pendingIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: scale(8),
+    marginTop: scale(6),
   },
   pendingText: {
-    color: '#7B61FF',
-    fontSize: scaleFont(12),
-    marginLeft: scale(8),
-    fontWeight: '700',
+    color: PRIMARY_THEME_COLOR,
+    fontSize: scaleFont(11),
+    marginLeft: scale(6),
+    fontWeight: '600',
   },
 });
 

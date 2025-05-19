@@ -17,15 +17,30 @@ import { useDispatch, useSelector } from 'react-redux';
 import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import InputBox from '../Components/InputBox';
-import Strings from '../constants/Strings';
-import Colors from '../constants/Colors';
 import img from '../assets/Images/img';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, StackActions } from '@react-navigation/native';
 import Button from '../Components/Button';
-import { signup, clearErrors } from '../redux/slices/authSlice';
+import { signup, clearErrors, logout } from '../redux/slices/authSlice';
 import Loader from '../Components/Loader';
 
 const { width, height } = Dimensions.get('window');
+const scaleFactor = Math.min(width, 375) / 375;
+const scale = (size) => Math.round(size * scaleFactor);
+const scaleFont = (size) => {
+  const fontScale = Math.min(width, height) / 375;
+  const scaledSize = size * fontScale * (Platform.OS === 'ios' ? 0.9 : 0.85);
+  return Math.round(scaledSize);
+};
+
+// Theme constants
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
 
 const SellerSignup = () => {
   const navigation = useNavigation();
@@ -68,31 +83,23 @@ const SellerSignup = () => {
     ]).start();
 
     const handleBackPress = () => {
+      console.log('Back press triggered, showSignupForm:', showSignupForm);
       if (showSignupForm) {
-        AsyncStorage.removeItem('userToken')
-          .then(() => {
-            BackHandler.exitApp();
-          })
-          .catch((error) => {
-            console.error('Error removing token:', error);
-            BackHandler.exitApp();
-          });
+        navigation.navigate('Main', {
+          screen: 'HomeStack',
+          params: { screen: 'BottomTabs' },
+        });
         return true;
       } else {
-        try {
-          navigation.goBack();
-        } catch (error) {
-          console.error('Error navigating back:', error);
-          navigation.navigate('Login'); 
-        }
-        return true; // Handle back press manually
+        navigation.navigate('Login');
+        return true;
       }
     };
 
     const backListener = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
 
     return () => {
-      backListener.remove(); // Properly clean up the listener
+      backListener.remove();
       AsyncStorage.removeItem('wasOnSignupForm').catch((error) =>
         console.error('Error removing wasOnSignupForm:', error)
       );
@@ -121,19 +128,52 @@ const SellerSignup = () => {
   };
 
   const handleGoBack = () => {
+    console.log('Attempting to go back to BottomTabs');
     try {
-      navigation.goBack();
+      navigation.navigate('Main', {
+        screen: 'HomeStack',
+        params: { screen: 'BottomTabs' },
+      });
+      console.log('Navigated to BottomTabs');
     } catch (error) {
-      console.error('Error navigating back:', error);
-      navigation.navigate('Login'); // Fallback to Login screen
+      console.error('Error navigating to BottomTabs:', error);
+      navigation.navigate('Login');
+      console.log('Fallback: Navigated to Login');
     }
   };
 
-  const handleLogin = () => {
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Login' }],
-    });
+  const handleLogin = async () => {
+    console.log('Attempting to navigate to Login from SellerSignup');
+    console.log('Navigation state before:', navigation.getState());
+    try {
+      // Clear all auth-related AsyncStorage keys
+      await AsyncStorage.multiRemove(['userToken', 'wasOnSignupForm', 'user']);
+      console.log('AsyncStorage cleared: userToken, wasOnSignupForm, user');
+
+      // Dispatch logout to clear Redux auth state
+      await dispatch(logout()).unwrap();
+      console.log('Logout dispatched, auth state cleared');
+
+      // Try replacing the current screen with Login
+      navigation.dispatch(StackActions.replace('Login'));
+      console.log('Dispatched StackActions.replace to Login');
+    } catch (error) {
+      console.error('Navigation to Login failed:', error);
+      // Fallback to reset navigation stack
+      try {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+        console.log('Navigation reset to Login');
+      } catch (resetError) {
+        console.error('Reset navigation to Login failed:', resetError);
+        // Ultimate fallback: navigate to root
+        navigation.navigate('Login');
+        console.log('Fallback: Navigated to Login');
+      }
+    }
+    console.log('Navigation state after:', navigation.getState());
   };
 
   const validateForm = () => {
@@ -255,7 +295,7 @@ const SellerSignup = () => {
           onPress={handleProceedToSignup}
           style={styles.welcomeButton}
           textStyle={styles.buttonText}
-          gradientColors={['#7B61FF', '#AD4DFF']}
+          gradientColors={['#5b9cff', '#8ec5fc']}
         />
       </Animated.View>
       <TouchableOpacity onPress={handleGoBack}>
@@ -279,7 +319,7 @@ const SellerSignup = () => {
 
       <View style={styles.sellerCheckboxContainer}>
         <LinearGradient
-          colors={['#7B61FF', '#AD4DFF']}
+          colors={['#5b9cff', '#8ec5fc']}
           style={styles.sellerCheckbox}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -291,7 +331,7 @@ const SellerSignup = () => {
 
       <InputBox
         placeholder="Full Name"
-        placeholderTextColor="#A0A4B0"
+        placeholderTextColor={SUBTEXT_THEME_COLOR}
         icon={img.user}
         value={fullName}
         onChangeText={(text) => {
@@ -299,13 +339,13 @@ const SellerSignup = () => {
           clearError('fullName');
         }}
         error={errors.fullName}
-        iconColor="#AD4DFF"
+        iconColor={PRIMARY_THEME_COLOR}
         containerStyle={styles.inputContainer}
       />
 
       <InputBox
         placeholder="Username"
-        placeholderTextColor="#A0A4B0"
+        placeholderTextColor={SUBTEXT_THEME_COLOR}
         icon={img.user}
         value={userName}
         onChangeText={(text) => {
@@ -313,13 +353,13 @@ const SellerSignup = () => {
           clearError('userName');
         }}
         error={errors.userName}
-        iconColor="#AD4DFF"
+        iconColor={PRIMARY_THEME_COLOR}
         containerStyle={styles.inputContainer}
       />
 
       <InputBox
         placeholder="Email Address"
-        placeholderTextColor="#A0A4B0"
+        placeholderTextColor={SUBTEXT_THEME_COLOR}
         icon={img.mail}
         value={email}
         onChangeText={(text) => {
@@ -327,14 +367,14 @@ const SellerSignup = () => {
           clearError('email');
         }}
         error={errors.email}
-        iconColor="#AD4DFF"
+        iconColor={PRIMARY_THEME_COLOR}
         containerStyle={styles.inputContainer}
         keyboardType="email-address"
       />
 
       <InputBox
         placeholder="Phone Number"
-        placeholderTextColor="#A0A4B0"
+        placeholderTextColor={SUBTEXT_THEME_COLOR}
         icon={img.call}
         value={phoneNumber}
         onChangeText={(text) => {
@@ -342,14 +382,14 @@ const SellerSignup = () => {
           clearError('phoneNumber');
         }}
         error={errors.phoneNumber}
-        iconColor="#AD4DFF"
+        iconColor={PRIMARY_THEME_COLOR}
         containerStyle={styles.inputContainer}
         keyboardType="phone-pad"
       />
 
       <InputBox
         placeholder="Password"
-        placeholderTextColor="#A0A4B0"
+        placeholderTextColor={SUBTEXT_THEME_COLOR}
         icon={img.lock}
         value={password}
         onChangeText={(text) => {
@@ -358,13 +398,13 @@ const SellerSignup = () => {
         }}
         secureTextEntry
         error={errors.password}
-        iconColor="#AD4DFF"
+        iconColor={PRIMARY_THEME_COLOR}
         containerStyle={styles.inputContainer}
       />
 
       <InputBox
         placeholder="Confirm Password"
-        placeholderTextColor="#A0A4B0"
+        placeholderTextColor={SUBTEXT_THEME_COLOR}
         icon={img.lock}
         value={confirmPassword}
         onChangeText={(text) => {
@@ -373,7 +413,7 @@ const SellerSignup = () => {
         }}
         secureTextEntry
         error={errors.confirmPassword}
-        iconColor="#AD4DFF"
+        iconColor={PRIMARY_THEME_COLOR}
         containerStyle={styles.inputContainer}
       />
 
@@ -387,7 +427,7 @@ const SellerSignup = () => {
           }}
         >
           <LinearGradient
-            colors={isChecked ? ['#7B61FF', '#AD4DFF'] : ['transparent', 'transparent']}
+            colors={isChecked ? ['#5b9cff', '#8ec5fc'] : ['transparent', 'transparent']}
             style={[styles.checkbox, isChecked && styles.checkboxChecked]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -413,7 +453,7 @@ const SellerSignup = () => {
       )}
 
       {errors.message && (
-        <Text style={[styles.errorText, { textAlign: 'center', marginBottom: 10 }]}>
+        <Text style={[styles.errorText, { textAlign: 'center', marginBottom: scale(10) }]}>
           {errors.message}
         </Text>
       )}
@@ -424,7 +464,7 @@ const SellerSignup = () => {
           onPress={handleSignup}
           style={styles.button}
           textStyle={styles.buttonText}
-          gradientColors={['#AD4DFF', '#7B61FF']}
+          gradientColors={['#5b9cff', '#8ec5fc']}
         />
       </Animated.View>
 
@@ -440,18 +480,18 @@ const SellerSignup = () => {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']}
+        colors={BACKGROUND_GRADIENT}
         style={styles.backgroundGradient}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        end={{ x: 0, y: 1 }}
       />
 
-      <Loader visible={loading} color="#7B61FF" />
+      <Loader visible={loading} color={PRIMARY_THEME_COLOR} />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoid}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? scale(60) : 0}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
@@ -468,7 +508,7 @@ const SellerSignup = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A0A1E',
+    backgroundColor: PRODUCT_BG_COLOR,
   },
   backgroundGradient: {
     position: 'absolute',
@@ -482,191 +522,210 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 20,
+    paddingHorizontal: scale(24),
+    paddingBottom: scale(40),
   },
   welcomeContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: height * 0.1,
+    padding: scale(20),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    elevation: 5,
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: scale(30),
   },
   logo: {
     width: width * 0.35,
     height: width * 0.35,
-    marginBottom: 12,
+    marginBottom: scale(12),
   },
   tagline: {
-    color: '#E5E7EB',
-    fontSize: 16,
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(14),
+    fontWeight: '500',
     letterSpacing: 0.5,
-    opacity: 0.8,
   },
   welcomeText: {
-    color: '#FFFFFF',
-    fontSize: 28,
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(26),
     fontWeight: '700',
-    marginBottom: 16,
+    marginBottom: scale(16),
     textAlign: 'center',
   },
   welcomeSubtitle: {
-    color: '#D8B4FE',
-    fontSize: 16,
+    color: SUBTEXT_THEME_COLOR,
+    fontSize: scaleFont(14),
     textAlign: 'center',
-    marginBottom: 24,
-    paddingHorizontal: 20,
+    marginBottom: scale(24),
+    paddingHorizontal: scale(20),
+    fontWeight: '500',
   },
   welcomeButton: {
-    height: 52,
-    borderRadius: 12,
-    marginBottom: 16,
-    shadowColor: '#7B61FF',
-    shadowOffset: { width: 0, height: 4 },
+    height: scale(56),
+    borderRadius: scale(16),
+    marginBottom: scale(16),
+    shadowColor: PRIMARY_THEME_COLOR,
+    shadowOffset: { width: 0, height: scale(4) },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: scale(8),
     elevation: 5,
     width: width * 0.6,
   },
   backLink: {
-    color: '#7B61FF',
-    fontSize: 14,
+    color: SECONDARY_THEME_COLOR,
+    fontSize: scaleFont(14),
     fontWeight: '600',
-    marginTop: 10,
+    marginTop: scale(10),
   },
   formContainer: {
-    backgroundColor: 'rgba(30, 30, 63, 0.85)',
-    borderRadius: 20,
-    padding: 20,
-    marginVertical: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(173, 77, 255, 0.3)',
-    shadowColor: '#AD4DFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(20),
+    padding: scale(20),
+    marginVertical: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(4) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(10),
     elevation: 8,
   },
   formTitle: {
-    color: '#FFFFFF',
-    fontSize: 24,
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(22),
     fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: scale(8),
   },
   formSubtitle: {
-    color: '#D8B4FE',
-    fontSize: 14,
+    color: SUBTEXT_THEME_COLOR,
+    fontSize: scaleFont(14),
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: scale(20),
+    fontWeight: '500',
   },
   sellerCheckboxContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    padding: 10,
-    backgroundColor: 'rgba(123, 97, 255, 0.1)',
-    borderRadius: 10,
+    marginBottom: scale(20),
+    padding: scale(12),
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(12),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   sellerCheckbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
+    width: scale(24),
+    height: scale(24),
+    borderRadius: scale(6),
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: scale(12),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   sellerCheckboxText: {
-    color: '#FFFFFF',
-    fontSize: 14,
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(14),
     fontWeight: '600',
   },
   inputContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(173, 77, 255, 0.4)',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    marginBottom: 16,
-    height: 50,
-    shadowColor: '#AD4DFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    borderRadius: scale(16),
+    paddingHorizontal: scale(8),
+    marginBottom: scale(16),
+    height: scale(56),
+    shadowColor: PRIMARY_THEME_COLOR,
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale(4),
   },
   termsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: scale(20),
     flexWrap: 'wrap',
   },
   checkboxContainer: {
-    marginRight: 8,
+    marginRight: scale(8),
   },
   checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(173, 77, 255, 0.4)',
+    width: scale(22),
+    height: scale(22),
+    borderRadius: scale(6),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkboxChecked: {
-    borderColor: '#AD4DFF',
+    borderColor: PRIMARY_THEME_COLOR,
   },
   checkIcon: {
-    width: 12,
-    height: 10,
-    tintColor: '#FFFFFF',
+    width: scale(12),
+    height: scale(10),
+    tintColor: TEXT_THEME_COLOR,
   },
   termsText: {
-    color: '#E5E7EB',
-    fontSize: 12,
-    marginRight: 4,
+    color: SUBTEXT_THEME_COLOR,
+    fontSize: scaleFont(12),
+    marginRight: scale(4),
+    fontWeight: '500',
   },
   termsLink: {
-    color: '#AD4DFF',
-    fontSize: 12,
+    color: SECONDARY_THEME_COLOR,
+    fontSize: scaleFont(12),
     fontWeight: '600',
-    marginRight: 4,
+    marginRight: scale(4),
   },
   button: {
-    height: 50,
-    borderRadius: 14,
-    marginBottom: 20,
-    shadowColor: '#AD4DFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
+    height: scale(56),
+    borderRadius: scale(16),
+    marginBottom: scale(20),
+    shadowColor: PRIMARY_THEME_COLOR,
+    shadowOffset: { width: 0, height: scale(4) },
+    shadowOpacity: 0.3,
+    shadowRadius: scale(8),
     elevation: 6,
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
   },
   loginContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
   },
   loginText: {
-    color: '#E5E7EB',
-    fontSize: 12,
+    color: SUBTEXT_THEME_COLOR,
+    fontSize: scaleFont(13),
+    fontWeight: '500',
   },
   loginLink: {
-    color: '#AD4DFF',
-    fontSize: 13,
+    color: SECONDARY_THEME_COLOR,
+    fontSize: scaleFont(13),
     fontWeight: '600',
   },
   errorText: {
-    color: '#FF6B6B',
-    fontSize: 11,
-    top: -16,
-    marginBottom: 8,
+    color: SECONDARY_THEME_COLOR,
+    fontSize: scaleFont(11),
+    top: scale(-16),
+    marginBottom: scale(8),
+    fontWeight: '500',
   },
 });
 

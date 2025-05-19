@@ -30,13 +30,13 @@ export const store = configureStore({
     productDetail: productDetailSlice,
     userProfile: userProfileReducer,
     productModal: productModalReducer,
-    support: supportReducer, 
+    support: supportReducer,
     checkout: checkoutReducer,
     orders: ordersReducer,
     notifications: notificationsReducer,
     NotificationsScreen: notificationScreenReducer,
     chat: chatReducer
-    },
+  },
 });
 
 export default store;

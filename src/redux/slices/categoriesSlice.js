@@ -29,7 +29,6 @@ export const fetchAllProducts = createAsyncThunk(
           media: (() => {
             if (Array.isArray(product.media) && product.media.length > 0) {
               const firstMedia = product.media[0];
-              // Handle different media formats
               if (typeof firstMedia === 'string') return [{ url: firstMedia }];
               if (firstMedia?.url) return [{ url: firstMedia.url }];
               if (firstMedia?.image) return [{ url: firstMedia.image }];
@@ -38,6 +37,9 @@ export const fetchAllProducts = createAsyncThunk(
           })(),
           price: product.price || 0,
           name: product.name || 'Unnamed Product',
+          stock: product.stock || 0, // Added stock
+          brand: product.brand || 'Unknown Brand', // Added brand
+          offer: product.offer || '', // Added offer
         }));
         return normalizedProducts;
       } else {
@@ -66,7 +68,6 @@ export const fetchProductsByCategory = createAsyncThunk(
           media: (() => {
             if (Array.isArray(product.media) && product.media.length > 0) {
               const firstMedia = product.media[0];
-              // Handle different media formats
               if (typeof firstMedia === 'string') return [{ url: firstMedia }];
               if (firstMedia?.url) return [{ url: firstMedia.url }];
               if (firstMedia?.image) return [{ url: firstMedia.image }];
@@ -75,6 +76,9 @@ export const fetchProductsByCategory = createAsyncThunk(
           })(),
           price: product.price || 0,
           name: product.name || 'Unnamed Product',
+          stock: product.stock || 0, // Added stock
+          brand: product.brand || 'Unknown Brand', // Added brand
+          offer: product.offer || '', // Added offer
         }));
         return normalizedProducts;
       } else {
@@ -109,7 +113,6 @@ const categoriesSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Fetch All Products
       .addCase(fetchAllProducts.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -131,7 +134,6 @@ const categoriesSlice = createSlice({
           topOffset: TOAST_TOP_OFFSET,
         });
       })
-      // Fetch Products by Category
       .addCase(fetchProductsByCategory.pending, (state) => {
         state.loading = true;
         state.error = null;

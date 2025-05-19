@@ -21,6 +21,7 @@ import {
   Pressable,
   SafeAreaView,
   Keyboard,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
@@ -42,6 +43,23 @@ import { DEFAULT_IMAGE_URL } from '../constants/GlobalConstants';
 
 const { width, height } = Dimensions.get('window');
 const scaleFactor = width / 375;
+const scale = (size) => {
+  const scaledSize = size * scaleFactor;
+  return Math.min(Math.max(scaledSize, size * 0.8), size * 1.2);
+};
+const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375));
+
+// Theme constants
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)';
+const SELECTED_CATEGORY_BG_COLOR = '#5b9cff';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
+
 const audioRecorderPlayer = new AudioRecorderPlayer();
 
 const Message = ({ route }) => {
@@ -131,7 +149,7 @@ const Message = ({ route }) => {
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
-        ])
+        ]),
       ).start();
     } else {
       typingAnim.setValue(0);
@@ -142,7 +160,7 @@ const Message = ({ route }) => {
     try {
       if (Platform.OS === 'android') {
         const permission = await PermissionsAndroid.check(
-          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
         );
         return permission;
       }
@@ -163,7 +181,7 @@ const Message = ({ route }) => {
             message: 'This app needs access to your microphone to record voice messages.',
             buttonPositive: 'OK',
             buttonNegative: 'Cancel',
-          }
+          },
         );
         return granted === PermissionsAndroid.RESULTS.GRANTED;
       }
@@ -185,7 +203,7 @@ const Message = ({ route }) => {
             message: 'App needs access to your camera',
             buttonPositive: 'OK',
             buttonNegative: 'Cancel',
-          }
+          },
         );
         return granted === PermissionsAndroid.RESULTS.GRANTED;
       }
@@ -207,9 +225,7 @@ const Message = ({ route }) => {
 
     try {
       const content = selectedImage ? `Image: ${selectedImage.uri}` : message;
-      await dispatch(
-        sendMessage({ recipientId, content })
-      ).unwrap();
+      await dispatch(sendMessage({ recipientId, content })).unwrap();
       setMessage('');
       setSelectedImage(null);
       setSelectedMessages([]);
@@ -280,7 +296,7 @@ const Message = ({ route }) => {
           } else if (buttonIndex === 3) {
             handleRecordPress();
           }
-        }
+        },
       );
     } else {
       setShowAttachmentOptions(true);
@@ -342,9 +358,7 @@ const Message = ({ route }) => {
 
         if (result && recordTime > 0) {
           const content = `Voice message (${recordTime}s): ${result}`;
-          await dispatch(
-            sendMessage({ recipientId, content })
-          ).unwrap();
+          await dispatch(sendMessage({ recipientId, content })).unwrap();
           setSelectedMessages([]);
           setIsSelectionMode(false);
         }
@@ -442,7 +456,7 @@ const Message = ({ route }) => {
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -484,7 +498,7 @@ const Message = ({ route }) => {
         : [...currentReactions, emoji];
 
       await dispatch(
-        updateMessage({ messageId, content: message.content, reactions: newReactions })
+        updateMessage({ messageId, content: message.content, reactions: newReactions }),
       ).unwrap();
       setSelectedMessages([]);
       setIsSelectionMode(false);
@@ -534,7 +548,7 @@ const Message = ({ route }) => {
               onPress={() => deleteMessages()}
               activeOpacity={0.7}
             >
-              <Icon name="delete" size={scale(20)} color="#FF3E6D" />
+              <Icon name="delete" size={scale(20)} color={SECONDARY_THEME_COLOR} />
               <Text style={styles.deleteButtonText}>Delete</Text>
             </TouchableOpacity>
           </View>
@@ -581,6 +595,7 @@ const Message = ({ route }) => {
                           }) || '0deg',
                         },
                       ],
+
                     },
                   ]}
                 >
@@ -605,7 +620,7 @@ const Message = ({ route }) => {
                   ],
                 }}
               >
-                <Icon name="delete" size={scale(20)} color="#FF3E6D" />
+                <Icon name="delete" size={scale(20)} color={SECONDARY_THEME_COLOR} />
               </Animated.View>
             </TouchableOpacity>
           </Animated.View>
@@ -656,7 +671,7 @@ const Message = ({ route }) => {
                     <Icon
                       name={playingVoiceId === item.id ? 'pause' : 'play'}
                       size={scale(16)}
-                      color="#FFFFFF"
+                      color={TEXT_THEME_COLOR}
                     />
                     <View style={styles.voiceWave}>
                       {[1, 2, 3, 4, 5].map((_, i) => (
@@ -873,17 +888,19 @@ const Message = ({ route }) => {
         keyboardVerticalOffset={Platform.OS === 'ios' ? scale(80) : scale(20)}
       >
         <LinearGradient
-          colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']}
+          colors={BACKGROUND_GRADIENT}
           style={styles.gradientContainer}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
         >
-          <StatusBar barStyle="light-content" backgroundColor="#1A0B3B" />
+          <StatusBar barStyle="dark-content" backgroundColor={PRODUCT_BG_COLOR} />
           <View style={styles.header}>
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => navigation.goBack()}
               activeOpacity={0.7}
             >
-              <AntDesignIcon name="arrowleft" size={scale(24)} color="#FFFFFF" />
+              <AntDesignIcon name="arrowleft" size={scale(24)} color={PRIMARY_THEME_COLOR} />
             </TouchableOpacity>
             <View style={styles.headerUser}>
               <Image
@@ -904,15 +921,19 @@ const Message = ({ route }) => {
               onPress={handleCall}
               activeOpacity={0.7}
             >
-              <IoniconsIcon name="call" size={scale(20)} color="#FFFFFF" />
+              <IoniconsIcon name="call" size={scale(20)} color={PRIMARY_THEME_COLOR} />
             </TouchableOpacity>
           </View>
 
           <View style={styles.messagesContainer}>
-            {loading && (
-              <Text style={styles.loadingText}>Loading messages...</Text>
+            {loading && messages.length === 0 && (
+              <View style={styles.loaderContainer}>
+                <ActivityIndicator size="large" color={PRIMARY_THEME_COLOR} />
+              </View>
             )}
-            {error && <Text style={styles.errorText}>{error}</Text>}
+            {error && (
+              <Text style={styles.errorText}>{error}</Text>
+            )}
             <FlatList
               ref={flatListRef}
               data={animatedMessages}
@@ -939,7 +960,7 @@ const Message = ({ route }) => {
             ]}
           >
             <LinearGradient
-              colors={['#2A2A5A', '#3A3A7A']}
+              colors={[PRODUCT_BG_COLOR, PRODUCT_BG_COLOR]}
               style={styles.inputContainer}
             >
               <TouchableOpacity
@@ -947,7 +968,7 @@ const Message = ({ route }) => {
                 onPress={showAttachmentMenu}
                 activeOpacity={0.7}
               >
-                <FeatherIcon name="paperclip" size={scale(24)} color="#A855F7" />
+                <FeatherIcon name="paperclip" size={scale(24)} color={PRIMARY_THEME_COLOR} />
               </TouchableOpacity>
               <TextInput
                 ref={inputRef}
@@ -955,7 +976,7 @@ const Message = ({ route }) => {
                 value={message}
                 onChangeText={setMessage}
                 placeholder="Type a message..."
-                placeholderTextColor="#B0B0D0"
+                placeholderTextColor={SUBTEXT_THEME_COLOR}
                 onSubmitEditing={handleSend}
                 multiline
                 textAlignVertical="center"
@@ -966,7 +987,7 @@ const Message = ({ route }) => {
                   onPress={handleSend}
                   activeOpacity={0.7}
                 >
-                  <Icon name="send" size={scale(24)} color="#FFFFFF" />
+                  <Icon name="send" size={scale(24)} color={TEXT_THEME_COLOR} />
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
@@ -977,7 +998,7 @@ const Message = ({ route }) => {
                   <Icon
                     name={recording ? 'stop' : 'microphone'}
                     size={scale(24)}
-                    color={recording ? '#FF3E6D' : '#A855F7'}
+                    color={recording ? SECONDARY_THEME_COLOR : PRIMARY_THEME_COLOR}
                   />
                   {recording && (
                     <Text style={styles.recordingTime}>{recordTime}s</Text>
@@ -996,7 +1017,7 @@ const Message = ({ route }) => {
         >
           <View style={styles.modalOverlay}>
             <LinearGradient
-              colors={['#2A2A5A', '#3A3A7A']}
+              colors={[PRODUCT_BG_COLOR, PRODUCT_BG_COLOR]}
               style={styles.modalContainer}
             >
               <View style={styles.modalHeader}>
@@ -1006,7 +1027,7 @@ const Message = ({ route }) => {
                   onPress={() => setImageModalVisible(false)}
                   activeOpacity={0.7}
                 >
-                  <Text>yyyyyyyyyyyyyyyy</Text>
+                  <AntDesignIcon name="close" size={scale(24)} color={TEXT_THEME_COLOR} />
                 </TouchableOpacity>
               </View>
               {selectedImage && (
@@ -1030,7 +1051,7 @@ const Message = ({ route }) => {
                   activeOpacity={0.7}
                 >
                   <Text style={styles.sendImageButtonText}>Send</Text>
-                  <Icon name="send" size={scale(16)} color="#FFFFFF" />
+                  <Icon name="send" size={scale(16)} color={TEXT_THEME_COLOR} />
                 </TouchableOpacity>
               </View>
             </LinearGradient>
@@ -1058,7 +1079,7 @@ const Message = ({ route }) => {
                   }}
                   activeOpacity={0.7}
                 >
-                  <Icon name="camera" size={scale(24)} color="#A855F7" />
+                  <Icon name="camera" size={scale(24)} color={PRIMARY_THEME_COLOR} />
                   <Text style={styles.attachmentOptionText}>Take Photo</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -1069,7 +1090,7 @@ const Message = ({ route }) => {
                   }}
                   activeOpacity={0.7}
                 >
-                  <Icon name="image" size={scale(24)} color="#A855F7" />
+                  <Icon name="image" size={scale(24)} color={PRIMARY_THEME_COLOR} />
                   <Text style={styles.attachmentOptionText}>Choose from Gallery</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -1080,7 +1101,7 @@ const Message = ({ route }) => {
                   }}
                   activeOpacity={0.7}
                 >
-                  <Icon name="microphone" size={scale(24)} color="#A855F7" />
+                  <Icon name="microphone" size={scale(24)} color={PRIMARY_THEME_COLOR} />
                   <Text style={styles.attachmentOptionText}>Record Voice</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -1099,15 +1120,10 @@ const Message = ({ route }) => {
   );
 };
 
-const scale = (size) => {
-  const scaledSize = size * scaleFactor;
-  return Math.min(Math.max(scaledSize, size * 0.8), size * 1.2);
-};
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1A0B3B',
+    backgroundColor: PRODUCT_BG_COLOR,
   },
   keyboardAvoidingContainer: {
     flex: 1,
@@ -1121,67 +1137,81 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: scale(15),
     paddingTop: Platform.OS === 'ios' ? scale(10) : scale(15),
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    backgroundColor: 'rgba(26, 11, 59, 0.9)',
+    borderBottomWidth: scale(2),
+    borderBottomColor: BORDER_THEME_COLOR,
+    backgroundColor: PRODUCT_BG_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    elevation: 4,
   },
   backButton: {
-    padding: scale(8),
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: scale(20),
+    padding: scale(10),
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(24),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   headerUser: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    marginLeft: scale(10),
+    marginLeft: scale(12),
   },
   headerAvatar: {
-    width: scale(50),
-    height: scale(50),
-    borderRadius: scale(25),
+    width: scale(56),
+    height: scale(56),
+    borderRadius: scale(28),
     marginRight: scale(15),
-    borderWidth: 2,
-    borderColor: '#4A2A8D',
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   headerName: {
-    fontSize: scale(16),
+    fontSize: scaleFont(18),
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
   },
   headerStatus: {
-    fontSize: scale(12),
-    color: '#AAA',
-    marginTop: scale(2),
+    fontSize: scaleFont(14),
+    color: SUBTEXT_THEME_COLOR,
+    marginTop: scale(3),
   },
   callButton: {
-    backgroundColor: '#4A2A8D',
-    padding: scale(10),
-    borderRadius: scale(20),
+    backgroundColor: CATEGORY_BG_COLOR,
+    padding: scale(12),
+    borderRadius: scale(24),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale(5),
     elevation: 3,
   },
   messagesContainer: {
     flex: 1,
   },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   messageList: {
-    padding: scale(15),
-    paddingBottom: scale(20),
+    padding: scale(20),
+    paddingBottom: scale(30),
   },
   messageContainer: {
     flexDirection: 'row',
-    marginVertical: scale(8),
+    marginVertical: scale(10),
     maxWidth: '85%',
     alignItems: 'flex-end',
   },
   selectedMessage: {
-    backgroundColor: 'rgba(74, 42, 141, 0.3)',
-    borderRadius: scale(12),
-    borderWidth: 1,
-    borderColor: '#4A2A8D',
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(18),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   userMessageContainer: {
     alignSelf: 'flex-end',
@@ -1191,66 +1221,71 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   avatar: {
-    width: scale(30),
-    height: scale(30),
-    borderRadius: scale(15),
-    marginHorizontal: scale(8),
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
+    marginHorizontal: scale(10),
   },
   messageContent: {
-    borderRadius: scale(12),
-    padding: scale(10),
+    borderRadius: scale(18),
+    padding: scale(12),
     maxWidth: width * 0.65,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    elevation: 4,
   },
   userMessageContent: {
-    backgroundColor: '#7B61FF',
+    backgroundColor: PRIMARY_THEME_COLOR,
     borderBottomRightRadius: scale(4),
   },
   botMessageContent: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: PRODUCT_BG_COLOR,
     borderBottomLeftRadius: scale(4),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   messageText: {
-    fontSize: scale(14),
-    lineHeight: scale(20),
+    fontSize: scaleFont(15),
+    lineHeight: scale(22),
   },
   userMessageText: {
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
   },
   botMessageText: {
-    color: '#E5E7EB',
+    color: TEXT_THEME_COLOR,
   },
   messageTimestamp: {
-    fontSize: scale(10),
-    marginTop: scale(4),
+    fontSize: scaleFont(11),
+    marginTop: scale(6),
+    color: SUBTEXT_THEME_COLOR,
   },
   userTimestamp: {
-    color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'right',
   },
   botTimestamp: {
-    color: 'rgba(255, 255, 255, 0.5)',
     textAlign: 'left',
   },
   messageImage: {
-    width: scale(200),
-    height: scale(200),
-    borderRadius: scale(8),
-    marginBottom: scale(5),
+    width: scale(220),
+    height: scale(220),
+    borderRadius: scale(10),
+    marginBottom: scale(8),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   playButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    padding: scale(8),
-    borderRadius: scale(20),
+    backgroundColor: CATEGORY_BG_COLOR,
+    padding: scale(10),
+    borderRadius: scale(24),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   playingButton: {
-    backgroundColor: '#4A2A8D',
+    backgroundColor: SELECTED_CATEGORY_BG_COLOR,
   },
   voiceMessageContent: {
     flexDirection: 'row',
@@ -1259,173 +1294,196 @@ const styles = StyleSheet.create({
   voiceWave: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: scale(8),
+    marginHorizontal: scale(10),
   },
   voiceWaveBar: {
     width: scale(2),
-    backgroundColor: '#FFFFFF',
+    backgroundColor: SUBTEXT_THEME_COLOR,
     marginHorizontal: scale(1),
     borderRadius: scale(2),
   },
   voiceWaveBarActive: {
-    backgroundColor: '#A855F7',
+    backgroundColor: PRIMARY_THEME_COLOR,
   },
   playButtonText: {
-    color: '#FFFFFF',
-    fontSize: scale(12),
-    marginLeft: scale(5),
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(13),
+    marginLeft: scale(8),
   },
   reactionContainer: {
     flexDirection: 'row',
-    marginTop: scale(5),
+    marginTop: scale(6),
     flexWrap: 'wrap',
   },
   reactionEmoji: {
-    fontSize: scale(16),
-    marginRight: scale(5),
-    marginTop: scale(2),
+    fontSize: scaleFont(17),
+    marginRight: scale(6),
+    marginTop: scale(3),
   },
   reactionBar: {
     flexDirection: 'row',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    padding: scale(8),
-    borderRadius: scale(20),
-    marginVertical: scale(5),
+    backgroundColor: CATEGORY_BG_COLOR,
+    padding: scale(10),
+    borderRadius: scale(24),
+    marginVertical: scale(8),
     alignSelf: 'center',
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   reactionButton: {
-    padding: scale(5),
-    marginHorizontal: scale(5),
+    padding: scale(6),
+    marginHorizontal: scale(6),
   },
   messageActionBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(74, 42, 141, 0.5)',
-    padding: scale(8),
-    borderRadius: scale(8),
-    marginBottom: scale(5),
+    backgroundColor: CATEGORY_BG_COLOR,
+    padding: scale(10),
+    borderRadius: scale(24),
+    marginBottom: scale(8),
     alignSelf: 'center',
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   selectionCount: {
-    color: '#FFFFFF',
-    fontSize: scale(14),
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(15),
     fontWeight: '600',
   },
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 62, 109, 0.2)',
-    padding: scale(8),
-    borderRadius: scale(8),
+    backgroundColor: 'rgba(255, 107, 138, 0.2)',
+    padding: scale(10),
+    borderRadius: scale(12),
+    borderWidth: scale(2),
+    borderColor: SECONDARY_THEME_COLOR,
   },
   deleteButtonText: {
-    color: '#FF3E6D',
-    fontSize: scale(12),
-    marginLeft: scale(5),
+    color: SECONDARY_THEME_COLOR,
+    fontSize: scaleFont(13),
+    marginLeft: scale(6),
   },
   typingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: scale(10),
+    marginBottom: scale(15),
   },
   typingAvatar: {
-    width: scale(30),
-    height: scale(30),
-    borderRadius: scale(15),
-    marginRight: scale(8),
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
+    marginRight: scale(10),
   },
   typingBubble: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    padding: scale(8),
-    borderRadius: scale(12),
+    backgroundColor: PRODUCT_BG_COLOR,
+    padding: scale(10),
+    borderRadius: scale(18),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   typingDot: {
-    width: scale(6),
-    height: scale(6),
-    borderRadius: scale(3),
-    backgroundColor: '#A855F7',
-    marginHorizontal: scale(2),
+    width: scale(7),
+    height: scale(7),
+    borderRadius: scale(3.5),
+    backgroundColor: PRIMARY_THEME_COLOR,
+    marginHorizontal: scale(3),
   },
   inputContainerWrapper: {
-    padding: scale(15),
-    backgroundColor: 'rgba(26, 11, 59, 0.9)',
+    padding: scale(20),
+    backgroundColor: PRODUCT_BG_COLOR,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: scale(25),
-    paddingHorizontal: scale(10),
-    paddingVertical: scale(5),
+    borderRadius: scale(30),
+    paddingHorizontal: scale(12),
+    paddingVertical: scale(8),
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 3,
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    elevation: 4,
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   optionButton: {
-    padding: scale(8),
+    padding: scale(10),
   },
   input: {
     flex: 1,
-    fontSize: scale(14),
-    color: '#FFFFFF',
-    paddingVertical: scale(8),
-    paddingHorizontal: scale(10),
+    fontSize: scaleFont(15),
+    color: TEXT_THEME_COLOR,
+    paddingVertical: 'top',
+    paddingHorizontal: scale(12),
     maxHeight: scale(100),
   },
   sendButton: {
-    backgroundColor: '#A855F7',
-    padding: scale(10),
-    borderRadius: scale(20),
+    backgroundColor: PRIMARY_THEME_COLOR,
+    padding: scale(12),
+    borderRadius: scale(24),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   recordButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: scale(10),
-    borderRadius: scale(20),
+    padding: scale(12),
+    borderRadius: scale(24),
   },
   recordingTime: {
-    color: '#FF3E6D',
-    fontSize: scale(12),
-    marginLeft: scale(5),
+    color: SECONDARY_THEME_COLOR,
+    fontSize: scaleFont(13),
+    marginLeft: scale(8),
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContainer: {
     width: width * 0.9,
-    borderRadius: scale(15),
-    padding: scale(20),
+    borderRadius: scale(24),
+    padding: scale(25),
     alignItems: 'center',
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    elevation: 5,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     width: '100%',
-    marginBottom: scale(15),
+    marginBottom: scale(20),
   },
   modalTitle: {
-    fontSize: scale(18),
+    fontSize: scaleFont(20),
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
   },
   modalCloseButton: {
-    padding: scale(8),
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: scale(20),
+    padding: scale(10),
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(24),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   modalImage: {
     width: width * 0.8,
     height: width * 0.8,
-    borderRadius: scale(10),
-    marginBottom: scale(20),
+    borderRadius: scale(12),
+    marginBottom: scale(25),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   modalButtons: {
     flexDirection: 'row',
@@ -1434,78 +1492,82 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: '#FF3E6D',
-    padding: scale(12),
-    borderRadius: scale(8),
+    backgroundColor: CATEGORY_BG_COLOR,
+    padding: scale(14),
+    borderRadius: scale(12),
     alignItems: 'center',
-    marginRight: scale(10),
+    marginRight: scale(12),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   cancelButtonText: {
-    color: '#FFFFFF',
-    fontSize: scale(14),
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(16),
     fontWeight: '600',
   },
   sendImageButton: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#A855F7',
-    padding: scale(12),
-    borderRadius: scale(8),
+    backgroundColor: PRIMARY_THEME_COLOR,
+    padding: scale(14),
+    borderRadius: scale(12),
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   sendImageButtonText: {
-    color: '#FFFFFF',
-    fontSize: scale(14),
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(16),
     fontWeight: '600',
-    marginRight: scale(5),
+    marginRight: scale(8),
   },
   attachmentModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
   },
   attachmentModalContainer: {
-    backgroundColor: '#2A2A5A',
-    borderTopLeftRadius: scale(20),
-    borderTopRightRadius: scale(20),
-    padding: scale(20),
-    paddingBottom: scale(30),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderTopLeftRadius: scale(24),
+    borderTopRightRadius: scale(24),
+    padding: scale(25),
+    paddingBottom: scale(40),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   attachmentOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: scale(15),
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    paddingVertical: scale(18),
+    borderBottomWidth: scale(1),
+    borderBottomColor: BORDER_THEME_COLOR,
   },
   attachmentOptionText: {
-    fontSize: scale(16),
-    color: '#FFFFFF',
+    fontSize: scaleFont(17),
+    color: TEXT_THEME_COLOR,
     marginLeft: scale(15),
   },
   attachmentCancelButton: {
-    marginTop: scale(20),
-    backgroundColor: '#FF3E6D',
-    padding: scale(12),
-    borderRadius: scale(8),
+    marginTop: scale(25),
+    backgroundColor: CATEGORY_BG_COLOR,
+    padding: scale(14),
+    borderRadius: scale(12),
     alignItems: 'center',
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   attachmentCancelText: {
-    color: '#FFFFFF',
-    fontSize: scale(16),
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(16),
     fontWeight: '600',
   },
-  loadingText: {
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginVertical: scale(10),
-  },
   errorText: {
-    color: '#FF3E6D',
+    color: SECONDARY_THEME_COLOR,
     textAlign: 'center',
-    marginVertical: scale(10),
+    marginVertical: scale(15),
+    fontSize: scaleFont(16),
   },
 });
 
-export default Message
+export default Message;

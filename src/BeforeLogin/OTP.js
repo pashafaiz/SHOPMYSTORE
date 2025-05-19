@@ -9,14 +9,27 @@ import img from '../assets/Images/img';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import Strings from '../constants/Strings';
 import Button from '../Components/Button';
-import Colors from '../constants/Colors';
-import { verifyOtp, resendOtp, setOtp, setOtpTimer } from '.././/redux/slices/authSlice';
+import { verifyOtp, resendOtp, setOtp, setOtpTimer } from '../redux/slices/authSlice';
 import LinearGradient from 'react-native-linear-gradient';
 
 const { width, height } = Dimensions.get('window');
+const scaleFactor = Math.min(width, 375) / 375;
+const scale = (size) => Math.round(size * scaleFactor);
+const scaleFont = (size) => {
+  const fontScale = Math.min(width, height) / 375;
+  const scaledSize = size * fontScale * (Platform.OS === 'ios' ? 0.9 : 0.85);
+  return Math.round(scaledSize);
+};
 
-const scaleSize = (size) => Math.round(size * (width / 375));
-const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375));
+// Theme constants
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
 
 const OTP = () => {
   const navigation = useNavigation();
@@ -204,10 +217,10 @@ const OTP = () => {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']}
+        colors={BACKGROUND_GRADIENT}
         style={styles.backgroundGradient}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        end={{ x: 0, y: 1 }}
       />
 
       <Header
@@ -215,8 +228,8 @@ const OTP = () => {
         showLeftIcon={true}
         leftIcon="arrow-back"
         onLeftPress={() => navigation.goBack()}
-        transparent
-        style={styles.header}
+        textStyle={styles.headerText}
+        containerStyle={styles.header}
       />
 
       <KeyboardAvoidingView
@@ -262,7 +275,7 @@ const OTP = () => {
                     keyboardType="number-pad"
                     value={digit}
                     onChangeText={text => handleChange(text, index)}
-                    selectionColor="#7B61FF"
+                    selectionColor={PRIMARY_THEME_COLOR}
                     autoFocus={index === 0}
                     accessibilityLabel={`OTP digit ${index + 1}`}
                   />
@@ -279,11 +292,11 @@ const OTP = () => {
 
           <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
             <Button
-              title={loading ? <ActivityIndicator color="#fff" /> : Strings.continue}
+              title={loading ? <ActivityIndicator color={TEXT_THEME_COLOR} /> : Strings.continue}
               onPress={handleVerifyOtp}
               style={styles.button}
               textStyle={styles.buttonText}
-              gradientColors={['#7B61FF', '#AD4DFF']}
+              gradientColors={['#5b9cff', '#8ec5fc']}
               disabled={loading}
             />
           </Animated.View>
@@ -296,7 +309,7 @@ const OTP = () => {
             ) : (
               <TouchableOpacity onPress={handleResend}>
                 <LinearGradient
-                  colors={['#7B61FF', '#AD4DFF']}
+                  colors={['#5b9cff', '#8ec5fc']}
                   style={styles.resendButton}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
@@ -320,7 +333,7 @@ const OTP = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A0A1E',
+    backgroundColor: PRODUCT_BG_COLOR,
   },
   backgroundGradient: {
     position: 'absolute',
@@ -330,16 +343,22 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   header: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: scaleSize(16),
-    margin: scaleSize(16),
-    paddingVertical: scaleSize(12),
-    paddingHorizontal: scaleSize(16),
-    shadowColor: '#7B61FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(20),
+    margin: scale(20),
+    padding: scale(15),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+  },
+  headerText: {
+    fontSize: scaleFont(20),
+    fontWeight: '700',
+    color: TEXT_THEME_COLOR,
+    textAlign: 'center',
   },
   keyboardAvoid: {
     flex: 1,
@@ -347,119 +366,136 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: scaleSize(24),
-    paddingBottom: scaleSize(40),
+    padding: scale(20),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(20),
+    marginHorizontal: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
   },
   verifyText: {
-    marginBottom: scaleSize(40),
-    paddingHorizontal: scaleSize(16),
+    marginBottom: scale(30),
+    paddingHorizontal: scale(16),
     alignItems: 'center',
   },
   verifyString: {
-    fontSize: scaleFont(20),
+    fontSize: scaleFont(22),
     fontWeight: '800',
-    color: Colors.White,
-    marginBottom: scaleSize(12),
-    textShadowColor: 'rgba(123, 97, 255, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    color: TEXT_THEME_COLOR,
+    marginBottom: scale(12),
+    letterSpacing: 0.8,
   },
   codeSend_String: {
-    fontSize: scaleFont(15),
-    lineHeight: scaleFont(22),
-    color: '#C0C4D0',
+    fontSize: scaleFont(14),
+    lineHeight: scaleFont(20),
+    color: SUBTEXT_THEME_COLOR,
     textAlign: 'center',
+    fontWeight: '500',
   },
   emailText: {
-    color: '#7B61FF',
+    color: PRIMARY_THEME_COLOR,
     fontWeight: '600',
   },
   otpContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginHorizontal: scaleSize(10),
-    marginBottom: scaleSize(16),
+    marginHorizontal: scale(10),
+    marginBottom: scale(16),
   },
   otpInput: {
-    borderWidth: 1,
-    borderColor: 'rgba(123, 97, 255, 0.4)',
-    borderRadius: scaleSize(14),
-    width: scaleSize(45),
-    height: scaleSize(54),
+    borderWidth: scale(1),
+    borderColor: BORDER_THEME_COLOR,
+    borderRadius: scale(16),
+    width: scale(45),
+    height: scale(50),
     textAlign: 'center',
-    fontSize: scaleFont(16),
+    fontSize: scaleFont(18),
     fontWeight: '600',
-    color: Colors.White,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    shadowColor: '#7B61FF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    color: TEXT_THEME_COLOR,
+    backgroundColor: CATEGORY_BG_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale(4),
   },
   filledInput: { 
-    fontSize:16,
-    borderColor: '#7B61FF',
-    backgroundColor: 'rgba(123, 97, 255, 0.1)',
+    borderColor: PRIMARY_THEME_COLOR,
+    backgroundColor: CATEGORY_BG_COLOR,
   },
   errorInput: {
-    borderColor: '#FF6B6B',
-    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    borderColor: PRIMARY_THEME_COLOR,
+    backgroundColor: 'rgba(255, 107, 107, 0.2)',
   },
   button: {
-    height: scaleSize(56),
-    borderRadius: scaleSize(14),
-    marginTop: scaleSize(32),
-    shadowColor: '#7B61FF',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 8,
+    height: scale(56),
+    borderRadius: scale(16),
+    marginTop: scale(32),
+    borderWidth: scale(1),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: PRIMARY_THEME_COLOR,
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.3,
+    shadowRadius: scale(8),
   },
   buttonText: {
-    fontSize: scaleFont(18),
+    fontSize: scaleFont(16),
     fontWeight: '700',
-    color: Colors.White,
+    color: TEXT_THEME_COLOR,
   },
   resendContainer: {
     alignItems: 'center',
-    marginTop: scaleSize(28),
+    marginTop: scale(28),
   },
   resendButton: {
-    paddingVertical: scaleSize(10),
-    paddingHorizontal: scaleSize(20),
-    borderRadius: scaleSize(10),
+    paddingVertical: scale(12),
+    paddingHorizontal: scale(20),
+    borderRadius: scale(12),
+    borderWidth: scale(1),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: PRIMARY_THEME_COLOR,
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.2,
+    shadowRadius: scale(6),
   },
   timerText: {
-    fontSize: scaleFont(15),
-    color: '#C0C4D0',
+    fontSize: scaleFont(14),
+    color: SUBTEXT_THEME_COLOR,
+    fontWeight: '500',
   },
   timerCount: {
-    color: '#7B61FF',
+    color: PRIMARY_THEME_COLOR,
     fontWeight: '600',
   },
   resendText: {
-    fontSize: scaleFont(15),
-    color: Colors.White,
+    fontSize: scaleFont(14),
+    color: TEXT_THEME_COLOR,
     fontWeight: '600',
   },
   toggleText: {
     fontSize: scaleFont(12),
-    color: '#7B61FF',
-    marginTop: scaleSize(12),
+    color: PRIMARY_THEME_COLOR,
+    marginTop: scale(12),
+    fontWeight: '500',
   },
   errorText: {
-    color: '#FF6B6B',
+    color: SECONDARY_THEME_COLOR,
     fontSize: scaleFont(14),
     textAlign: 'center',
-    marginTop: scaleSize(12),
-    marginBottom: scaleSize(12),
+    marginTop: scale(12),
+    marginBottom: scale(12),
+    fontWeight: '500',
   },
   instructionText: {
-    color: '#C0C4D0',
-    fontSize: scaleFont(12),
+    color: SUBTEXT_THEME_COLOR,
+    fontSize: scaleFont(14),
     textAlign: 'center',
-    marginTop: scaleSize(12),
-    marginBottom: scaleSize(12),
+    marginTop: scale(12),
+    marginBottom: scale(12),
+    fontWeight: '500',
   },
 });
 

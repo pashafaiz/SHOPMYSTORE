@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useContext } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -29,40 +29,53 @@ import {
   TOAST_TOP_OFFSET,
   TOAST_VISIBILITY_TIME,
 } from '../constants/GlobalConstants';
-import { ThemeContext } from '../constants/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
-const scaleFactor = width / 375;
-const scale = size => size * scaleFactor;
-const scaleFont = size => Math.round(size * (Math.min(width, height) / 375));
+const scaleFactor = Math.min(width, 375) / 375;
+const scale = size => Math.round(size * scaleFactor);
+const scaleFont = size => {
+  const fontScale = Math.min(width, height) / 375;
+  const scaledSize = size * fontScale * (Platform.OS === 'ios' ? 0.9 : 0.85);
+  return Math.round(scaledSize);
+};
 
-// Custom toast configuration to match the app's theme
-const toastConfig = (theme) => ({
+// Theme constants
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
+
+// Custom toast configuration
+const toastConfig = {
   success: ({ text1, text2 }) => (
     <LinearGradient
-      colors={['#7B61FF', '#AD4DFF']}
+      colors={['#5b9cff', '#8ec5fc']}
       style={styles.customToast}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
     >
-      <Text style={[styles.toastText1, { color: theme.textPrimary }]}>{text1}</Text>
-      {text2 && <Text style={[styles.toastText2, { color: theme.textMuted }]}>{text2}</Text>}
+      <Text style={styles.toastText1}>{text1}</Text>
+      {text2 && <Text style={styles.toastText2}>{text2}</Text>}
     </LinearGradient>
   ),
   error: ({ text1, text2 }) => (
     <LinearGradient
-      colors={['#FF6B6B', '#FFD93D']}
+      colors={['#ff6b8a', '#ff8f9f']}
       style={styles.customToast}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
     >
-      <Text style={[styles.toastText1, { color: theme.textPrimary }]}>{text1}</Text>
-      {text2 && <Text style={[styles.toastText2, { color: theme.textMuted }]}>{text2}</Text>}
+      <Text style={styles.toastText1}>{text1}</Text>
+      {text2 && <Text style={styles.toastText2}>{text2}</Text>}
     </LinearGradient>
   ),
-});
+};
 
-const FAQItem = ({ item, index, expandedFAQ, toggleFAQ, theme }) => {
+const FAQItem = ({ item, index, expandedFAQ, toggleFAQ }) => {
   const animatedHeight = useRef(new Animated.Value(0)).current;
   const animatedOpacity = useRef(new Animated.Value(0)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
@@ -101,31 +114,26 @@ const FAQItem = ({ item, index, expandedFAQ, toggleFAQ, theme }) => {
   };
 
   return (
-    <Animated.View style={[styles.faqItem(theme), { transform: [{ scale: buttonScale }] }]}>
+    <Animated.View style={[styles.faqItem, { transform: [{ scale: buttonScale }] }]}>
       <TouchableOpacity
         style={styles.faqQuestionContainer}
         onPressIn={onPressIn}
         onPressOut={onPressOut}
         onPress={() => toggleFAQ(index)}
       >
-        <LinearGradient
-          colors={['rgba(123, 97, 255, 0.2)', 'rgba(173, 77, 255, 0.2)']}
-          style={styles.faqQuestionGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <Text style={[styles.faqQuestion, { color: theme.textPrimary }]}>{item.question}</Text>
+        <View style={styles.faqQuestionGradient}>
+          <Text style={styles.faqQuestion}>{item.question}</Text>
           <Icon
             name={expandedFAQ === index ? 'expand-less' : 'expand-more'}
-            size={scale(20)}
-            color={theme.textTertiary}
+            size={scale(24)}
+            color={PRIMARY_THEME_COLOR}
           />
-        </LinearGradient>
+        </View>
       </TouchableOpacity>
       <Animated.View
-        style={[styles.faqAnswerContainer(theme), { height: animatedHeight, opacity: animatedOpacity }]}
+        style={[styles.faqAnswerContainer, { height: animatedHeight, opacity: animatedOpacity }]}
       >
-        <Text style={[styles.faqAnswer, { color: theme.textMuted }]}>{item.answer}</Text>
+        <Text style={styles.faqAnswer}>{item.answer}</Text>
       </Animated.View>
     </Animated.View>
   );
@@ -134,7 +142,6 @@ const FAQItem = ({ item, index, expandedFAQ, toggleFAQ, theme }) => {
 const Support = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
-  const { theme } = useContext(ThemeContext);
   const { faqs, loading, error } = useSelector(state => state.support);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideUpAnim = useRef(new Animated.Value(50)).current;
@@ -296,7 +303,7 @@ const Support = () => {
       });
   };
 
-  const renderContactButton = (type, icon, colors) => {
+  const renderContactButton = (type, icon) => {
     const buttonScale = useRef(new Animated.Value(1)).current;
 
     const onPressIn = () => {
@@ -323,12 +330,12 @@ const Support = () => {
           onPress={() => handleContact(type)}
         >
           <LinearGradient
-            colors={colors}
+            colors={['#5b9cff', '#8ec5fc']}
             style={styles.contactButtonGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            <Icon name={icon} size={scale(18)} color="#FFFFFF" style={styles.contactIcon} />
+            <Icon name={icon} size={scale(20)} color={TEXT_THEME_COLOR} style={styles.contactIcon} />
             <Text style={styles.contactText}>{type}</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -362,34 +369,34 @@ const Support = () => {
         animationType="none"
         onRequestClose={closeModal}
       >
-        <Animated.View style={[styles.modalOverlay(theme), { opacity: modalFadeAnim }]}>
+        <Animated.View style={[styles.modalOverlay, { opacity: modalFadeAnim }]}>
           <Animated.View
-            style={[styles.modalContainer(theme), { transform: [{ translateY: modalSlideAnim }] }]}
+            style={[styles.modalContainer, { transform: [{ translateY: modalSlideAnim }] }]}
           >
             <LinearGradient
-              colors={theme.background}
+              colors={['#f5f9ff', '#f5f9ff']}
               style={styles.modalGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
               <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Submit a Ticket</Text>
+                <Text style={styles.modalTitle}>Submit a Ticket</Text>
                 <TouchableOpacity onPress={closeModal}>
-                  <Icon name="close" size={scale(24)} color={theme.textTertiary} />
+                  <Icon name="close" size={scale(24)} color={PRIMARY_THEME_COLOR} />
                 </TouchableOpacity>
               </View>
               <TextInput
-                style={[styles.modalInput(theme), { color: theme.textPrimary }]}
+                style={styles.modalInput}
                 placeholder="Subject"
-                placeholderTextColor={theme.textMuted}
+                placeholderTextColor={SUBTEXT_THEME_COLOR}
                 value={ticketSubject}
                 onChangeText={setTicketSubject}
                 maxLength={MAX_TICKET_SUBJECT_LENGTH}
               />
               <TextInput
-                style={[styles.modalInput(theme), styles.modalTextArea, { color: theme.textPrimary }]}
+                style={[styles.modalInput, styles.modalTextArea]}
                 placeholder="Describe your issue..."
-                placeholderTextColor={theme.textMuted}
+                placeholderTextColor={SUBTEXT_THEME_COLOR}
                 value={ticketDescription}
                 onChangeText={setTicketDescription}
                 multiline
@@ -404,7 +411,7 @@ const Support = () => {
                   disabled={loading}
                 >
                   <LinearGradient
-                    colors={['#AD4DFF', '#7B61FF']}
+                    colors={['#5b9cff', '#8ec5fc']}
                     style={styles.modalButtonGradient}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
@@ -412,7 +419,7 @@ const Support = () => {
                     <Text style={styles.modalButtonText}>
                       {loading ? 'Submitting...' : 'Submit'}
                     </Text>
-                    <Icon name="send" size={scale(16)} color="#FFFFFF" />
+                    <Icon name="send" size={scale(18)} color={TEXT_THEME_COLOR} />
                   </LinearGradient>
                 </TouchableOpacity>
               </Animated.View>
@@ -424,12 +431,12 @@ const Support = () => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.containerBg }]}>
+    <View style={styles.container}>
       <LinearGradient
-        colors={theme.background}
+        colors={BACKGROUND_GRADIENT}
         style={styles.backgroundGradient}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        end={{ x: 0, y: 1 }}
       />
       <Animated.View
         style={[styles.mainContainer, { opacity: fadeAnim, transform: [{ translateY: slideUpAnim }] }]}
@@ -439,31 +446,33 @@ const Support = () => {
           leftIcon="arrow-back"
           onLeftPress={() => navigation.goBack()}
           title="Support"
-          textStyle={{ color: theme.textPrimary }}
+          textStyle={{ color: TEXT_THEME_COLOR }}
+          style={styles.header}
+          iconColor={PRIMARY_THEME_COLOR}
         />
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.welcomeSection(theme)}>
+          <View style={styles.welcomeSection}>
             <LinearGradient
-              colors={['#7B61FF', '#AD4DFF']}
+              colors={['#5b9cff', '#8ec5fc']}
               style={styles.welcomeIconContainer}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Icon name="support-agent" size={scale(30)} color="#FFFFFF" />
+              <Icon name="support-agent" size={scale(30)} color={TEXT_THEME_COLOR} />
             </LinearGradient>
-            <Text style={[styles.welcomeTitle, { color: theme.textPrimary }]}>Premium Support</Text>
-            <Text style={[styles.welcomeSubtitle, { color: theme.textSecondary }]}>
+            <Text style={styles.welcomeTitle}>Premium Support</Text>
+            <Text style={styles.welcomeSubtitle}>
               Your gateway to exceptional assistance—explore FAQs, reach out, or submit a ticket.
             </Text>
           </View>
 
-          <View style={styles.faqSection(theme)}>
-            <Text style={[styles.sectionTitle, { color: theme.textTertiary }]}>Frequently Asked Questions</Text>
+          <View style={styles.faqSection}>
+            <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
             {loading ? (
-              <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading FAQs...</Text>
+              <Text style={styles.loadingText}>Loading FAQs...</Text>
             ) : faqs.length > 0 ? (
               faqs.map((item, index) => (
                 <FAQItem
@@ -472,37 +481,36 @@ const Support = () => {
                   index={index}
                   expandedFAQ={expandedFAQ}
                   toggleFAQ={toggleFAQ}
-                  theme={theme}
                 />
               ))
             ) : (
-              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No FAQs available</Text>
+              <Text style={styles.emptyText}>No FAQs available</Text>
             )}
           </View>
 
-          <View style={styles.contactSection(theme)}>
-            <Text style={[styles.sectionTitle, { color: theme.textTertiary }]}>Get in Touch</Text>
+          <View style={styles.contactSection}>
+            <Text style={styles.sectionTitle}>Get in Touch</Text>
             <View style={styles.contactButtons}>
-              {renderContactButton('Email Support', 'email', ['#7B61FF', '#AD4DFF'])}
-              {renderContactButton('Live Chat', 'chat', ['#FF6B6B', '#FFD93D'])}
+              {renderContactButton('Email Support', 'email')}
+              {renderContactButton('Live Chat', 'chat')}
             </View>
           </View>
 
           <TouchableOpacity style={styles.submitButton} onPress={openModal} activeOpacity={0.9}>
             <LinearGradient
-              colors={['#AD4DFF', '#7B61FF']}
+              colors={['#5b9cff', '#8ec5fc']}
               style={styles.submitButtonGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
               <Text style={styles.submitButtonText}>Submit a Ticket</Text>
-              <Icon name="send" size={scale(16)} color="#FFFFFF" />
+              <Icon name="send" size={scale(18)} color={TEXT_THEME_COLOR} />
             </LinearGradient>
           </TouchableOpacity>
         </ScrollView>
         {renderModal()}
       </Animated.View>
-      <Toast config={toastConfig(theme)} />
+      <Toast config={toastConfig} />
     </View>
   );
 };
@@ -510,6 +518,7 @@ const Support = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: PRODUCT_BG_COLOR,
   },
   backgroundGradient: {
     position: 'absolute',
@@ -522,232 +531,297 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContainer: {
-    paddingHorizontal: scale(20),
-    paddingBottom: scale(30),
+    paddingHorizontal: scale(24),
+    paddingBottom: scale(40),
     flexGrow: 1,
     marginTop: scale(30),
   },
-  welcomeSection: theme => ({
+  welcomeSection: {
     alignItems: 'center',
-    marginBottom: scale(30),
-    padding: scale(16),
-    backgroundColor: theme.glassBg,
-    borderRadius: scale(16),
-    borderWidth: 1,
-    borderColor: theme.glassBorder,
-  }),
+    marginBottom: scale(32),
+    padding: scale(20),
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(4) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    // elevation: 6,
+  },
   welcomeIconContainer: {
-    width: scale(60),
-    height: scale(60),
-    borderRadius: scale(30),
+    width: scale(64),
+    height: scale(64),
+    borderRadius: scale(32),
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: scale(16),
+    shadowColor: PRIMARY_THEME_COLOR,
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.2,
+    shadowRadius: scale(4),
+    elevation: 4,
   },
   welcomeTitle: {
-    fontSize: scaleFont(24),
+    fontSize: scaleFont(26),
     fontWeight: '800',
-    marginBottom: scale(10),
+    marginBottom: scale(12),
     textAlign: 'center',
     letterSpacing: 1,
+    color: TEXT_THEME_COLOR,
   },
   welcomeSubtitle: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(15),
     textAlign: 'center',
     paddingHorizontal: scale(20),
-    lineHeight: scale(20),
-    opacity: 0.9,
+    lineHeight: scaleFont(22),
+    color: SUBTEXT_THEME_COLOR,
+    fontWeight: '500',
   },
-  faqSection: theme => ({
-    marginBottom: scale(30),
-    padding: scale(12),
-    backgroundColor: theme.glassBg,
-    borderRadius: scale(16),
-    borderWidth: 1,
-    borderColor: theme.glassBorder,
-  }),
-  contactSection: theme => ({
-    marginBottom: scale(30),
-    padding: scale(12),
-    backgroundColor: theme.glassBg,
-    borderRadius: scale(16),
-    borderWidth: 1,
-    borderColor: theme.glassBorder,
-  }),
+  faqSection: {
+    marginBottom: scale(32),
+    padding: scale(16),
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(4) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    // elevation: 6,
+  },
+  contactSection: {
+    marginBottom: scale(32),
+    padding: scale(16),
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(4) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    // elevation: 6,
+  },
   sectionTitle: {
-    fontSize: scaleFont(20),
+    fontSize: scaleFont(22),
     fontWeight: '700',
     marginBottom: scale(16),
     letterSpacing: 0.5,
+    color: PRIMARY_THEME_COLOR,
   },
-  faqItem: theme => ({
-    marginBottom: scale(8),
-    borderRadius: scale(12),
+  faqItem: {
+    marginBottom: scale(12),
+    borderRadius: scale(16),
     overflow: 'hidden',
-    backgroundColor: theme.glassBg,
-    borderWidth: 1,
-    borderColor: theme.glassBorder,
-  }),
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: PRIMARY_THEME_COLOR,
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale(4),
+  },
   faqQuestionContainer: {
-    borderRadius: scale(12),
-    minHeight: scale(48),
+    borderRadius: scale(16),
+    minHeight: scale(56),
   },
   faqQuestionGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: scale(12),
+    padding: scale(16),
     justifyContent: 'space-between',
-    minHeight: scale(48),
+    minHeight: scale(56),
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(16),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   faqQuestion: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(16),
     fontWeight: '700',
     flex: 1,
-    lineHeight: scale(20),
+    lineHeight: scaleFont(22),
+    color: TEXT_THEME_COLOR,
   },
-  faqAnswerContainer: theme => ({
-    paddingHorizontal: scale(12),
-    paddingVertical: scale(8),
+  faqAnswerContainer: {
+    paddingHorizontal: scale(16),
+    marginVertical:5,
     overflow: 'visible',
-    backgroundColor: theme.containerBg === '#0A0A1E' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
-  }),
+  },
   faqAnswer: {
-    fontSize: scaleFont(12),
-    lineHeight: scale(18),
-    opacity: 0.9,
+    fontSize: scaleFont(14),
+    lineHeight: scaleFont(20),
+    color: SUBTEXT_THEME_COLOR,
+    fontWeight: '500',
   },
   contactButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: scale(12),
+    gap: scale(16),
   },
   contactButton: {
     flex: 1,
-    borderRadius: scale(12),
+    borderRadius: scale(16),
   },
   contactButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: scale(10),
-    borderRadius: scale(12),
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: scale(12),
+    borderRadius: scale(10),
+    shadowColor: PRIMARY_THEME_COLOR,
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.2,
+    shadowRadius: scale(4),
+    // elevation: 4,
   },
   contactIcon: {
-    marginRight: scale(8),
+    marginRight: scale(10),
   },
   contactText: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(15),
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
     letterSpacing: 0.5,
   },
   submitButton: {
-    borderRadius: scale(12),
+    borderRadius: scale(16),
     overflow: 'hidden',
-    marginVertical: scale(20),
+    marginVertical: scale(24),
   },
   submitButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: scale(12),
-    paddingHorizontal: scale(18),
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    paddingVertical: scale(14),
+    paddingHorizontal: scale(20),
+    shadowColor: PRIMARY_THEME_COLOR,
+    shadowOffset: { width: 0, height: scale(4) },
+    shadowOpacity: 0.3,
+    shadowRadius: scale(8),
+    // elevation: 6,
   },
   submitButtonText: {
-    fontSize: scaleFont(16),
+    fontSize: scaleFont(18),
     fontWeight: '800',
-    color: '#FFFFFF',
-    marginRight: scale(8),
+    color: TEXT_THEME_COLOR,
+    marginRight: scale(10),
     letterSpacing: 0.5,
   },
-  modalOverlay: theme => ({
+  modalOverlay: {
     flex: 1,
-    backgroundColor: theme.containerBg === '#0A0A1E' ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
-  }),
-  modalContainer: theme => ({
-    width: width * 0.85,
-    borderRadius: scale(20),
+  },
+  modalContainer: {
+    width: width * 0.9,
+    borderRadius: scale(24),
     overflow: 'hidden',
-    backgroundColor: theme.glassBg,
-  }),
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(4) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    // elevation: 6,
+  },
   modalGradient: {
-    padding: scale(20),
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: scale(24),
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: scale(20),
+    marginBottom: scale(24),
   },
   modalTitle: {
-    fontSize: scaleFont(20),
+    fontSize: scaleFont(22),
     fontWeight: '800',
     letterSpacing: 0.5,
+    color: TEXT_THEME_COLOR,
   },
-  modalInput: theme => ({
-    backgroundColor: theme.containerBg === '#0A0A1E' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
-    borderRadius: scale(10),
-    padding: scale(12),
-    marginBottom: scale(16),
+  modalInput: {
+    backgroundColor: 'rgba(91, 156, 255, 0.1)',
+    borderRadius: scale(12),
+    padding: scale(14),
+    marginBottom: scale(20),
     fontSize: scaleFont(14),
-    borderWidth: 1,
-    borderColor: theme.glassBorder,
-  }),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    color: TEXT_THEME_COLOR,
+    shadowColor: PRIMARY_THEME_COLOR,
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale(4),
+    // elevation: 3,
+  },
   modalTextArea: {
-    height: scale(100),
+    height: scale(120),
     textAlignVertical: 'top',
   },
   modalButton: {
-    borderRadius: scale(12),
+    borderRadius: scale(16),
     overflow: 'hidden',
   },
   modalButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: scale(12),
-    paddingHorizontal: scale(18),
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    paddingVertical: scale(14),
+    paddingHorizontal: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: PRIMARY_THEME_COLOR,
+    shadowOffset: { width: 0, height: scale(4) },
+    shadowOpacity: 0.3,
+    shadowRadius: scale(8),
+    // elevation: 6,
   },
   modalButtonText: {
-    fontSize: scaleFont(16),
+    fontSize: scaleFont(18),
     fontWeight: '800',
-    color: '#FFFFFF',
-    marginRight: scale(8),
+    color: TEXT_THEME_COLOR,
+    marginRight: scale(10),
     letterSpacing: 0.5,
   },
   loadingText: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(15),
     textAlign: 'center',
-    opacity: 0.8,
+    color: SUBTEXT_THEME_COLOR,
+    fontWeight: '500',
   },
   emptyText: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(15),
     textAlign: 'center',
-    opacity: 0.8,
+    color: SUBTEXT_THEME_COLOR,
+    fontWeight: '500',
   },
   customToast: {
     width: '90%',
-    padding: scale(14),
-    borderRadius: scale(10),
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: scale(16),
+    borderRadius: scale(12),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale(4),
+    // elevation: 3,
   },
   toastText1: {
     fontSize: scaleFont(16),
     fontWeight: '700',
+    color: TEXT_THEME_COLOR,
   },
   toastText2: {
-    fontSize: scaleFont(12),
-    marginTop: scale(4),
+    fontSize: scaleFont(13),
+    marginTop: scale(6),
+    color: SUBTEXT_THEME_COLOR,
+    fontWeight: '500',
   },
 });
 

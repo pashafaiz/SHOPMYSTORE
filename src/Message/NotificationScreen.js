@@ -19,6 +19,20 @@ import Header from '../Components/Header';
 import { DEFAULT_IMAGE_URL } from '../constants/GlobalConstants';
 
 const { width } = Dimensions.get('window');
+const scaleFactor = width / 375;
+const scale = (size) => size * scaleFactor;
+const scaleFont = (size) => Math.round(size * (Math.min(width, Dimensions.get('window').height) / 375));
+
+// Theme constants
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)';
+const SELECTED_CATEGORY_BG_COLOR = '#5b9cff';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
 
 const NotificationScreen = ({ navigation }) => {
   const [search, setSearch] = useState('');
@@ -42,7 +56,7 @@ const NotificationScreen = ({ navigation }) => {
       const filtered = chats.filter(
         (chat) =>
           chat.fullName?.toLowerCase().includes(search.toLowerCase()) ||
-          chat.latestMessageContent?.toLowerCase().includes(search.toLowerCase())
+          chat.latestMessageContent?.toLowerCase().includes(search.toLowerCase()),
       );
       setFilteredChats(filtered);
     } else {
@@ -127,8 +141,10 @@ const NotificationScreen = ({ navigation }) => {
 
   return (
     <LinearGradient
-      colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']}
+      colors={BACKGROUND_GRADIENT}
       style={styles.container}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
     >
       <Header
         isSearch={true}
@@ -140,6 +156,7 @@ const NotificationScreen = ({ navigation }) => {
         showRightIcon1={true}
         rightIcon1="camera"
         onRightPress1={() => handleHeaderIconPress('camera')}
+        textStyle={{ color: TEXT_THEME_COLOR }}
       />
 
       <View style={styles.content}>
@@ -159,8 +176,9 @@ const NotificationScreen = ({ navigation }) => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#FFFFFF"
-              colors={['#FFFFFF']}
+              tintColor={PRIMARY_THEME_COLOR}
+              colors={[PRIMARY_THEME_COLOR]}
+              progressBackgroundColor={PRODUCT_BG_COLOR}
             />
           }
         />
@@ -175,54 +193,60 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 15,
-    paddingTop: 10,
+    paddingHorizontal: scale(20),
+    paddingTop: scale(15),
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 20,
-    marginLeft: 5,
+    fontSize: scaleFont(26),
+    fontWeight: '700',
+    color: TEXT_THEME_COLOR,
+    marginBottom: scale(25),
+    marginLeft: scale(5),
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: scale(30),
   },
   messageItem: {
-    marginBottom: 15,
-    borderRadius: 15,
+    marginBottom: scale(15),
+    borderRadius: scale(18),
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
   },
   messageContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    padding: 15,
-    borderRadius: 15,
+    backgroundColor: PRODUCT_BG_COLOR,
+    padding: scale(18),
+    borderRadius: scale(18),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   avatarContainer: {
     position: 'relative',
-    marginRight: 15,
+    marginRight: scale(15),
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: scale(56),
+    height: scale(56),
+    borderRadius: scale(28),
   },
   onlineAvatar: {
-    borderWidth: 2,
-    borderColor: '#4CAF50',
+    borderWidth: scale(2),
+    borderColor: PRIMARY_THEME_COLOR,
   },
   onlineIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#4CAF50',
+    width: scale(14),
+    height: scale(14),
+    borderRadius: scale(7),
+    backgroundColor: PRIMARY_THEME_COLOR,
     position: 'absolute',
     bottom: 0,
     right: 0,
-    borderWidth: 2,
-    borderColor: '#1A0B3B',
+    borderWidth: scale(2),
+    borderColor: PRODUCT_BG_COLOR,
   },
   messageInfo: {
     flex: 1,
@@ -230,41 +254,43 @@ const styles = StyleSheet.create({
   messageHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 5,
+    marginBottom: scale(6),
   },
   userName: {
-    fontSize: 16,
+    fontSize: scaleFont(17),
     fontWeight: '600',
-    color: 'white',
+    color: TEXT_THEME_COLOR,
   },
   time: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: scaleFont(13),
+    color: SUBTEXT_THEME_COLOR,
   },
   messageText: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: scaleFont(15),
+    color: TEXT_THEME_COLOR,
   },
   messageCount: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.5)',
-    marginTop: 5,
+    fontSize: scaleFont(13),
+    color: SUBTEXT_THEME_COLOR,
+    marginTop: scale(6),
   },
   loadingText: {
-    color: 'white',
+    color: TEXT_THEME_COLOR,
     textAlign: 'center',
-    marginVertical: 10,
+    marginVertical: scale(15),
+    fontSize: scaleFont(16),
   },
   errorText: {
-    color: '#FF3E6D',
+    color: SECONDARY_THEME_COLOR,
     textAlign: 'center',
-    marginVertical: 10,
+    marginVertical: scale(15),
+    fontSize: scaleFont(16),
   },
   emptyText: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: SUBTEXT_THEME_COLOR,
     textAlign: 'center',
-    marginVertical: 20,
-    fontSize: 16,
+    marginVertical: scale(25),
+    fontSize: scaleFont(17),
   },
 });
 

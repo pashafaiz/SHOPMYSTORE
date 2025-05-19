@@ -14,7 +14,7 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
   TouchableWithoutFeedback,
-  Modal
+  Modal,
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
@@ -25,9 +25,33 @@ import Animated, {
 } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { CATEGORIES } from '../constants/GlobalConstants';
+import {
+  MAX_MEDIA_FILES,
+  FONT_SIZE_XLARGE,
+  FONT_SIZE_LARGE,
+  FONT_SIZE_MEDIUM,
+  FONT_SIZE_SMALL,
+  SCREEN_PADDING,
+  CARD_BORDER_RADIUS,
+  ICON_SIZE,
+  PRODUCT_BG_COLOR,
+  CATEGORY_BG_COLOR,
+  PRIMARY_THEME_COLOR,
+  SECONDARY_THEME_COLOR,
+  TEXT_THEME_COLOR,
+  SUBTEXT_THEME_COLOR,
+  BORDER_THEME_COLOR,
+  BACKGROUND_GRADIENT,
+} from '../constants/GlobalConstants';
 
 const { width, height } = Dimensions.get('window');
+const scaleFactor = Math.min(width, 375) / 375;
+const scale = (size) => Math.round(size * scaleFactor);
+const scaleFont = (size) => {
+  const fontScale = Math.min(width, height) / 375;
+  const scaledSize = size * fontScale * (Platform.OS === 'ios' ? 0.9 : 0.85);
+  return Math.round(scaledSize);
+};
 
 const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' }) => {
   const COMMON_SPECS = ['Material', 'Weight', 'Dimensions', 'Color', 'Size', 'Brand', 'Model'];
@@ -48,13 +72,15 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
     specifications: '[]',
     tags: '',
     category: '',
+    stock: '0',
+    brand: '',
+    offer: '',
   });
   const [media, setMedia] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [userId, setUserId] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
-  
   const [dropdownType, setDropdownType] = useState(null);
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ x: 0, y: 0, width: 0 });
@@ -70,7 +96,6 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
   }));
 
   const inputRefs = {
-    category: useRef(null),
     sizes: useRef(null),
     colors: useRef(null),
     highlights: useRef(null),
@@ -84,8 +109,6 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
       opacityValue.value = 1;
     }
   }, [visible, scaleValue, opacityValue]);
-
-  const categories = CATEGORIES.filter(cat => cat.id !== 'all').map(cat => cat.name);
 
   useEffect(() => {
     const getUserId = async () => {
@@ -114,15 +137,18 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
         sizes: product.sizes?.join(', ') || '',
         colors: product.colors?.join(', ') || '',
         highlights: product.highlights?.join(', ') || '',
-        specifications: Array.isArray(product.specifications) 
+        specifications: Array.isArray(product.specifications)
           ? JSON.stringify(product.specifications)
           : '[]',
         tags: product.tags?.join(', ') || '',
         category: product.category || '',
+        stock: product.stock?.toString() || '0',
+        brand: product.brand || '',
+        offer: product.offer || '',
       };
       setFormData(formattedProduct);
       console.log('Loaded product for edit:', formattedProduct);
-      
+
       const formattedMedia = product.media?.map((item) => ({
         uri: item.url,
         mediaType: item.mediaType || 'image',
@@ -148,6 +174,9 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
       specifications: '[]',
       tags: '',
       category: '',
+      stock: '0',
+      brand: '',
+      offer: '',
     });
     setMedia([]);
     setUploadProgress(0);
@@ -157,20 +186,20 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
 
   const handleChange = (name, value) => {
     console.log(`Changing ${name} to: ${value}`);
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
 
     if ((name === 'price' || name === 'originalPrice') && formData.originalPrice && formData.price) {
       const original = parseFloat(name === 'originalPrice' ? value : formData.originalPrice);
       const discounted = parseFloat(name === 'price' ? value : formData.price);
-      
+
       if (original > 0 && discounted > 0 && original >= discounted) {
         const discountValue = Math.round(((original - discounted) / original) * 100);
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
-          discount: discountValue.toString()
+          discount: discountValue.toString(),
         }));
         console.log(`Calculated discount: ${discountValue}%`);
       }
@@ -181,7 +210,7 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
     const options = {
       mediaType: 'mixed',
       quality: 0.8,
-      selectionLimit: 5 - media.length,
+      selectionLimit: MAX_MEDIA_FILES - media.length,
       maxWidth: 1000,
       maxHeight: 1000,
     };
@@ -201,14 +230,14 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
           type: asset.type,
           fileName: asset.fileName || `media_${Date.now()}.${asset.type?.startsWith('video') ? 'mp4' : 'jpg'}`,
         }));
-        setMedia(prev => [...prev, ...selectedMedia].slice(0, 5));
+        setMedia((prev) => [...prev, ...selectedMedia].slice(0, MAX_MEDIA_FILES));
         console.log('Selected media:', selectedMedia);
       }
     });
   };
 
   const removeMedia = (index) => {
-    setMedia(prev => prev.filter((_, i) => i !== index));
+    setMedia((prev) => prev.filter((_, i) => i !== index));
     console.log(`Removed media at index: ${index}`);
   };
 
@@ -216,17 +245,22 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
     <View style={styles.mediaItem}>
       {item.mediaType === 'video' ? (
         <View style={styles.videoContainer}>
-          <Image 
-            source={{ uri: 'https://cdn-icons-png.flaticon.com/512/3172/3172555.png' }} 
+          <Image
+            source={{ uri: item.uri }}
             style={styles.videoThumbnail}
+            defaultSource={{ uri: 'https://cdn-icons-png.flaticon.com/512/3172/3172555.png' }}
           />
-          <Icon name="play-circle-filled" size={24} color="#FFFFFF" style={styles.playIcon} />
+          <Icon name="play-circle-filled" size={scale(ICON_SIZE)} color={TEXT_THEME_COLOR} style={styles.playIcon} />
         </View>
       ) : (
-        <Image source={{ uri: item.uri }} style={styles.mediaPreview} />
+        <Image
+          source={{ uri: item.uri }}
+          style={styles.mediaPreview}
+          defaultSource={{ uri: 'https://via.placeholder.com/90' }}
+        />
       )}
       <TouchableOpacity style={styles.removeButton} onPress={() => removeMedia(index)}>
-        <Icon name="cancel" size={16} color="#FFFFFF" />
+        <Icon name="cancel" size={scale(16)} color={TEXT_THEME_COLOR} />
       </TouchableOpacity>
     </View>
   );
@@ -235,20 +269,15 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
     console.log(`Opening dropdown for: ${type}`);
     setDropdownType(type);
     setCustomInput('');
-    
-    if (type === 'category') {
-      setSelectedItems([]);
-    } else {
-      const currentValues = formData[type]?.split(',').map(item => item.trim()).filter(item => item) || [];
-      setSelectedItems(currentValues);
-      console.log(`Current values for ${type}:`, currentValues);
-    }
 
-    // Center the dropdown on the screen
-    const dropdownWidth = width * 0.8; // 80% of screen width
-    const dropdownHeight = 300; // Fixed height (maxHeight from styles)
-    const x = (width - dropdownWidth) / 2; // Center horizontally
-    const y = (height - dropdownHeight) / 2; // Center vertically
+    const currentValues = formData[type]?.split(',').map((item) => item.trim()).filter((item) => item) || [];
+    setSelectedItems(currentValues);
+    console.log(`Current values for ${type}:`, currentValues);
+
+    const dropdownWidth = width * 0.8;
+    const dropdownHeight = 300;
+    const x = (width - dropdownWidth) / 2;
+    const y = (height - dropdownHeight) / 2;
 
     setDropdownPosition({ x, y, width: dropdownWidth });
     setDropdownVisible(true);
@@ -263,68 +292,46 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
 
   const handleDropdownSelect = (value) => {
     console.log(`Selecting ${value} for ${dropdownType}`);
-    if (dropdownType === 'category') {
-      setFormData(prev => ({
-        ...prev,
-        category: value
+    setSelectedItems((prev) => {
+      const newItems = prev.includes(value)
+        ? prev.filter((item) => item !== value)
+        : [...prev, value];
+      setFormData((prevForm) => ({
+        ...prevForm,
+        [dropdownType]: newItems.join(', '),
       }));
-      closeDropdown();
-      console.log(`Set category to: ${value}`);
-    } else {
-      setSelectedItems(prev => {
-        const newItems = prev.includes(value)
-          ? prev.filter(item => item !== value)
-          : [...prev, value];
-        setFormData(prevForm => ({
-          ...prevForm,
-          [dropdownType]: newItems.join(', ')
-        }));
-        console.log(`Updated selectedItems for ${dropdownType}:`, newItems);
-        return newItems;
-      });
-    }
+      console.log(`Updated selectedItems for ${dropdownType}:`, newItems);
+      return newItems;
+    });
   };
 
   const addCustomValue = () => {
     if (!customInput.trim()) return;
-    
-    if (dropdownType === 'category') {
-      setFormData(prev => ({
-        ...prev,
-        category: customInput
+
+    setSelectedItems((prev) => {
+      const newItems = [...prev, customInput.trim()];
+      setFormData((prevForm) => ({
+        ...prevForm,
+        [dropdownType]: newItems.join(', '),
       }));
-      console.log(`Set custom category: ${customInput}`);
-      closeDropdown();
-    } else {
-      setSelectedItems(prev => {
-        const newItems = [...prev, customInput.trim()];
-        setFormData(prevForm => ({
-          ...prevForm,
-          [dropdownType]: newItems.join(', ')
-        }));
-        console.log(`Added custom ${dropdownType}: ${customInput}, new items:`, newItems);
-        return newItems;
-      });
-      setCustomInput('');
-    }
+      console.log(`Added custom ${dropdownType}: ${customInput}, new items:`, newItems);
+      return newItems;
+    });
+    setCustomInput('');
   };
 
   const confirmSelections = () => {
-    if (dropdownType !== 'category') {
-      const joinedItems = selectedItems.join(', ');
-      setFormData(prev => ({
-        ...prev,
-        [dropdownType]: joinedItems
-      }));
-      console.log(`Confirmed selections for ${dropdownType}: ${joinedItems}`);
-    }
+    const joinedItems = selectedItems.join(', ');
+    setFormData((prev) => ({
+      ...prev,
+      [dropdownType]: joinedItems,
+    }));
+    console.log(`Confirmed selections for ${dropdownType}: ${joinedItems}`);
     closeDropdown();
   };
 
   const getDropdownItems = () => {
     switch (dropdownType) {
-      case 'category':
-        return categories;
       case 'sizes':
         return COMMON_SIZES;
       case 'colors':
@@ -348,17 +355,27 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
   };
 
   const handleSubmit = async () => {
-    const { name, price, originalPrice, discount, category } = formData;
-    
-    if (!name || !price || !category || !originalPrice || !discount || media.length === 0) {
+    const { name, price, originalPrice, discount, category, stock, brand } = formData;
+
+    if (!name || !price || !category || !originalPrice || !discount || !stock || !brand || media.length === 0) {
       Alert.alert('Error', 'Please fill all required fields and add at least one media file');
-      console.log('Validation failed:', { name, price, originalPrice, discount, category, mediaLength: media.length });
+      console.log('Validation failed:', {
+        name,
+        price,
+        originalPrice,
+        discount,
+        category,
+        stock,
+        brand,
+        mediaLength: media.length,
+      });
       return;
     }
 
     const priceNum = parseFloat(price);
     const originalPriceNum = parseFloat(originalPrice);
     const discountNum = parseFloat(discount);
+    const stockNum = parseInt(stock);
 
     if (isNaN(priceNum)) {
       Alert.alert('Error', 'Price must be a valid number');
@@ -378,6 +395,12 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
       return;
     }
 
+    if (isNaN(stockNum) || stockNum < 0) {
+      Alert.alert('Error', 'Stock must be a valid number');
+      console.log('Invalid stock:', stock);
+      return;
+    }
+
     let specificationsArray = [];
     try {
       specificationsArray = JSON.parse(formData.specifications);
@@ -386,52 +409,62 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
       }
     } catch (e) {
       try {
-        const pairs = formData.specifications.split(',')
-          .map(pair => pair.trim())
-          .filter(pair => pair.includes(':'));
+        const pairs = formData.specifications
+          .split(',')
+          .map((pair) => pair.trim())
+          .filter((pair) => pair.includes(':'));
 
-        specificationsArray = pairs.map(pair => {
-          const [name, value] = pair.split(':').map(s => s.trim());
+        specificationsArray = pairs.map((pair) => {
+          const [name, value] = pair.split(':').map((s) => s.trim());
           return { name, value };
         });
       } catch (err) {
-        Alert.alert('Error', 'Specifications must be in format: "Material: Cotton, Weight: 250gsm" or valid JSON array');
+        Alert.alert(
+          'Error',
+          'Specifications must be in format: "Material: Cotton, Weight: 250gsm" or valid JSON array'
+        );
         console.log('Invalid specifications:', formData.specifications);
         return;
       }
     }
 
-    const processField = (field) => 
-      field ? field.split(',').map(item => item.trim()).filter(item => item) : [];
+    const processField = (field) =>
+      field ? field.split(',').map((item) => item.trim()).filter((item) => item) : [];
 
-    const colors = processField(formData.colors).map(color => color.toLowerCase());
+    const colors = processField(formData.colors).map((color) => color.toLowerCase());
 
     const productData = {
       ...formData,
       price: priceNum,
       originalPrice: originalPriceNum,
       discount: discountNum,
+      stock: stockNum,
       sizes: processField(formData.sizes),
       colors: colors,
       highlights: processField(formData.highlights),
       specifications: specificationsArray,
       tags: processField(formData.tags),
-      media,
-      createdBy: userId
+      media: media.map((item) => ({
+        url: item.uri,
+        mediaType: item.mediaType,
+        type: item.type,
+        fileName: item.fileName,
+      })),
+      createdBy: userId,
     };
 
     setIsLoading(true);
     setIsUploading(true);
     setUploadProgress(0);
     console.log('Submitting product:', productData);
-    
+
     try {
       const submitResult = onSubmit({
         ...productData,
         progressCallback: (progress) => {
           setUploadProgress(Math.round(progress * 100));
           console.log(`Upload progress: ${Math.round(progress * 100)}%`);
-        }
+        },
       });
 
       if (submitResult && typeof submitResult.then === 'function') {
@@ -440,7 +473,7 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
       } else {
         console.warn('onSubmit did not return a promise, proceeding without awaiting');
       }
-      
+
       setIsLoading(false);
       setIsUploading(false);
       resetForm();
@@ -468,12 +501,14 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
         style={styles.container}
       >
         <LinearGradient
-          colors={['#0A0A1E', '#1E1E3F']}
+          colors={BACKGROUND_GRADIENT}
           style={styles.gradientContainer}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
         >
           <View style={styles.header}>
             <TouchableOpacity onPress={handleRequestClose} style={styles.closeButton}>
-              <Icon name="arrow-back" size={24} color="#FFFFFF" />
+              <Icon name="arrow-back" size={scale(ICON_SIZE)} color={PRIMARY_THEME_COLOR} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>
               {screenType === 'edit' ? 'Edit Product' : 'Add New Product'}
@@ -481,7 +516,7 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
             <View style={styles.headerRight} />
           </View>
 
-          <ScrollView 
+          <ScrollView
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
           >
@@ -490,9 +525,11 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
                 <Text style={styles.sectionTitle}>Media *</Text>
                 <TouchableOpacity onPress={pickMedia} style={styles.mediaPicker}>
                   <View style={styles.mediaPickerContent}>
-                    <Icon name="add-photo-alternate" size={24} color="#7B61FF" />
+                    <Icon name="add-photo-alternate" size={scale(ICON_SIZE)} color={PRIMARY_THEME_COLOR} />
                     <Text style={styles.mediaPlaceholder}>
-                      {media.length > 0 ? 'Add more media' : 'Tap to select images or videos (up to 5)'}
+                      {media.length > 0
+                        ? 'Add more media'
+                        : `Tap to select images or videos (up to ${MAX_MEDIA_FILES})`}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -515,14 +552,36 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
                 <TextInput
                   style={styles.input}
                   placeholder="Product Name *"
-                  placeholderTextColor="#B0B0D0"
+                  placeholderTextColor={SUBTEXT_THEME_COLOR}
                   value={formData.name}
                   onChangeText={(text) => handleChange('name', text)}
                 />
                 <TextInput
+                  style={styles.input}
+                  placeholder="Brand *"
+                  placeholderTextColor={SUBTEXT_THEME_COLOR}
+                  value={formData.brand}
+                  onChangeText={(text) => handleChange('brand', text)}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Stock *"
+                  placeholderTextColor={SUBTEXT_THEME_COLOR}
+                  value={formData.stock}
+                  onChangeText={(text) => handleChange('stock', text)}
+                  keyboardType="numeric"
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Offer (e.g., Buy 1 Get 1)"
+                  placeholderTextColor={SUBTEXT_THEME_COLOR}
+                  value={formData.offer}
+                  onChangeText={(text) => handleChange('offer', text)}
+                />
+                <TextInput
                   style={[styles.input, styles.multilineInput]}
                   placeholder="Description"
-                  placeholderTextColor="#B0B0D0"
+                  placeholderTextColor={SUBTEXT_THEME_COLOR}
                   value={formData.description}
                   onChangeText={(text) => handleChange('description', text)}
                   multiline
@@ -533,12 +592,12 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Pricing</Text>
                 <View style={styles.row}>
-                  <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
+                  <View style={[styles.inputContainer, { flex: 1, marginRight: scale(10) }]}>
                     <Text style={styles.inputLabel}>Original Price *</Text>
                     <TextInput
                       style={styles.input}
                       placeholder="₹0.00"
-                      placeholderTextColor="#B0B0D0"
+                      placeholderTextColor={SUBTEXT_THEME_COLOR}
                       value={formData.originalPrice}
                       onChangeText={(text) => handleChange('originalPrice', text)}
                       keyboardType="numeric"
@@ -549,7 +608,7 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
                     <TextInput
                       style={styles.input}
                       placeholder="₹0.00"
-                      placeholderTextColor="#B0B0D0"
+                      placeholderTextColor={SUBTEXT_THEME_COLOR}
                       value={formData.price}
                       onChangeText={(text) => handleChange('price', text)}
                       keyboardType="numeric"
@@ -561,7 +620,7 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
                   <TextInput
                     style={styles.input}
                     placeholder="0"
-                    placeholderTextColor="#B0B0D0"
+                    placeholderTextColor={SUBTEXT_THEME_COLOR}
                     value={formData.discount}
                     onChangeText={(text) => handleChange('discount', text)}
                     keyboardType="numeric"
@@ -572,16 +631,13 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
 
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Category *</Text>
-                <TouchableOpacity
-                  style={styles.categoryInput}
-                  onPress={() => openDropdown('category')}
-                  ref={inputRefs.category}
-                >
-                  <Text style={[styles.categoryText, !formData.category && { color: '#B0B0D0' }]}>
-                    {formData.category || 'Select Category'}
-                  </Text>
-                  <Icon name="keyboard-arrow-down" size={20} color="#B0B0D0" />
-                </TouchableOpacity>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter Category *"
+                  placeholderTextColor={SUBTEXT_THEME_COLOR}
+                  value={formData.category}
+                  onChangeText={(text) => handleChange('category', text)}
+                />
               </View>
 
               <View style={styles.section}>
@@ -592,15 +648,15 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
                     <TextInput
                       style={[styles.input, { flex: 1 }]}
                       placeholder="XS, S, M, L"
-                      placeholderTextColor="#B0B0D0"
+                      placeholderTextColor={SUBTEXT_THEME_COLOR}
                       value={formData.sizes}
                       onChangeText={(text) => handleChange('sizes', text)}
                     />
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.dropdownButton}
                       onPress={() => openDropdown('sizes')}
                     >
-                      <Icon name="arrow-drop-down" size={24} color="#7B61FF" />
+                      <Icon name="arrow-drop-down" size={scale(ICON_SIZE)} color={PRIMARY_THEME_COLOR} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -610,15 +666,15 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
                     <TextInput
                       style={[styles.input, { flex: 1 }]}
                       placeholder="red, blue, green"
-                      placeholderTextColor="#B0B0D0"
+                      placeholderTextColor={SUBTEXT_THEME_COLOR}
                       value={formData.colors}
                       onChangeText={(text) => handleChange('colors', text)}
                     />
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.dropdownButton}
                       onPress={() => openDropdown('colors')}
                     >
-                      <Icon name="arrow-drop-down" size={24} color="#7B61FF" />
+                      <Icon name="arrow-drop-down" size={scale(ICON_SIZE)} color={PRIMARY_THEME_COLOR} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -628,15 +684,15 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
                     <TextInput
                       style={[styles.input, { flex: 1 }]}
                       placeholder="Waterproof, Lightweight"
-                      placeholderTextColor="#B0B0D0"
+                      placeholderTextColor={SUBTEXT_THEME_COLOR}
                       value={formData.highlights}
                       onChangeText={(text) => handleChange('highlights', text)}
                     />
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.dropdownButton}
                       onPress={() => openDropdown('highlights')}
                     >
-                      <Icon name="arrow-drop-down" size={24} color="#7B61FF" />
+                      <Icon name="arrow-drop-down" size={scale(ICON_SIZE)} color={PRIMARY_THEME_COLOR} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -646,17 +702,17 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
                     <TextInput
                       style={[styles.input, styles.multilineInput, { flex: 1 }]}
                       placeholder='Material: Cotton, Weight: 250gsm OR [{"name":"Material","value":"Cotton"}]'
-                      placeholderTextColor="#B0B0D0"
+                      placeholderTextColor={SUBTEXT_THEME_COLOR}
                       value={formData.specifications}
                       onChangeText={(text) => handleChange('specifications', text)}
                       multiline
                       numberOfLines={4}
                     />
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.dropdownButton}
                       onPress={() => openDropdown('specifications')}
                     >
-                      <Icon name="arrow-drop-down" size={24} color="#7B61FF" />
+                      <Icon name="arrow-drop-down" size={scale(ICON_SIZE)} color={PRIMARY_THEME_COLOR} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -666,15 +722,15 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
                     <TextInput
                       style={[styles.input, { flex: 1 }]}
                       placeholder="fashion, summer"
-                      placeholderTextColor="#B0B0D0"
+                      placeholderTextColor={SUBTEXT_THEME_COLOR}
                       value={formData.tags}
                       onChangeText={(text) => handleChange('tags', text)}
                     />
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.dropdownButton}
                       onPress={() => openDropdown('tags')}
                     >
-                      <Icon name="arrow-drop-down" size={24} color="#7B61FF" />
+                      <Icon name="arrow-drop-down" size={scale(ICON_SIZE)} color={PRIMARY_THEME_COLOR} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -685,65 +741,63 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
           {isUploading && (
             <View style={styles.progressContainer}>
               <View style={styles.progressBar}>
-                <View 
-                  style={[
-                    styles.progressFill,
-                    { width: `${uploadProgress}%` }
-                  ]}
+                <View
+                  style={[styles.progressFill, { width: `${uploadProgress}%` }]}
                 />
               </View>
-              <Text style={styles.progressText}>
-                Uploading: {uploadProgress}%
-              </Text>
-              <ActivityIndicator size="small" color="#7B61FF" />
+              <Text style={styles.progressText}>Uploading: {uploadProgress}%</Text>
+              <ActivityIndicator size="small" color={PRIMARY_THEME_COLOR} />
             </View>
           )}
 
           <TouchableOpacity
-            style={[
-              styles.submitButton,
-              isUploading && styles.submitButtonDisabled
-            ]}
+            style={[styles.submitButton, isUploading && styles.submitButtonDisabled]}
             onPress={handleSubmit}
             disabled={isLoading || isUploading}
           >
             <LinearGradient
-              colors={['#7B61FF', '#A855F7']}
+              colors={[PRIMARY_THEME_COLOR, '#8ec5fc']}
               style={styles.submitButtonGradient}
               start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+              end={{ x: 1, y: 1 }}
             >
+              <Text style={styles.submitButtonText}>
+                {screenType === 'edit' ? 'Update Product' : 'Add Product'}
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
 
           {dropdownVisible && (
             <TouchableWithoutFeedback onPress={closeDropdown}>
               <View style={styles.dropdownOverlay}>
-                <View 
-                  style={[styles.dropdownContainer, {
-                    position: 'absolute',
-                    top: dropdownPosition.y,
-                    left: dropdownPosition.x,
-                    width: dropdownPosition.width,
-                    maxHeight: 300,
-                  }]}
+                <View
+                  style={[
+                    styles.dropdownContainer,
+                    {
+                      position: 'absolute',
+                      top: dropdownPosition.y,
+                      left: dropdownPosition.x,
+                      width: dropdownPosition.width,
+                      maxHeight: scale(300),
+                    },
+                  ]}
                   onStartShouldSetResponder={() => true}
                 >
                   <View style={styles.customInputContainer}>
                     <TextInput
                       style={styles.customInput}
                       placeholder={`Add new ${dropdownType}`}
-                      placeholderTextColor="#B0B0D0"
+                      placeholderTextColor={SUBTEXT_THEME_COLOR}
                       value={customInput}
                       onChangeText={setCustomInput}
                       onSubmitEditing={addCustomValue}
                     />
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.addButton}
                       onPress={addCustomValue}
                       disabled={!customInput.trim()}
                     >
-                      <Icon name="add" size={20} color="#FFFFFF" />
+                      <Icon name="add" size={scale(20)} color={TEXT_THEME_COLOR} />
                     </TouchableOpacity>
                   </View>
 
@@ -756,10 +810,8 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
                         activeOpacity={0.7}
                       >
                         <Text style={styles.dropdownItemText}>{item}</Text>
-                        {(dropdownType === 'category' ? 
-                          formData.category === item : 
-                          selectedItems.includes(item)) && (
-                          <Icon name="check" size={20} color="#7B61FF" />
+                        {selectedItems.includes(item) && (
+                          <Icon name="check" size={scale(20)} color={PRIMARY_THEME_COLOR} />
                         )}
                       </TouchableOpacity>
                     )}
@@ -767,14 +819,12 @@ const ProductModal = ({ visible, onClose, onSubmit, product, screenType = 'add' 
                     contentContainerStyle={styles.dropdownList}
                   />
 
-                  {dropdownType !== 'category' && (
-                    <TouchableOpacity
-                      style={[styles.addButton, { alignSelf: 'center', marginVertical: 10 }]}
-                      onPress={confirmSelections}
-                    >
-                      <Text style={styles.addButtonText}>Confirm</Text>
-                    </TouchableOpacity>
-                  )}
+                  <TouchableOpacity
+                    style={[styles.addButton, { alignSelf: 'center', marginVertical: scale(10) }]}
+                    onPress={confirmSelections}
+                  >
+                    <Text style={styles.addButtonText}>Confirm</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             </TouchableWithoutFeedback>
@@ -796,45 +846,63 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 50 : 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: scale(SCREEN_PADDING),
+    paddingTop: Platform.OS === 'ios' ? scale(20) : scale(10),
+    paddingBottom: scale(15),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderBottomWidth: scale(2),
+    borderBottomColor: BORDER_THEME_COLOR,
+    borderRadius: scale(CARD_BORDER_RADIUS),
+    margin: scale(SCREEN_PADDING),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    elevation: 5,
   },
   closeButton: {
-    padding: 8,
+    paddingTop: scale(8),
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontSize: scaleFont(FONT_SIZE_XLARGE),
+    fontWeight: '700',
+    color: TEXT_THEME_COLOR,
   },
   headerRight: {
-    width: 40,
+    width: scale(40),
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: scale(100),
   },
   contentContainer: {
-    paddingHorizontal: 16,
+    padding: scale(SCREEN_PADDING),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(CARD_BORDER_RADIUS),
+    margin: scale(SCREEN_PADDING),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    elevation: 5,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: scale(24),
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: scaleFont(FONT_SIZE_LARGE),
     fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: 12,
+    color: TEXT_THEME_COLOR,
+    marginBottom: scale(12),
   },
   mediaPicker: {
-    backgroundColor: 'rgba(123, 97, 255, 0.1)',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(123, 97, 255, 0.3)',
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(CARD_BORDER_RADIUS),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    padding: scale(20),
+    marginBottom: scale(12),
   },
   mediaPickerContent: {
     flexDirection: 'row',
@@ -842,23 +910,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   mediaPlaceholder: {
-    color: '#7B61FF',
-    fontSize: 14,
-    marginLeft: 8,
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(FONT_SIZE_MEDIUM),
+    marginLeft: scale(8),
   },
   mediaList: {
-    marginBottom: 12,
+    marginBottom: scale(12),
   },
   mediaListContent: {
-    paddingRight: 8,
+    paddingRight: scale(8),
   },
   mediaItem: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    marginRight: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    width: scale(90),
+    height: scale(90),
+    borderRadius: scale(CARD_BORDER_RADIUS),
+    marginRight: scale(8),
+    backgroundColor: PRODUCT_BG_COLOR,
     overflow: 'hidden',
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   mediaPreview: {
     width: '100%',
@@ -867,7 +937,7 @@ const styles = StyleSheet.create({
   videoContainer: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#000',
+    backgroundColor: CATEGORY_BG_COLOR,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -881,12 +951,12 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: 'rgba(239, 68, 68, 0.8)',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
+    top: scale(4),
+    right: scale(4),
+    backgroundColor: SECONDARY_THEME_COLOR,
+    borderRadius: scale(10),
+    width: scale(20),
+    height: scale(20),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -894,47 +964,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   inputContainer: {
-    marginBottom: 12,
+    marginBottom: scale(12),
   },
   dropdownInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   dropdownButton: {
-    padding: 10,
-    marginLeft: 5,
+    padding: scale(10),
+    marginLeft: scale(5),
   },
   inputLabel: {
-    fontSize: 14,
-    color: '#B0B0D0',
-    marginBottom: 6,
+    fontSize: scaleFont(FONT_SIZE_MEDIUM),
+    color: SUBTEXT_THEME_COLOR,
+    marginBottom: scale(6),
   },
   input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
-    padding: 12,
-    color: '#FFFFFF',
-    fontSize: 14,
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    borderRadius: scale(CARD_BORDER_RADIUS),
+    padding: scale(14),
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(FONT_SIZE_MEDIUM),
+    marginVertical: 5,
   },
   multilineInput: {
-    minHeight: 100,
+    minHeight: scale(100),
     textAlignVertical: 'top',
-  },
-  categoryInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
-    padding: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  categoryText: {
-    color: '#FFFFFF',
-    fontSize: 14,
   },
   dropdownOverlay: {
     position: 'absolute',
@@ -942,104 +999,111 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent background
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   dropdownContainer: {
-    backgroundColor: '#2A2A5A',
-    borderRadius: 12,
-    elevation: 5,
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(16),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    elevation: 5,
   },
   customInputContainer: {
     flexDirection: 'row',
-    padding: 16,
-    paddingBottom: 8,
+    padding: scale(16),
+    paddingBottom: scale(8),
   },
   customInput: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 8,
-    padding: 12,
-    color: '#FFFFFF',
-    fontSize: 14,
-    marginRight: 8,
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    borderRadius: scale(CARD_BORDER_RADIUS),
+    padding: scale(12),
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(FONT_SIZE_MEDIUM),
+    marginRight: scale(8),
   },
   addButton: {
-    backgroundColor: '#7B61FF',
-    borderRadius: 8,
-    width: 70,
-    height: 44,
+    backgroundColor: PRIMARY_THEME_COLOR,
+    borderRadius: scale(CARD_BORDER_RADIUS),
+    width: scale(48),
+    height: scale(48),
     justifyContent: 'center',
     alignItems: 'center',
   },
   addButtonText: {
-    color: '#FFFFFF',
-    fontSize: 10,
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(FONT_SIZE_MEDIUM),
     fontWeight: '600',
   },
   dropdownList: {
-    paddingHorizontal: 16,
+    paddingHorizontal: scale(16),
   },
   dropdownItem: {
-    paddingVertical: 12,
+    paddingVertical: scale(12),
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomWidth: scale(1),
+    borderBottomColor: BORDER_THEME_COLOR,
   },
   dropdownItemText: {
-    color: '#FFFFFF',
-    fontSize: 14,
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(FONT_SIZE_MEDIUM),
   },
   submitButton: {
     position: 'absolute',
-    bottom: 20,
-    left: 16,
-    right: 16,
-    borderRadius: 8,
+    bottom: scale(20),
+    left: scale(SCREEN_PADDING),
+    right: scale(SCREEN_PADDING),
+    borderRadius: scale(CARD_BORDER_RADIUS),
     overflow: 'hidden',
+    shadowColor: PRIMARY_THEME_COLOR,
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.3,
+    shadowRadius: scale(8),
+    elevation: 5,
   },
   submitButtonDisabled: {
     opacity: 0.7,
   },
   submitButtonGradient: {
-    paddingVertical: 16,
+    paddingVertical: scale(16),
     alignItems: 'center',
     justifyContent: 'center',
   },
   submitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(FONT_SIZE_LARGE),
+    fontWeight: '700',
   },
   progressContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 10,
+    paddingHorizontal: scale(SCREEN_PADDING),
+    marginBottom: scale(10),
     alignItems: 'center',
   },
   progressBar: {
-    height: 6,
+    height: scale(8),
     width: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 3,
-    marginBottom: 8,
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(4),
+    marginBottom: scale(8),
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#7B61FF',
-    borderRadius: 3,
+    backgroundColor: PRIMARY_THEME_COLOR,
+    borderRadius: scale(4),
   },
   progressText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    marginBottom: 8,
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(FONT_SIZE_MEDIUM),
+    marginBottom: scale(8),
   },
 });
 

@@ -29,12 +29,24 @@ import {
   setShowProgress,
   resetUploadState,
 } from '../redux/slices/uploadReelSlice';
+import Header from '../Components/Header';
 
 const { width, height } = Dimensions.get('window');
 
 // Responsive scaling functions
 const scaleSize = (size) => Math.round(size * (width / 375));
 const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375));
+
+// Theme constants
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)';
+const SELECTED_CATEGORY_BG_COLOR = '#5b9cff';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
 
 // Constants
 const MAX_VIDEO_DURATION = 60; // 60 seconds
@@ -253,12 +265,12 @@ const UploadReel = () => {
 
   const glowShadow = glowAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [scaleSize(2), scaleSize(8)],
+    outputRange: [scaleSize(1), scaleSize(6)],
   });
 
   const glowOpacity = glowAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.3, 0.8],
+    outputRange: [0.2, 0.6],
   });
 
   const progressWidth = progressAnim.interpolate({
@@ -268,23 +280,23 @@ const UploadReel = () => {
 
   return (
     <LinearGradient
-      colors={['#0A0A1E', '#1E1E3F']}
+      colors={BACKGROUND_GRADIENT}
       style={styles.container}
       start={{ x: 0, y: 0 }}
-      end={{ x: 0, y: 1 }}>
+      end={{ x: 0, y: 1 }}
+    >
+      <Header
+        title={"Upload video"}
+        showLeftIcon={true}
+        leftIcon="arrow-back"
+        onLeftPress={() => navigation.goBack()}
+        transparent
+        style={styles.header}
+      />
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
-        keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}>
-            <Ionicons name="arrow-back" size={scaleSize(24)} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Create Reel</Text>
-          <View style={styles.headerRight} />
-        </View>
-
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.videoContainer}>
           {video ? (
             <Animated.View
@@ -293,12 +305,15 @@ const UploadReel = () => {
                 {
                   shadowRadius: glowShadow,
                   shadowOpacity: glowOpacity,
+                  shadowColor: PRIMARY_THEME_COLOR,
                 },
-              ]}>
+              ]}
+            >
               <TouchableOpacity
                 activeOpacity={0.9}
                 onPress={handleVideoPress}
-                style={styles.videoTouchable}>
+                style={styles.videoTouchable}
+              >
                 <Video
                   ref={videoRef}
                   source={{ uri: video.uri }}
@@ -314,11 +329,12 @@ const UploadReel = () => {
 
               <TouchableOpacity
                 style={styles.removeButton}
-                onPress={() => dispatch(removeVideo())}>
+                onPress={() => dispatch(removeVideo())}
+              >
                 <Ionicons
                   name="close-circle"
-                  size={scaleSize(32)}
-                  color="#FF3E6D"
+                  size={scaleSize(28)}
+                  color={SECONDARY_THEME_COLOR}
                   style={styles.removeIcon}
                 />
               </TouchableOpacity>
@@ -327,7 +343,8 @@ const UploadReel = () => {
                 <TouchableOpacity
                   style={styles.progressBarContainer}
                   onPress={handleSeek}
-                  activeOpacity={1}>
+                  activeOpacity={1}
+                >
                   <View style={styles.progressBarBackground}>
                     <Animated.View
                       style={[styles.progressBarFill, { width: progressWidth }]}
@@ -359,8 +376,8 @@ const UploadReel = () => {
             <View style={styles.placeholder}>
               <Ionicons
                 name="videocam-outline"
-                size={scaleSize(60)}
-                color="#B0B0D0"
+                size={scaleSize(64)}
+                color={PRIMARY_THEME_COLOR}
               />
               <Text style={styles.placeholderText}>
                 Select or Record a Video
@@ -375,7 +392,7 @@ const UploadReel = () => {
         <TextInput
           style={styles.captionInput}
           placeholder="Add a caption (required)"
-          placeholderTextColor="#A0A0A0"
+          placeholderTextColor={SUBTEXT_THEME_COLOR}
           value={caption}
           onChangeText={(text) => dispatch(setCaption(text))}
           multiline
@@ -385,21 +402,26 @@ const UploadReel = () => {
 
         <View style={styles.buttonContainer}>
           <TouchableOpacity
-            style={[styles.actionButton, styles.cameraButton]}
+            style={styles.actionButton}
             onPress={() => handleVideoPick('camera')}
-            disabled={loading}>
-            <Ionicons name="camera" size={scaleSize(24)} color="#FFFFFF" />
-            <Text style={styles.buttonText}>Record</Text>
+            disabled={loading}
+          >
+            <LinearGradient
+              colors={[CATEGORY_BG_COLOR, PRIMARY_THEME_COLOR]}
+              style={styles.actionButtonGradient}
+            >
+              <Ionicons name="camera" size={scaleSize(24)} color={TEXT_THEME_COLOR} />
+              <Text style={styles.buttonText}>Record</Text>
+            </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.actionButton, styles.galleryButton]}
             onPress={() => handleVideoPick('gallery')}
-            disabled={loading}>
-            <Ionicons name="images" size={scaleSize(24)} color="#000000" />
-            <Text style={[styles.buttonText, styles.galleryButtonText]}>
-              Gallery
-            </Text>
+            disabled={loading}
+          >
+            <Ionicons name="images" size={scaleSize(24)} color={TEXT_THEME_COLOR} />
+            <Text style={styles.buttonText}>Gallery</Text>
           </TouchableOpacity>
         </View>
 
@@ -409,15 +431,16 @@ const UploadReel = () => {
             (!video || loading || !caption.trim()) && styles.disabledButton,
           ]}
           onPress={handleUpload}
-          disabled={!video || loading || !caption.trim()}>
+          disabled={!video || loading || !caption.trim()}
+        >
           {loading ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <ActivityIndicator size="small" color={TEXT_THEME_COLOR} />
           ) : (
             <>
               <Ionicons
                 name="cloud-upload"
                 size={scaleSize(24)}
-                color="#FFFFFF"
+                color={TEXT_THEME_COLOR}
               />
               <Text style={styles.uploadButtonText}>Upload Reel</Text>
             </>
@@ -435,40 +458,26 @@ const styles = StyleSheet.create({
   scrollContainer: {
     padding: scaleSize(20),
     paddingTop: scaleSize(10),
-    paddingBottom: scaleSize(20),
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: scaleSize(20),
-  },
-  backButton: {
-    padding: scaleSize(5),
-  },
-  headerTitle: {
-    fontSize: scaleFont(20),
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  headerRight: {
-    width: scaleSize(34),
+    paddingBottom: scaleSize(30),
   },
   videoContainer: {
     alignItems: 'center',
-    marginBottom: scaleSize(15),
+    marginBottom: scaleSize(20),
   },
   videoWrapper: {
     width: width * 0.85,
     height: width * 0.85,
     maxHeight: height * 0.6,
-    borderRadius: scaleSize(12),
+    borderRadius: scaleSize(15),
     overflow: 'hidden',
     position: 'relative',
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 0 },
-    elevation: scaleSize(10),
-    backgroundColor: '#000',
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderWidth: scaleSize(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowOffset: { width: 0, height: scaleSize(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scaleSize(6),
+    elevation: 4,
   },
   videoTouchable: {
     flex: 1,
@@ -479,17 +488,17 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     position: 'absolute',
-    top: scaleSize(10),
-    right: scaleSize(10),
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: scaleSize(20),
-    padding: scaleSize(5),
+    top: scaleSize(8),
+    right: scaleSize(8),
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: scaleSize(16),
+    padding: scaleSize(4),
   },
   removeIcon: {
-    shadowColor: '#FF3E6D',
+    shadowColor: SECONDARY_THEME_COLOR,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: scaleSize(5),
+    shadowOpacity: 0.3,
+    shadowRadius: scaleSize(4),
   },
   progressBarContainer: {
     position: 'absolute',
@@ -500,23 +509,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   progressBarBackground: {
-    height: scaleSize(4),
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: scaleSize(2),
+    height: scaleSize(5),
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scaleSize(3),
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: PRIMARY_THEME_COLOR,
   },
   timeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: scaleSize(5),
+    marginTop: scaleSize(6),
   },
   timeText: {
-    color: '#FFFFFF',
-    fontSize: scaleFont(12),
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(13),
     fontWeight: '600',
   },
   progressCircle: {
@@ -526,122 +535,131 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   progressBackground: {
-    width: scaleSize(100),
-    height: scaleSize(100),
-    borderRadius: scaleSize(50),
-    borderWidth: scaleSize(4),
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    width: scaleSize(80),
+    height: scaleSize(80),
+    borderRadius: scaleSize(40),
+    borderWidth: scaleSize(3),
+    borderColor: CATEGORY_BG_COLOR,
     position: 'absolute',
   },
   progressFill: {
-    width: scaleSize(100),
-    height: scaleSize(100),
-    borderRadius: scaleSize(50),
-    borderWidth: scaleSize(4),
-    borderColor: '#FFFFFF',
+    width: scaleSize(80),
+    height: scaleSize(80),
+    borderRadius: scaleSize(40),
+    borderWidth: scaleSize(3),
+    borderColor: PRIMARY_THEME_COLOR,
     borderStyle: 'solid',
     borderRightColor: 'transparent',
     borderBottomColor: 'transparent',
     position: 'absolute',
   },
   progressText: {
-    color: '#FFFFFF',
-    fontSize: scaleFont(18),
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(16),
     fontWeight: '800',
   },
   placeholder: {
     width: width * 0.85,
     height: width * 0.85,
     maxHeight: height * 0.6,
-    borderRadius: scaleSize(12),
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: scaleSize(2),
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: scaleSize(15),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderWidth: scaleSize(3),
+    borderColor: BORDER_THEME_COLOR,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: scaleSize(20),
+    padding: scaleSize(25),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scaleSize(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scaleSize(6),
+    elevation: 4,
   },
   placeholderText: {
-    fontSize: scaleFont(18),
-    color: '#FFFFFF',
-    marginTop: scaleSize(15),
+    fontSize: scaleFont(20),
+    color: TEXT_THEME_COLOR,
+    marginTop: scaleSize(20),
     fontWeight: '600',
     textAlign: 'center',
   },
   placeholderSubtext: {
-    fontSize: scaleFont(14),
-    color: 'rgba(255, 255, 255, 0.6)',
-    marginTop: scaleSize(5),
+    fontSize: scaleFont(15),
+    color: SUBTEXT_THEME_COLOR,
+    marginTop: scaleSize(8),
     fontWeight: '500',
     textAlign: 'center',
   },
   captionInput: {
-    borderWidth: scaleSize(1),
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: scaleSize(12),
-    padding: scaleSize(16),
-    fontSize: scaleFont(16),
-    color: '#FFFFFF',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    marginBottom: scaleSize(15),
-    minHeight: scaleSize(120),
+    borderWidth: scaleSize(2),
+    borderColor: BORDER_THEME_COLOR,
+    borderRadius: scaleSize(15),
+    padding: scaleSize(18),
+    fontSize: scaleFont(17),
+    color: TEXT_THEME_COLOR,
+    backgroundColor: PRODUCT_BG_COLOR,
+    marginBottom: scaleSize(20),
+    minHeight: scaleSize(130),
     textAlignVertical: 'top',
     fontWeight: '500',
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: scaleSize(15),
-    gap: scaleSize(15),
+    marginBottom: scaleSize(20),
+    gap: scaleSize(20),
   },
   actionButton: {
+    flex: 1,
+    borderRadius: scaleSize(12),
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scaleSize(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scaleSize(6),
+    // elevation: 4,
+  },
+  actionButtonGradient: {
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: scaleSize(14),
-    borderRadius: scaleSize(10),
-    gap: scaleSize(10),
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: scaleSize(8),
-    elevation: scaleSize(5),
-  },
-  cameraButton: {
-    backgroundColor: '#A855F7',
+    paddingVertical: scaleSize(16),
+    gap: scaleSize(12),
   },
   galleryButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: PRODUCT_BG_COLOR,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: scaleSize(16),
+    gap: scaleSize(12),
   },
   buttonText: {
-    fontSize: scaleFont(16),
+    fontSize: scaleFont(17),
     fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  galleryButtonText: {
-    color: '#000000',
+    color: TEXT_THEME_COLOR,
   },
   uploadButton: {
-    backgroundColor: '#7B61FF',
-    paddingVertical: scaleSize(16),
-    borderRadius: scaleSize(12),
+    backgroundColor: PRIMARY_THEME_COLOR,
+    paddingVertical: scaleSize(18),
+    borderRadius: scaleSize(15),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: scaleSize(12),
-    shadowColor: '#7B61FF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: scaleSize(10),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scaleSize(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scaleSize(6),
+    // elevation: 4,
   },
   disabledButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: CATEGORY_BG_COLOR,
     shadowOpacity: 0,
   },
   uploadButtonText: {
     fontSize: scaleFont(18),
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
     fontWeight: '800',
   },
 });

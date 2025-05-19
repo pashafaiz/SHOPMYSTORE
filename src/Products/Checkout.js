@@ -14,11 +14,14 @@ import {
   FlatList,
   Modal,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import Toast from 'react-native-toast-message';
 import { useSelector, useDispatch } from 'react-redux';
+import RazorpayCheckout from 'react-native-razorpay';
 import {
   fetchCheckoutProductDetails,
   fetchAddresses,
@@ -30,18 +33,14 @@ import {
   setPromoCode,
   setPaymentMethod,
   clearDiscount,
+  createRazorpayOrder,
 } from '../redux/slices/checkoutSlice';
 import Header from '../Components/Header';
-import {
-  TOAST_POSITION,
-  TOAST_TOP_OFFSET,
-  DEFAULT_IMAGE_URL,
-} from '../constants/GlobalConstants';
 
 const { width, height } = Dimensions.get('window');
 const scaleFactor = Math.min(width, 375) / 375;
 const scale = (size) => size * scaleFactor;
-const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375) * 0.75);
+const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375) * 0.85); // Increased multiplier from 0.75 to 0.85
 
 const Checkout = ({ route, navigation }) => {
   const { productId, quantity, size, color } = route.params || {};
@@ -58,6 +57,7 @@ const Checkout = ({ route, navigation }) => {
     error,
   } = useSelector((state) => state.checkout);
   const { userId, token } = useSelector((state) => state.productDetail);
+  const userEmail = useSelector((state) => state.auth?.user?.email) || 'customer@example.com';
 
   const [newAddress, setNewAddress] = useState({
     address: '',
@@ -69,16 +69,14 @@ const Checkout = ({ route, navigation }) => {
   });
   const [isAddressModalVisible, setAddressModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [isPaymentLoading, setPaymentLoading] = useState(false);
+  const [activeSection, setActiveSection] = useState('delivery');
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideUpAnim = useRef(new Animated.Value(50)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
-  const skeletonPulse = useRef(new Animated.Value(0.4)).current;
 
   useEffect(() => {
-    console.log('Checkout: productId=', productId);
-    console.log('Checkout: initial state=', { product, addresses, error });
     if (productId && (!product || product._id !== productId)) {
       dispatch(fetchCheckoutProductDetails({ productId }));
     }
@@ -86,58 +84,33 @@ const Checkout = ({ route, navigation }) => {
   }, [productId, product, dispatch]);
 
   useEffect(() => {
-    // Content animations
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 600,
+        duration: 400,
         useNativeDriver: true,
       }),
       Animated.timing(slideUpAnim, {
         toValue: 0,
-        duration: 600,
+        duration: 400,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 6,
-        tension: 50,
-        useNativeDriver: true,
-      }),
     ]).start();
-
-    // Skeleton loader pulse
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(skeletonPulse, {
-          toValue: 0.8,
-          duration: 1000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(skeletonPulse, {
-          toValue: 0.4,
-          duration: 1000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
 
     if (error) {
       Toast.show({
         type: 'error',
         text1: error,
-        position: TOAST_POSITION,
-        topOffset: TOAST_TOP_OFFSET,
+        position: 'top',
+        topOffset: Platform.OS === 'ios' ? 50 : 30,
       });
     }
-  }, [fadeAnim, slideUpAnim, scaleAnim, skeletonPulse, error]);
+  }, [fadeAnim, slideUpAnim, error]);
 
   const handleButtonPressIn = () => {
     Animated.spring(buttonScale, {
-      toValue: 0.95,
+      toValue: 0.96,
       friction: 8,
       useNativeDriver: true,
     }).start();
@@ -153,7 +126,6 @@ const Checkout = ({ route, navigation }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    console.log('Checkout: Refreshing data');
     await Promise.all([
       dispatch(fetchCheckoutProductDetails({ productId })),
       dispatch(fetchAddresses()),
@@ -165,9 +137,9 @@ const Checkout = ({ route, navigation }) => {
     if (!promoCode.trim()) {
       Toast.show({
         type: 'error',
-        text1: 'Enter a promo code',
-        position: TOAST_POSITION,
-        topOffset: TOAST_TOP_OFFSET,
+        text1: 'Please enter a promo code',
+        position: 'top',
+        topOffset: Platform.OS === 'ios' ? 50 : 30,
       });
       return;
     }
@@ -178,18 +150,9 @@ const Checkout = ({ route, navigation }) => {
     if (!newAddress.address || !newAddress.city || !newAddress.state || !newAddress.zipCode) {
       Toast.show({
         type: 'error',
-        text1: 'Fill all required address fields',
-        position: TOAST_POSITION,
-        topOffset: TOAST_TOP_OFFSET,
-      });
-      return;
-    }
-    if (newAddress.alternatePhone && !/^[6-9]\d{9}$/.test(newAddress.alternatePhone)) {
-      Toast.show({
-        type: 'error',
-        text1: 'Invalid alternate phone number',
-        position: TOAST_POSITION,
-        topOffset: TOAST_TOP_OFFSET,
+        text1: 'Please fill all required fields',
+        position: 'top',
+        topOffset: Platform.OS === 'ios' ? 50 : 30,
       });
       return;
     }
@@ -209,9 +172,9 @@ const Checkout = ({ route, navigation }) => {
     if (addresses.length === 1) {
       Toast.show({
         type: 'error',
-        text1: 'Cannot delete default address',
-        position: TOAST_POSITION,
-        topOffset: TOAST_TOP_OFFSET,
+        text1: 'You must have at least one address',
+        position: 'top',
+        topOffset: Platform.OS === 'ios' ? 50 : 30,
       });
       return;
     }
@@ -221,7 +184,7 @@ const Checkout = ({ route, navigation }) => {
   const calculateTotal = () => {
     if (!product?.price) return 0;
     const subtotal = product.price * quantity;
-    const shipping = 50;
+    const shipping = 50; // Match backend shipping value
     const tax = subtotal * 0.05;
     const discountAmount = subtotal * (discount / 100);
     return (subtotal + shipping + tax - discountAmount).toFixed(2);
@@ -229,7 +192,7 @@ const Checkout = ({ route, navigation }) => {
 
   const getEstimatedDelivery = () => {
     const today = new Date();
-    today.setDate(today.getDate() + 5);
+    today.setDate(today.getDate() + 3);
     return today.toLocaleDateString('en-IN', { weekday: 'long', month: 'short', day: 'numeric' });
   };
 
@@ -237,9 +200,9 @@ const Checkout = ({ route, navigation }) => {
     if (!userId || !token) {
       Toast.show({
         type: 'error',
-        text1: 'Please login',
-        position: TOAST_POSITION,
-        topOffset: TOAST_TOP_OFFSET,
+        text1: 'Please login to continue',
+        position: 'top',
+        topOffset: Platform.OS === 'ios' ? 50 : 30,
       });
       return;
     }
@@ -247,15 +210,36 @@ const Checkout = ({ route, navigation }) => {
     if (!selectedAddressId) {
       Toast.show({
         type: 'error',
-        text1: 'Select a delivery address',
-        position: TOAST_POSITION,
-        topOffset: TOAST_TOP_OFFSET,
+        text1: 'Please select a delivery address',
+        position: 'top',
+        topOffset: Platform.OS === 'ios' ? 50 : 30,
       });
       return;
     }
 
     const selectedAddress = addresses.find((addr) => addr._id === selectedAddressId);
-    const orderData = {
+    if (!selectedAddress) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid address selected',
+        position: 'top',
+        topOffset: Platform.OS === 'ios' ? 50 : 30,
+      });
+      return;
+    }
+
+    if (!paymentMethod) {
+      Toast.show({
+        type: 'error',
+        text1: 'Please select a payment method',
+        position: 'top',
+        topOffset: Platform.OS === 'ios' ? 50 : 30,
+      });
+      return;
+    }
+
+    const total = calculateTotal();
+    let orderData = {
       productId,
       quantity,
       size,
@@ -269,28 +253,101 @@ const Checkout = ({ route, navigation }) => {
       },
       paymentMethod,
       promoCode: discount > 0 ? promoCode : null,
-      total: calculateTotal(),
+      total,
     };
 
-    console.log('Checkout: Placing order with data=', orderData);
-    dispatch(placeOrder(orderData)).then((action) => {
-      console.log('Checkout: placeOrder action=', action);
-      if (action.meta.requestStatus === 'fulfilled') {
-        console.log('Checkout: Navigating to OrderConfirmation with order=', action.payload, 'and product=', product);
-        navigation.navigate('OrderConfirmation', {
-          orderId: action.payload._id,
-          order: action.payload,
-          product: product, // Pass the product details directly
-        });
+    try {
+      setPaymentLoading(true);
+
+      if (paymentMethod !== 'cod') {
+        // Send amount in rupees (backend will convert to paise)
+        const razorpayOrderResponse = await dispatch(
+          createRazorpayOrder({ amount: parseFloat(total) })
+        ).unwrap();
+        const { id: razorpayOrderId, amount: razorpayAmount, currency } = razorpayOrderResponse;
+
+        const options = {
+          key: process.env.RAZORPAY_KEY_ID || 'rzp_test_9r6fi8ChH5mImP', // Use env variable or fallback
+          amount: razorpayAmount.toString(), // Amount in paise from backend
+          currency,
+          order_id: razorpayOrderId,
+          name: 'Premium Store',
+          description: `Order for ${product?.name || 'Product'}`,
+          prefill: {
+            email: userEmail,
+            contact: selectedAddress.alternatePhone || '9999999999',
+          },
+          theme: { color: '#5b9cff' },
+        };
+
+        console.log('Razorpay options:', options);
+
+        RazorpayCheckout.open(options)
+          .then(async (response) => {
+            console.log('Razorpay payment response:', response);
+            const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = response;
+
+            orderData = {
+              ...orderData,
+              razorpayOrderId: razorpay_order_id,
+              razorpayPaymentId: razorpay_payment_id,
+              razorpaySignature: razorpay_signature,
+            };
+
+            const placeOrderAction = await dispatch(placeOrder(orderData)).unwrap();
+            navigation.navigate('OrderConfirmation', {
+              orderId: placeOrderAction._id,
+              order: placeOrderAction,
+              product,
+              address: orderData.address,
+              paymentMethod: orderData.paymentMethod,
+            });
+
+            Toast.show({
+              type: 'success',
+              text1: 'Order placed successfully',
+              position: 'top',
+              topOffset: Platform.OS === 'ios' ? 50 : 30,
+            });
+          })
+          .catch((error) => {
+            console.error('Razorpay payment error:', error);
+            Toast.show({
+              type: 'error',
+              text1: error.description || 'Payment failed. Please try again.',
+              position: 'top',
+              topOffset: Platform.OS === 'ios' ? 50 : 30,
+            });
+            setPaymentLoading(false);
+          });
       } else {
+        const placeOrderAction = await dispatch(placeOrder(orderData)).unwrap();
+        navigation.navigate('OrderConfirmation', {
+          orderId: placeOrderAction._id,
+          order: placeOrderAction,
+          product,
+          address: orderData.address,
+          paymentMethod: orderData.paymentMethod,
+        });
+
         Toast.show({
-          type: 'error',
-          text1: action.payload || 'Failed to place order',
-          position: TOAST_POSITION,
-          topOffset: TOAST_TOP_OFFSET,
+          type: 'success',
+          text1: 'Order placed successfully',
+          position: 'top',
+          topOffset: Platform.OS === 'ios' ? 50 : 30,
         });
       }
-    });
+    } catch (error) {
+      console.error('Confirm order error:', error);
+      Toast.show({
+        type: 'error',
+        text1: error.message || 'Failed to process payment. Please try again.',
+        position: 'top',
+        topOffset: Platform.OS === 'ios' ? 50 : 30,
+      });
+    } finally {
+      setPaymentLoading(false);
+    }
   };
 
   const renderAddressItem = ({ item }) => (
@@ -301,64 +358,98 @@ const Checkout = ({ route, navigation }) => {
       ]}
       onPress={() => dispatch(setSelectedAddressId(item._id))}
     >
-      <LinearGradient
-        colors={selectedAddressId === item._id ? ['#7B61FF', '#AD4DFF'] : ['#1A0B3B', '#2E1A5C']}
-        style={styles.addressGradient}
-      >
-        <View style={styles.addressContent}>
-          <Text style={styles.addressText}>
-            {item.address}, {item.city}, {item.state} - {item.zipCode}
-          </Text>
-          {item.alternatePhone && <Text style={styles.alternatePhone}>Alt: {item.alternatePhone}</Text>}
-          {item.isDefault && <Text style={styles.defaultBadge}>Default</Text>}
-        </View>
+      <View style={styles.addressHeader}>
+        <Text style={styles.addressType}>
+          {item.isDefault ? 'DEFAULT' : 'OTHER'}
+        </Text>
         <TouchableOpacity
           style={styles.deleteAddressButton}
           onPress={() => handleDeleteAddress(item._id)}
         >
-          <Ionicons name="trash-outline" size={scale(16)} color="#FF3E6D" />
+          <Ionicons name="trash-outline" size={scale(18)} color="#ff6b8a" />
         </TouchableOpacity>
-      </LinearGradient>
+      </View>
+      <Text style={styles.addressText}>
+        {item.address}, {item.city}, {item.state} - {item.zipCode}
+      </Text>
+      {item.alternatePhone && (
+        <Text style={styles.alternatePhone}>Alternate Phone: {item.alternatePhone}</Text>
+      )}
+      <View style={styles.addressFooter}>
+        <Ionicons name="location-outline" size={scale(16)} color="#5b9cff" />
+        <Text style={styles.deliveryText}>Delivery by {getEstimatedDelivery()}</Text>
+      </View>
     </TouchableOpacity>
   );
 
-  const renderSkeletonLoader = () => (
-    <Animated.View style={{ opacity: skeletonPulse }}>
-      <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.section}>
-        <Text style={styles.sectionTitle}>Order Summary</Text>
-        <View style={styles.productCard}>
-          <View style={[styles.productImage, styles.skeletonBox]} />
-          <View style={styles.productDetails}>
-            <View style={[styles.skeletonText, { width: '80%', marginBottom: scale(5) }]} />
-            <View style={[styles.skeletonText, { width: '60%', marginBottom: scale(5) }]} />
-            <View style={[styles.skeletonText, { width: '40%' }]} />
-          </View>
+  const renderPaymentMethod = (method) => {
+    let icon, color;
+    switch (method.id) {
+      case 'credit_card':
+        icon = 'credit-card';
+        color = '#5b9cff';
+        break;
+      case 'upi':
+        icon = 'mobile';
+        color = '#6b7280';
+        break;
+      case 'net_banking':
+        icon = 'bank';
+        color = '#3b82f6';
+        break;
+      case 'wallet':
+        icon = 'wallet';
+        color = '#1d4ed8';
+        break;
+      case 'cod':
+        icon = 'money';
+        color = '#2563eb';
+        break;
+      default:
+        icon = 'credit-card';
+        color = '#5b9cff';
+    }
+
+    return (
+      <TouchableOpacity
+        key={method.id}
+        style={[
+          styles.paymentOption,
+          paymentMethod === method.id && styles.paymentOptionSelected,
+        ]}
+        onPress={() => dispatch(setPaymentMethod(method.id))}
+      >
+        <View style={[styles.paymentIconContainer, { backgroundColor: `${color}20` }]}>
+          <FontAwesome name={icon} size={scale(18)} color={color} />
         </View>
-      </LinearGradient>
+        <Text style={styles.paymentOptionText}>{method.label}</Text>
+        {paymentMethod === method.id && (
+          <View style={styles.selectedIndicator}>
+            <Ionicons name="checkmark" size={scale(16)} color="#5b9cff" />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
-      <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.section}>
-        <Text style={styles.sectionTitle}>Delivery Address</Text>
-        <View style={[styles.skeletonBox, { height: scale(60), marginBottom: scale(12) }]} />
-      </LinearGradient>
-
-      <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.section}>
-        <Text style={styles.sectionTitle}>Price Details</Text>
-        <View style={[styles.skeletonText, { width: '100%', marginBottom: scale(10) }]} />
-        <View style={[styles.skeletonText, { width: '100%', marginBottom: scale(10) }]} />
-        <View style={[styles.skeletonText, { width: '100%' }]} />
-      </LinearGradient>
-    </Animated.View>
+  const renderSkeletonLoader = () => (
+    <LinearGradient colors={['#8ec5fc', '#fff']} style={styles.skeletonContainer}>
+      <View style={styles.skeletonHeader} />
+      <View style={styles.skeletonItem} />
+      <View style={styles.skeletonItem} />
+      <View style={styles.skeletonItem} />
+    </LinearGradient>
   );
 
   if (loading && !product && !addresses.length) {
     return (
-      <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.container}>
+      <LinearGradient colors={['#8ec5fc', '#fff']} style={styles.container}>
         <Header
           showLeftIcon={true}
           leftIcon="arrow-back"
           onLeftPress={() => navigation.goBack()}
           title="Checkout"
-          textStyle={{ color: '#FFFFFF' }}
+          textStyle={{ color: '#1a2b4a' }}
         />
         {renderSkeletonLoader()}
       </LinearGradient>
@@ -367,25 +458,23 @@ const Checkout = ({ route, navigation }) => {
 
   if (!product && !loading) {
     return (
-      <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.container}>
+      <LinearGradient colors={['#8ec5fc', '#fff']} style={styles.container}>
         <Header
           showLeftIcon={true}
           leftIcon="arrow-back"
           onLeftPress={() => navigation.goBack()}
           title="Checkout"
-          textStyle={{ color: '#FFFFFF' }}
+          textStyle={{ color: '#1a2b4a' }}
         />
         <View style={styles.errorContainer}>
+          <Ionicons name="warning-outline" size={scale(40)} color="#ff6b8a" />
           <Text style={styles.errorText}>Failed to load checkout details</Text>
           <TouchableOpacity
             style={styles.retryButton}
             onPress={() => dispatch(fetchCheckoutProductDetails({ productId }))}
           >
-            <LinearGradient
-              colors={['#7B61FF', '#AD4DFF']}
-              style={styles.retryButtonGradient}
-            >
-              <Text style={styles.retryButtonText}>Retry</Text>
+            <LinearGradient colors={['#5b9cff', '#3b82f6']} style={styles.retryButtonGradient}>
+              <Text style={styles.retryButtonText}>Try Again</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -394,253 +483,310 @@ const Checkout = ({ route, navigation }) => {
   }
 
   return (
-    <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.container}>
+    <LinearGradient colors={['#8ec5fc', '#fff']} style={styles.container}>
       <Header
         showLeftIcon={true}
         leftIcon="arrow-back"
         onLeftPress={() => navigation.goBack()}
         title="Checkout"
-        textStyle={{ color: '#FFFFFF' }}
+        textStyle={{ color: '#1a2b4a' }}
       />
 
-      <Animated.View style={[styles.content, { opacity: fadeAnim, transform: [{ translateY: slideUpAnim }, { scale: scaleAnim }] }]}>
+      <Animated.View
+        style={[styles.content, { opacity: fadeAnim, transform: [{ translateY: slideUpAnim }] }]}
+      >
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity
+            style={[
+              styles.tabButton,
+              activeSection === 'delivery' && styles.activeTabButton,
+            ]}
+            onPress={() => setActiveSection('delivery')}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeSection === 'delivery' && styles.activeTabText,
+              ]}
+            >
+              Delivery
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.tabButton,
+              activeSection === 'payment' && styles.activeTabButton,
+            ]}
+            onPress={() => setActiveSection('payment')}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeSection === 'payment' && styles.activeTabText,
+              ]}
+            >
+              Payment
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#7B61FF"
-              colors={['#7B61FF', '#AD4DFF']}
+              tintColor="#5b9cff"
+              colors={['#5b9cff']}
             />
           }
         >
-          <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.section}>
-            <Text style={styles.sectionTitle}>Order Summary</Text>
-            <View style={styles.productCard}>
-              <Image
-                source={{ uri: product?.media?.[0]?.url || DEFAULT_IMAGE_URL }}
-                style={styles.productImage}
-                resizeMode="contain"
-              />
-              <View style={styles.productDetails}>
-                <Text style={styles.productName} numberOfLines={2}>{product.name || 'Product'}</Text>
-                <Text style={styles.productPrice}>₹{(product.price * quantity).toFixed(2)}</Text>
-                <Text style={styles.productDetail}>Qty: {quantity}</Text>
-                {size && <Text style={styles.productDetail}>Size: {size}</Text>}
-                {color && <Text style={styles.productDetail}>Color: {color}</Text>}
-              </View>
-            </View>
-            <Text style={styles.deliveryInfo}>Delivery: {getEstimatedDelivery()}</Text>
-          </LinearGradient>
-
-          <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Delivery Address</Text>
-              <TouchableOpacity onPress={() => setAddressModalVisible(true)}>
-                <Text style={styles.addAddressText}>+ Add</Text>
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={addresses}
-              renderItem={renderAddressItem}
-              keyExtractor={(item) => item._id}
-              ListEmptyComponent={<Text style={styles.noAddressText}>Add an address</Text>}
-              scrollEnabled={false}
-            />
-          </LinearGradient>
-
-          <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.section}>
-            <Text style={styles.sectionTitle}>Promo Code</Text>
-            <View style={styles.promoContainer}>
-              <TextInput
-                style={styles.promoInput}
-                placeholder="Enter code (e.g., SAVE10)"
-                placeholderTextColor="#B0B0D0"
-                value={promoCode}
-                onChangeText={(text) => dispatch(setPromoCode(text))}
-              />
-              <TouchableOpacity
-                style={styles.applyButton}
-                onPress={applyPromoCode}
-                onPressIn={handleButtonPressIn}
-                onPressOut={handleButtonPressOut}
-                disabled={isActionLoading}
-              >
-                <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-                  <LinearGradient
-                    colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']}
-                    style={styles.applyButtonGradient}
-                  >
-                    <Text style={styles.applyButtonText}>Apply</Text>
-                  </LinearGradient>
-                </Animated.View>
-              </TouchableOpacity>
-            </View>
-            {discount > 0 && (
-              <Text style={styles.discountText}>{discount}% off applied</Text>
-            )}
-          </LinearGradient>
-
-          <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.section}>
-            <Text style={styles.sectionTitle}>Payment Method</Text>
-            {[
-              { id: 'credit_card', label: 'Card', icon: 'card-outline' },
-              { id: 'upi', label: 'UPI', icon: 'phone-portrait-outline' },
-              { id: 'net_banking', label: 'Net Banking', icon: 'business-outline' },
-              { id: 'wallet', label: 'Wallet', icon: 'wallet-outline' },
-              { id: 'cod', label: 'COD', icon: 'cash-outline' },
-            ].map((method) => (
-              <TouchableOpacity
-                key={method.id}
-                style={[
-                  styles.paymentOption,
-                  paymentMethod === method.id && styles.paymentOptionSelected,
-                ]}
-                onPress={() => dispatch(setPaymentMethod(method.id))}
-              >
-                <Ionicons
-                  name={method.icon}
-                  size={scale(20)}
-                  color={paymentMethod === method.id ? '#7B61FF' : '#FFFFFF'}
+          {activeSection === 'delivery' ? (
+            <>
+              <LinearGradient colors={['#d9e8ff', '#f5f9ff']} style={styles.section}>
+                <Text style={styles.sectionTitle}>Delivery Address</Text>
+                <FlatList
+                  data={addresses}
+                  renderItem={renderAddressItem}
+                  keyExtractor={(item) => item._id}
+                  ListEmptyComponent={
+                    <Text style={styles.noAddressText}>No addresses saved</Text>
+                  }
+                  scrollEnabled={false}
                 />
-                <Text
-                  style={[
-                    styles.paymentOptionText,
-                    paymentMethod === method.id && styles.paymentOptionTextSelected,
-                  ]}
+                <TouchableOpacity
+                  style={styles.addAddressButton}
+                  onPress={() => setAddressModalVisible(true)}
                 >
-                  {method.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </LinearGradient>
+                  <LinearGradient colors={['#5b9cff', '#3b82f6']} style={styles.addAddressButtonGradient}>
+                    <Text style={styles.addAddressButtonText}>+ Add New Address</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </LinearGradient>
 
-          <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.section}>
-            <Text style={styles.sectionTitle}>Price Details</Text>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Subtotal</Text>
-              <Text style={styles.totalValue}>₹{(product.price * quantity).toFixed(2)}</Text>
-            </View>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Shipping</Text>
-              <Text style={styles.totalValue}>₹50.00</Text>
-            </View>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Tax</Text>
-              <Text style={styles.totalValue}>₹{(product.price * quantity * 0.05).toFixed(2)}</Text>
-            </View>
-            {discount > 0 && (
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Discount</Text>
-                <Text style={[styles.totalValue, styles.discountValue]}>-₹{(product.price * quantity * (discount / 100)).toFixed(2)}</Text>
-              </View>
-            )}
-            <View style={[styles.totalRow, styles.totalRowFinal]}>
-              <Text style={[styles.totalLabel, styles.totalLabelFinal]}>Total</Text>
-              <Text style={[styles.totalValue, styles.totalValueFinal]}>₹{calculateTotal()}</Text>
-            </View>
-          </LinearGradient>
+              <LinearGradient colors={['#d9e8ff', '#f5f9ff']} style={styles.section}>
+                <Text style={styles.sectionTitle}>Order Summary</Text>
+                <View style={styles.productCard}>
+                  <Image
+                    source={{ uri: product?.media?.[0]?.url }}
+                    style={styles.productImage}
+                    resizeMode="contain"
+                  />
+                  <View style={styles.productDetails}>
+                    <Text style={styles.productName} numberOfLines={2}>
+                      {product?.name || 'Product'}
+                    </Text>
+                    <Text style={styles.productPrice}>
+                      ₹{(product?.price * quantity || 0).toFixed(2)}
+                    </Text>
+                    <View style={styles.productMeta}>
+                      <Text style={styles.productMetaText}>Qty: {quantity}</Text>
+                      {size && (
+                        <Text style={styles.productMetaText}>Size: {size}</Text>
+                      )}
+                      {color && (
+                        <Text style={styles.productMetaText}>Color: {color}</Text>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              </LinearGradient>
+            </>
+          ) : (
+            <>
+              <LinearGradient colors={['#d9e8ff', '#f5f9ff']} style={styles.section}>
+                <Text style={styles.sectionTitle}>Select Payment Method</Text>
+                {[
+                  { id: 'credit_card', label: 'Credit/Debit Card' },
+                  { id: 'upi', label: 'UPI' },
+                  { id: 'net_banking', label: 'Net Banking' },
+                  { id: 'wallet', label: 'Wallet' },
+                  { id: 'cod', label: 'Cash on Delivery' },
+                ].map((method) => renderPaymentMethod(method))}
+              </LinearGradient>
+
+              <LinearGradient colors={['#d9e8ff', '#f5f9ff']} style={styles.section}>
+                <Text style={styles.sectionTitle}>Apply Promo Code</Text>
+                <View style={styles.promoContainer}>
+                  <TextInput
+                    style={styles.promoInput}
+                    placeholder="Enter promo code"
+                    placeholderTextColor="#5a6b8a"
+                    value={promoCode}
+                    onChangeText={(text) => dispatch(setPromoCode(text))}
+                  />
+                  <TouchableOpacity
+                    style={styles.applyButton}
+                    onPress={applyPromoCode}
+                    onPressIn={handleButtonPressIn}
+                    onPressOut={handleButtonPressOut}
+                    disabled={isActionLoading}
+                  >
+                    <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                      <LinearGradient  colors={['#5b9cff', '#5b9cff']}style={styles.applyButtonGradient}>
+                        <Text style={styles.applyButtonText}>APPLY</Text>
+                      </LinearGradient>
+                    </Animated.View>
+                  </TouchableOpacity>
+                </View>
+                {discount > 0 && (
+                  <View style={styles.discountApplied}>
+                    <Ionicons name="checkmark-circle" size={scale(18)} color="#ff6b8a" />
+                    <Text style={styles.discountText}>
+                      {discount}% discount applied
+                    </Text>
+                  </View>
+                )}
+              </LinearGradient>
+
+              <LinearGradient colors={['#d9e8ff', '#f5f9ff']} style={styles.section}>
+                <Text style={styles.sectionTitle}>Price Details</Text>
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>Subtotal</Text>
+                  <Text style={styles.priceValue}>
+                    ₹{(product?.price * quantity || 0).toFixed(2)}
+                  </Text>
+                </View>
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>Delivery</Text>
+                  <Text style={styles.priceValue}>₹50.00</Text>
+                </View>
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>Tax (5%)</Text>
+                  <Text style={styles.priceValue}>
+                    ₹{(product?.price * quantity * 0.05 || 0).toFixed(2)}
+                  </Text>
+                </View>
+                {discount > 0 && (
+                  <View style={styles.priceRow}>
+                    <Text style={styles.priceLabel}>Discount</Text>
+                    <Text style={[styles.priceValue, styles.discountValue]}>
+                      -₹{(product?.price * quantity * (discount / 100) || 0).toFixed(2)}
+                    </Text>
+                  </View>
+                )}
+                <View style={[styles.priceRow, styles.totalRow]}>
+                  <Text style={styles.totalLabel}>Total Amount</Text>
+                  <Text style={styles.totalValue}>₹{calculateTotal()}</Text>
+                </View>
+              </LinearGradient>
+            </>
+          )}
         </ScrollView>
 
-
- <TouchableOpacity
-          style={styles.confirmButton}
-          onPress={handleConfirmOrder}
-          onPressIn={handleButtonPressIn}
-          onPressOut={handleButtonPressOut}
-          disabled={isActionLoading}
-        >
-          <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-            <LinearGradient
-              colors={['#7B61FF', '#AD4DFF']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.buttonGradient}
-            >
-              <Text style={styles.continueButtonText}>Place Order</Text>
-            </LinearGradient>
-          </Animated.View>
-        </TouchableOpacity>
-
-
+        <LinearGradient colors={['#d9e8ff', '#f5f9ff']} style={styles.footer}>
+          <View style={styles.priceSummary}>
+            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalPrice}>₹{calculateTotal()}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.confirmButton}
+            onPress={handleConfirmOrder}
+            onPressIn={handleButtonPressIn}
+            onPressOut={handleButtonPressOut}
+            disabled={isActionLoading || isPaymentLoading || !selectedAddressId}
+          >
+            <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+              <LinearGradient  colors={['#5b9cff', '#5b9cff']} style={styles.confirmButtonGradient}>
+                <Text style={styles.confirmButtonText}>
+                  {isPaymentLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    'PLACE ORDER'
+                  )}
+                </Text>
+              </LinearGradient>
+            </Animated.View>
+          </TouchableOpacity>
+        </LinearGradient>
       </Animated.View>
 
       <Modal
         visible={isAddressModalVisible}
         animationType="slide"
-        transparent={true}
+        transparent={false}
         onRequestClose={() => setAddressModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
-          <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add Address</Text>
+        <LinearGradient colors={['#8ec5fc', '#fff']} style={styles.modalContainer}>
+          <Header
+            showLeftIcon={true}
+            leftIcon="close"
+            onLeftPress={() => setAddressModalVisible(false)}
+            title="Add New Address"
+            textStyle={{ color: '#1a2b4a' }}
+          />
+          <ScrollView contentContainerStyle={styles.modalScrollContainer}>
             <TextInput
-              style={styles.input}
+              style={styles.modalInput}
               placeholder="Street Address"
-              placeholderTextColor="#B0B0D0"
+              placeholderTextColor="#5a6b8a"
               value={newAddress.address}
               onChangeText={(text) => setNewAddress({ ...newAddress, address: text })}
             />
             <View style={styles.inputRow}>
               <TextInput
-                style={[styles.input, styles.inputHalf]}
+                style={[styles.modalInput, styles.halfInput]}
                 placeholder="City"
-                placeholderTextColor="#B0B0D0"
+                placeholderTextColor="#5a6b8a"
                 value={newAddress.city}
                 onChangeText={(text) => setNewAddress({ ...newAddress, city: text })}
               />
               <TextInput
-                style={[styles.input, styles.inputHalf]}
+                style={[styles.modalInput, styles.halfInput]}
                 placeholder="State"
-                placeholderTextColor="#B0B0D0"
+                placeholderTextColor="#5a6b8a"
                 value={newAddress.state}
                 onChangeText={(text) => setNewAddress({ ...newAddress, state: text })}
               />
             </View>
             <View style={styles.inputRow}>
               <TextInput
-                style={[styles.input, styles.inputHalf]}
+                style={[styles.modalInput, styles.halfInput]}
                 placeholder="Zip Code"
-                placeholderTextColor="#B0B0D0"
+                placeholderTextColor="#5a6b8a"
                 value={newAddress.zipCode}
                 onChangeText={(text) => setNewAddress({ ...newAddress, zipCode: text })}
                 keyboardType="numeric"
               />
               <TextInput
-                style={[styles.input, styles.inputHalf]}
-                placeholder="Alt. Phone (Optional)"
-                placeholderTextColor="#B0B0D0"
+                style={[styles.modalInput, styles.halfInput]}
+                placeholder="Alternate Phone (Optional)"
+                placeholderTextColor="#5a6b8a"
                 value={newAddress.alternatePhone}
                 onChangeText={(text) => setNewAddress({ ...newAddress, alternatePhone: text })}
                 keyboardType="phone-pad"
                 maxLength={10}
               />
             </View>
-            <View style={styles.modalButtons}>
+            <View style={styles.defaultAddressContainer}>
+              <Text style={styles.defaultAddressText}>Set as default address</Text>
               <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setAddressModalVisible(false)}
+                onPress={() =>
+                  setNewAddress({ ...newAddress, isDefault: !newAddress.isDefault })
+                }
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.submitButton}
-                onPress={handleAddAddress}
-                onPressIn={handleButtonPressIn}
-                onPressOut={handleButtonPressOut}
-                disabled={isActionLoading}
-              >
-                <LinearGradient
-                  colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']}
-                  style={styles.submitButtonGradient}
-                >
-                  <Text style={styles.submitButtonText}>Add</Text>
-                </LinearGradient>
+                <Ionicons
+                  name={newAddress.isDefault ? 'checkbox' : 'square-outline'}
+                  size={scale(26)}
+                  color={newAddress.isDefault ? '#5b9cff' : '#5a6b8a'}
+                />
               </TouchableOpacity>
             </View>
-          </LinearGradient>
-        </View>
+          </ScrollView>
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleAddAddress}
+              disabled={isActionLoading}
+            >
+              <LinearGradient colors={['#5b9cff', '#3b82f6']} style={styles.saveButtonGradient}>
+                <Text style={styles.saveButtonText}>
+                  {isActionLoading ? 'Saving...' : 'SAVE ADDRESS'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
       </Modal>
     </LinearGradient>
   );
@@ -653,124 +799,156 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  tabsContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(91, 156, 255, 0.3)',
+    marginHorizontal: scale(16),
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: scale(15),
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTabButton: {
+    borderBottomColor: '#5b9cff',
+  },
+  tabText: {
+    fontSize: scaleFont(16), // Increased from 14
+    fontWeight: '600',
+    color: '#5a6b8a',
+  },
+  activeTabText: {
+    color: '#5b9cff',
+  },
   scrollContainer: {
     padding: scale(16),
     paddingBottom: scale(100),
   },
   section: {
-    borderRadius: scale(10),
+    backgroundColor: '#d9e8ff',
+    borderRadius: scale(12),
     padding: scale(16),
     marginBottom: scale(16),
     borderWidth: 1,
-    borderColor: 'rgba(123, 97, 255, 0.2)',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    shadowColor: '#7B61FF',
-    shadowOffset: { width: 0, height: scale(3) },
-    shadowOpacity: 0.4,
-    shadowRadius: scale(6),
-    elevation: 6,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: scale(12),
+    borderColor: 'rgba(91, 156, 255, 0.3)',
   },
   sectionTitle: {
-    fontSize: scaleFont(15),
+    fontSize: scaleFont(20), // Increased from 16
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#1a2b4a',
+    marginBottom: scale(16),
   },
-  addAddressText: {
-    fontSize: scaleFont(11),
+  addressCard: {
+    backgroundColor: '#f5f9ff',
+    borderRadius: scale(12),
+    padding: scale(16),
+    marginBottom: scale(12),
+    borderWidth: 1,
+    borderColor: 'rgba(91, 156, 255, 0.3)',
+  },
+  addressCardSelected: {
+    borderColor: '#5b9cff',
+    backgroundColor: 'rgba(91, 156, 255, 0.2)',
+  },
+  addressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: scale(8),
+  },
+  addressType: {
+    fontSize: scaleFont(12), // Increased from 10
+    fontWeight: '700',
+    color: '#5b9cff',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  addressText: {
+    fontSize: scaleFont(15), // Increased from 13
+    color: '#1a2b4a',
+    marginBottom: scale(4),
+    lineHeight: scale(20),
+  },
+  alternatePhone: {
+    fontSize: scaleFont(14), // Increased from 12
+    color: '#5a6b8a',
+    marginBottom: scale(12),
+  },
+  addressFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: scale(8),
+  },
+  deliveryText: {
+    fontSize: scaleFont(14), // Increased from 12
+    color: '#5a6b8a',
+    marginLeft: scale(6),
+  },
+  deleteAddressButton: {
+    padding: scale(4),
+  },
+  noAddressText: {
+    fontSize: scaleFont(15), // Increased from 13
+    color: '#5a6b8a',
+    textAlign: 'center',
+    marginVertical: scale(16),
+  },
+  addAddressButton: {
+    borderRadius: scale(8),
+    overflow: 'hidden',
+    marginTop: scale(8),
+  },
+  addAddressButtonGradient: {
+    padding: scale(14),
+    alignItems: 'center',
+  },
+  addAddressButtonText: {
+    fontSize: scaleFont(16), // Increased from 14
     fontWeight: '600',
-    color: '#7B61FF',
+    color: '#ffffff',
   },
   productCard: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderRadius: scale(8),
-    padding: scale(14),
-    marginBottom: scale(12),
+    backgroundColor: '#f5f9ff',
+    borderRadius: scale(12),
+    padding: scale(12),
     borderWidth: 1,
-    borderColor: 'rgba(123, 97, 255, 0.1)',
+    borderColor: 'rgba(91, 156, 255, 0.3)',
   },
   productImage: {
-    width: scale(60),
-    height: scale(60),
-    borderRadius: scale(6),
-    marginRight: scale(14),
-    backgroundColor: '#F0F0F0',
+    width: scale(80),
+    height: scale(80),
+    borderRadius: scale(8),
+    marginRight: scale(16),
+    backgroundColor: 'rgba(91, 156, 255, 0.2)',
   },
   productDetails: {
     flex: 1,
     justifyContent: 'center',
   },
   productName: {
-    fontSize: scaleFont(13),
+    fontSize: scaleFont(16), // Increased from 14
     fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: scale(5),
+    color: '#1a2b4a',
+    marginBottom: scale(6),
   },
   productPrice: {
-    fontSize: scaleFont(13),
+    fontSize: scaleFont(18), // Increased from 15
     fontWeight: '700',
-    color: '#7B61FF',
-    marginBottom: scale(5),
+    color: '#5b9cff',
+    marginBottom: scale(8),
   },
-  productDetail: {
-    fontSize: scaleFont(11),
-    color: '#B0B0D0',
-    marginBottom: scale(3),
-  },
-  deliveryInfo: {
-    fontSize: scaleFont(11),
-    color: '#00C4B4',
-    fontWeight: '600',
-    textAlign: 'center',
-    marginTop: scale(10),
-  },
-  addressCard: {
-    borderRadius: scale(8),
-    marginBottom: scale(12),
-    overflow: 'hidden',
-  },
-  addressGradient: {
-    padding: scale(14),
+  productMeta: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
   },
-  addressCardSelected: {
-    borderWidth: 1,
-    borderColor: '#7B61FF',
-  },
-  addressContent: {
-    flex: 1,
+  productMetaText: {
+    fontSize: scaleFont(14), // Increased from 12
+    color: '#5a6b8a',
     marginRight: scale(12),
-  },
-  addressText: {
-    fontSize: scaleFont(11),
-    color: '#FFFFFF',
-    marginBottom: scale(3),
-  },
-  alternatePhone: {
-    fontSize: scaleFont(11),
-    color: '#B0B0D0',
-    marginBottom: scale(3),
-  },
-  defaultBadge: {
-    fontSize: scaleFont(10),
-    color: '#00C4B4',
-    fontWeight: '600',
-  },
-  deleteAddressButton: {
-    padding: scale(10),
-  },
-  noAddressText: {
-    fontSize: scaleFont(11),
-    color: '#B0B0D0',
-    textAlign: 'center',
-    marginVertical: scale(12),
+    marginBottom: scale(4),
   },
   promoContainer: {
     flexDirection: 'row',
@@ -779,110 +957,147 @@ const styles = StyleSheet.create({
   },
   promoInput: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    backgroundColor: '#f5f9ff',
     borderWidth: 1,
-    borderColor: 'rgba(123, 97, 255, 0.1)',
-    borderRadius: scale(6),
-    padding: scale(12),
-    fontSize: scaleFont(11),
-    color: '#FFFFFF',
+    borderColor: 'rgba(91, 156, 255, 0.3)',
+    borderRadius: scale(8),
+    padding: scale(14),
+    fontSize: scaleFont(15), // Increased from 13
+    color: '#1a2b4a',
     marginRight: scale(12),
   },
   applyButton: {
-    borderRadius: scale(6),
+    borderRadius: scale(8),
     overflow: 'hidden',
   },
   applyButtonGradient: {
-    paddingVertical: scale(12),
-    paddingHorizontal: scale(16),
+    paddingVertical: scale(14),
+    paddingHorizontal: scale(20),
     alignItems: 'center',
   },
   applyButtonText: {
-    fontSize: scaleFont(11),
-    color: '#FFFFFF',
-    fontWeight: '600',
+    fontSize: scaleFont(15), // Increased from 13
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  discountApplied: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: scale(8),
   },
   discountText: {
-    fontSize: scaleFont(11),
-    color: '#00C4B4',
-    fontWeight: '600',
+    fontSize: scaleFont(15), // Increased from 13
+    color: '#ff6b8a',
+    marginLeft: scale(6),
   },
   paymentOption: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: scale(14),
-    borderRadius: scale(6),
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: scale(8),
+    backgroundColor: '#f5f9ff',
     marginBottom: scale(10),
     borderWidth: 1,
-    borderColor: 'rgba(123, 97, 255, 0.1)',
+    borderColor: 'rgba(91, 156, 255, 0.3)',
   },
   paymentOptionSelected: {
-    borderColor: '#7B61FF',
-    backgroundColor: 'rgba(123, 97, 255, 0.1)',
+    borderColor: '#5b9cff',
+    backgroundColor: 'rgba(91, 156, 255, 0.2)',
+  },
+  paymentIconContainer: {
+    width: scale(32),
+    height: scale(32),
+    borderRadius: scale(16),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: scale(12),
   },
   paymentOptionText: {
-    fontSize: scaleFont(11),
-    color: '#FFFFFF',
-    marginLeft: scale(16),
+    fontSize: scaleFont(16), // Increased from 14
+    color: '#1a2b4a',
+    flex: 1,
   },
-  paymentOptionTextSelected: {
-    color: '#7B61FF',
-    fontWeight: '600',
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: scale(10),
-  },
-  totalRowFinal: {
-    marginTop: scale(12),
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(123, 97, 255, 0.2)',
-    paddingTop: scale(10),
-  },
-  totalLabel: {
-    fontSize: scaleFont(11),
-    color: '#B0B0D0',
-  },
-  totalLabelFinal: {
-    fontSize: scaleFont(13),
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  totalValue: {
-    fontSize: scaleFont(11),
-    color: '#FFFFFF',
-  },
-  totalValueFinal: {
-    fontSize: scaleFont(13),
-    fontWeight: '700',
-    color: '#7B61FF',
-  },
-  discountValue: {
-    color: '#00C4B4',
-  },
-  confirmButton: {
-    position: 'absolute',
-    bottom: scale(16),
-    left: scale(35),
-    right: scale(35),
+  selectedIndicator: {
+    width: scale(20),
+    height: scale(20),
     borderRadius: scale(10),
-    overflow: 'hidden',
-    shadowColor: '#7B61FF',
-    shadowOffset: { width: 0, height: scale(3) },
-    shadowOpacity: 0.4,
-    shadowRadius: scale(6),
-    elevation: 6,
-  },
-  buttonGradient: {
-    paddingVertical: scale(14),
+    backgroundColor: '#f5f9ff',
+    borderWidth: 1,
+    borderColor: '#5b9cff',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  confirmButtonText: {
-    fontSize: scaleFont(13),
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: scale(12),
+  },
+  totalRow: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(91, 156, 255, 0.3)',
+    paddingTop: scale(12),
+    marginTop: scale(4),
+  },
+  priceLabel: {
+    fontSize: scaleFont(15), // Increased from 13
+    color: '#5a6b8a',
+  },
+  priceValue: {
+    fontSize: scaleFont(15), // Increased from 13
+    color: '#1a2b4a',
+    fontWeight: '500',
+  },
+  totalLabel: {
+    fontSize: scaleFont(16), // Increased from 14
+    color: '#1a2b4a',
+    fontWeight: '600',
+  },
+  totalValue: {
+    fontSize: scaleFont(16), // Increased from 14
+    color: '#5b9cff',
     fontWeight: '700',
-    color: '#FFFFFF',
+  },
+  discountValue: {
+    color: '#ff6b8a',
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: scale(16),
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(91, 156, 255, 0.3)',
+  },
+  priceSummary: {
+    flex: 1,
+  },
+  totalPrice: {
+    fontSize: scaleFont(20), // Increased from 18
+    fontWeight: '700',
+    color: '#5b9cff',
+    marginTop: scale(4),
+  },
+  confirmButton: {
+    borderRadius: scale(8),
+    overflow: 'hidden',
+    flex: 1,
+    marginLeft: scale(16),
+  },
+  confirmButtonGradient: {
+    paddingVertical: scale(16),
+    paddingHorizontal: scale(24),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmButtonText: {
+    fontSize: scaleFont(16), // Increased from 14
+    fontWeight: '700',
+    color: '#fff',
+    textTransform: 'uppercase',
   },
   errorContainer: {
     flex: 1,
@@ -891,100 +1106,91 @@ const styles = StyleSheet.create({
     padding: scale(16),
   },
   errorText: {
-    fontSize: scaleFont(13),
-    color: '#FFFFFF',
+    fontSize: scaleFont(18), // Increased from 16
+    color: '#1a2b4a',
     marginBottom: scale(20),
+    marginTop: scale(16),
     textAlign: 'center',
   },
   retryButton: {
-    borderRadius: scale(10),
+    borderRadius: scale(8),
     overflow: 'hidden',
   },
   retryButtonGradient: {
     paddingVertical: scale(14),
     paddingHorizontal: scale(40),
-    alignItems: 'center',
   },
   retryButtonText: {
-    fontSize: scaleFont(13),
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: scaleFont(16), // Increased from 14
+    fontWeight: '600',
+    color: '#fff',
   },
   modalContainer: {
     flex: 1,
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: scale(20),
   },
-  modalContent: {
-    borderRadius: scale(10),
-    padding: scale(20),
-    backgroundColor: '#1A0B3B',
+  modalScrollContainer: {
+    padding: scale(16),
   },
-  modalTitle: {
-    fontSize: scaleFont(15),
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: scale(16),
-  },
-  input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  modalInput: {
+    backgroundColor: '#f5f9ff',
     borderWidth: 1,
-    borderColor: 'rgba(123, 97, 255, 0.1)',
-    borderRadius: scale(6),
-    padding: scale(12),
-    fontSize: scaleFont(11),
-    color: '#FFFFFF',
-    marginBottom: scale(12),
+    borderColor: 'rgba(91, 156, 255, 0.3)',
+    borderRadius: scale(8),
+    padding: scale(14),
+    fontSize: scaleFont(15), // Increased from 13
+    color: '#1a2b4a',
+    marginBottom: scale(16),
   },
   inputRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  inputHalf: {
+  halfInput: {
     width: '48%',
   },
-  modalButtons: {
+  defaultAddressContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: scale(16),
-  },
-  cancelButton: {
-    flex: 1,
-    borderRadius: scale(6),
-    borderWidth: 1,
-    borderColor: 'rgba(123, 97, 255, 0.1)',
-    paddingVertical: scale(12),
     alignItems: 'center',
-    marginRight: scale(10),
+    marginBottom: scale(16),
   },
-  cancelButtonText: {
-    fontSize: scaleFont(11),
-    color: '#FFFFFF',
-    fontWeight: '600',
+  defaultAddressText: {
+    fontSize: scaleFont(16), // Increased from 14
+    color: '#1a2b4a',
   },
-  submitButton: {
-    flex: 1,
-    borderRadius: scale(6),
+  modalFooter: {
+    padding: scale(16),
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(91, 156, 255, 0.3)',
+  },
+  saveButton: {
+    borderRadius: scale(8),
     overflow: 'hidden',
   },
-  submitButtonGradient: {
-    paddingVertical: scale(12),
-    alignItems: 'center',
+  saveButtonGradient: {
+    padding: scale(16),
   },
-  submitButtonText: {
-    fontSize: scaleFont(11),
-    color: '#FFFFFF',
-    fontWeight: '600',
+  saveButtonText: {
+    fontSize: scaleFont(16), // Increased from 14
+    fontWeight: '700',
+    color: '#fff',
+    textTransform: 'uppercase',
   },
-  skeletonBox: {
-    backgroundColor: 'rgba(123, 97, 255, 0.1)',
+  skeletonContainer: {
+    flex: 1,
+    padding: scale(16),
+  },
+  skeletonHeader: {
+    height: scale(40),
+    backgroundColor: 'rgba(91, 156, 255, 0.2)',
     borderRadius: scale(8),
+    marginBottom: scale(16),
   },
-  skeletonText: {
-    backgroundColor: 'rgba(123, 97, 255, 0.1)',
-    height: scale(12),
-    borderRadius: scale(4),
+  skeletonItem: {
+    height: scale(100),
+    backgroundColor: 'rgba(91, 156, 255, 0.2)',
+    borderRadius: scale(8),
+    marginBottom: scale(16),
   },
 });
 

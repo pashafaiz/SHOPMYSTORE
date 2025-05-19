@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useContext, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -17,20 +17,32 @@ import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../redux/slices/profileSlice';
 import Trace from '../utils/Trace';
 import Header from '../Components/Header';
-import { ThemeContext } from '../constants/ThemeContext';
 import FastImage from 'react-native-fast-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
-const scaleFactor = width / 375;
-const scale = size => size * scaleFactor;
-const scaleFont = size => Math.round(size * (Math.min(width, height) / 375));
+const scaleFactor = Math.min(width, 375) / 375;
+const scale = (size) => Math.round(size * scaleFactor);
+const scaleFont = (size) => {
+  const fontScale = Math.min(width, height) / 375;
+  const scaledSize = size * fontScale * (Platform.OS === 'ios' ? 0.9 : 0.85);
+  return Math.round(scaledSize);
+};
+
+// Theme constants
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
 
 const Settings = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
-  const { theme, isDarkMode, toggleTheme } = useContext(ThemeContext);
-  const { user } = useSelector((state) => state.auth); // Access user from auth slice
+  const { user } = useSelector((state) => state.auth);
   const [userData, setUserData] = useState({
     name: 'Guest',
     email: '',
@@ -40,19 +52,16 @@ const Settings = () => {
   const slideUpAnim = useRef(new Animated.Value(50)).current;
   const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(false);
 
-  // Fetch user data from Redux or AsyncStorage
   useEffect(() => {
     const loadUserData = async () => {
       try {
         if (user?.fullName && user?.email) {
-          // Use Redux data if available
           setUserData({
             name: user.fullName || 'Guest',
             email: user.email || '',
             profileImage: user.profileImage || null,
           });
         } else {
-          // Fallback to AsyncStorage
           const storedUser = await AsyncStorage.getItem('user');
           if (storedUser) {
             const parsedUser = JSON.parse(storedUser);
@@ -90,10 +99,10 @@ const Settings = () => {
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [fadeAnim, slideUpAnim]);
 
   const handleToggleNotifications = () => {
-    setIsNotificationsEnabled(prev => !prev);
+    setIsNotificationsEnabled((prev) => !prev);
   };
 
   const handleNavigation = (screen) => {
@@ -132,7 +141,7 @@ const Settings = () => {
     };
 
     return (
-      <Animated.View style={[styles.settingItem(theme), { transform: [{ scale: scaleAnim }] }]}>
+      <Animated.View style={[styles.settingItem, { transform: [{ scale: scaleAnim }] }]}>
         <TouchableOpacity
           style={styles.settingItemContent}
           onPressIn={onPressIn}
@@ -140,24 +149,24 @@ const Settings = () => {
           onPress={onPress}
         >
           <LinearGradient
-            colors={['rgba(123, 97, 255, 0.2)', 'rgba(173, 77, 255, 0.2)']}
+            colors={[CATEGORY_BG_COLOR, CATEGORY_BG_COLOR]}
             style={styles.settingItemGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
             <View style={styles.settingItemLeft}>
-              <Icon name={icon} size={scale(20)} color={theme.textTertiary} style={styles.settingIcon} />
-              <Text style={[styles.settingText, { color: theme.textPrimary }]}>{title}</Text>
+              <Icon name={icon} size={scale(20)} color={SUBTEXT_THEME_COLOR} style={styles.settingIcon} />
+              <Text style={styles.settingText}>{title}</Text>
             </View>
             {isToggle ? (
               <Switch
                 value={toggleValue}
                 onValueChange={toggleAction}
-                trackColor={{ false: theme.textMuted, true: '#AD4DFF' }}
-                thumbColor={toggleValue ? '#7B61FF' : theme.textPrimary}
+                trackColor={{ false: CATEGORY_BG_COLOR, true: PRIMARY_THEME_COLOR }}
+                thumbColor={toggleValue ? TEXT_THEME_COLOR : PRODUCT_BG_COLOR}
               />
             ) : (
-              <Icon name="chevron-right" size={scale(20)} color={theme.textTertiary} />
+              <Icon name="chevron-right" size={scale(20)} color={SUBTEXT_THEME_COLOR} />
             )}
           </LinearGradient>
         </TouchableOpacity>
@@ -165,16 +174,15 @@ const Settings = () => {
     );
   };
 
-  // Default profile image
   const defaultProfileImage = 'https://via.placeholder.com/100';
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.containerBg }]}>
+    <View style={styles.container}>
       <LinearGradient
-        colors={theme.background}
+        colors={BACKGROUND_GRADIENT}
         style={styles.backgroundGradient}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        end={{ x: 0, y: 1 }}
       />
       <Animated.View
         style={[styles.mainContainer, { opacity: fadeAnim, transform: [{ translateY: slideUpAnim }] }]}
@@ -184,15 +192,16 @@ const Settings = () => {
           leftIcon="arrow-back"
           onLeftPress={() => navigation.goBack()}
           title="Settings"
-          textStyle={{ color: theme.textPrimary }}
+          textStyle={styles.headerText}
+          containerStyle={styles.headerContainer}
         />
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.profileSection(theme)}>
+          <View style={styles.profileSection}>
             <LinearGradient
-              colors={['#7B61FF', '#AD4DFF']}
+              colors={['#5b9cff', '#8ec5fc']}
               style={styles.profileIconContainer}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
@@ -206,14 +215,12 @@ const Settings = () => {
                 }}
               />
             </LinearGradient>
-            <Text style={[styles.profileName, { color: theme.textPrimary }]}>{userData.name}</Text>
-            <Text style={[styles.profileEmail, { color: theme.textSecondary }]}>
-              {userData.email || 'No email provided'}
-            </Text>
+            <Text style={styles.profileName}>{userData.name}</Text>
+            <Text style={styles.profileEmail}>{userData.email || 'No email provided'}</Text>
           </View>
 
-          <View style={styles.settingsSection(theme)}>
-            <Text style={[styles.sectionTitle, { color: theme.textTertiary }]}>General Settings</Text>
+          <View style={styles.settingsSection}>
+            <Text style={styles.sectionTitle}>General Settings</Text>
             {renderSettingItem(
               'notifications',
               'Notifications',
@@ -222,30 +229,22 @@ const Settings = () => {
               isNotificationsEnabled,
               handleToggleNotifications
             )}
-            {renderSettingItem(
-              'dark-mode',
-              'Dark Mode',
-              null,
-              true,
-              isDarkMode,
-              toggleTheme
-            )}
             {renderSettingItem('language', 'Language', () => handleNavigation('ChangeLanguage'))}
             {renderSettingItem('privacy', 'Privacy', () => handleNavigation('Privacy'))}
           </View>
 
-          <View style={styles.accountSection(theme)}>
-            <Text style={[styles.sectionTitle, { color: theme.textTertiary }]}>Account</Text>
+          <View style={styles.accountSection}>
+            <Text style={styles.sectionTitle}>Account</Text>
             {renderSettingItem('lock', 'Change Password', () => handleNavigation('ForgotPassword'))}
             {renderSettingItem('help', 'Help & Support', () => handleNavigation('Support'))}
             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
               <LinearGradient
-                colors={['#EF4444', '#F87171']}
+                colors={['#ff6b8a', '#ff8b9a']}
                 style={styles.logoutGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
-                <Icon name="exit-to-app" size={scale(18)} color="#FFFFFF" style={styles.menuIcon} />
+                <Icon name="exit-to-app" size={scale(18)} color={TEXT_THEME_COLOR} style={styles.menuIcon} />
                 <Text style={styles.logoutText}>Logout</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -259,6 +258,7 @@ const Settings = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: PRODUCT_BG_COLOR,
   },
   backgroundGradient: {
     position: 'absolute',
@@ -270,89 +270,132 @@ const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
   },
+  headerContainer: {
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(20),
+    padding: scale(15),
+    margin: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    elevation: 5,
+  },
+  headerText: {
+    fontSize: scaleFont(20),
+    fontWeight: '700',
+    color: TEXT_THEME_COLOR,
+    textAlign: 'center',
+  },
   scrollContainer: {
     paddingHorizontal: scale(20),
-    paddingBottom: scale(30),
+    paddingBottom: scale(40),
     flexGrow: 1,
-    marginTop: scale(30),
+    marginTop: scale(20),
   },
-  profileSection: theme => ({
+  profileSection: {
     alignItems: 'center',
     marginBottom: scale(30),
-    padding: scale(16),
-    backgroundColor: theme.glassBg,
-    borderRadius: scale(16),
-    borderWidth: 1,
-    borderColor: theme.glassBorder,
-  }),
+    padding: scale(20),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    // elevation: 5,
+  },
   profileIconContainer: {
-    width: scale(80),
-    height: scale(80),
-    borderRadius: scale(40),
+    width: scale(90),
+    height: scale(90),
+    borderRadius: scale(45),
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: scale(16),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   profileImage: {
-    width: scale(80),
-    height: scale(80),
-    borderRadius: scale(40),
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
+    width: scale(90),
+    height: scale(90),
+    borderRadius: scale(45),
+    borderWidth: scale(2),
+    borderColor: PRODUCT_BG_COLOR,
   },
   profileName: {
-    fontSize: scaleFont(24),
+    fontSize: scaleFont(22),
     fontWeight: '800',
+    color: TEXT_THEME_COLOR,
     marginBottom: scale(8),
     textAlign: 'center',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   profileEmail: {
     fontSize: scaleFont(14),
-    marginBottom: scale(16),
+    color: SUBTEXT_THEME_COLOR,
     textAlign: 'center',
-    opacity: 0.9,
+    fontWeight: '500',
   },
-  settingsSection: theme => ({
+  settingsSection: {
     marginBottom: scale(30),
-    padding: scale(12),
-    backgroundColor: theme.glassBg,
-    borderRadius: scale(16),
-    borderWidth: 1,
-    borderColor: theme.glassBorder,
-  }),
-  accountSection: theme => ({
+    padding: scale(20),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    // elevation: 5,
+  },
+  accountSection: {
     marginBottom: scale(30),
-    padding: scale(12),
-    backgroundColor: theme.glassBg,
-    borderRadius: scale(16),
-    borderWidth: 1,
-    borderColor: theme.glassBorder,
-  }),
+    padding: scale(20),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    // elevation: 5,
+  },
   sectionTitle: {
-    fontSize: scaleFont(20),
+    fontSize: scaleFont(18),
     fontWeight: '700',
+    color: TEXT_THEME_COLOR,
     marginBottom: scale(16),
     letterSpacing: 0.5,
   },
-  settingItem: theme => ({
-    marginBottom: scale(8),
-    borderRadius: scale(12),
+  settingItem: {
+    marginBottom: scale(12),
+    borderRadius: scale(16),
     overflow: 'hidden',
-    backgroundColor: theme.glassBg,
-    borderWidth: 1,
-    borderColor: theme.glassBorder,
-  }),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale(6),
+    // elevation: 3,
+  },
   settingItemContent: {
-    borderRadius: scale(12),
-    minHeight: scale(48),
+    borderRadius: scale(16),
+    minHeight: scale(56),
   },
   settingItemGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: scale(12),
+    padding: scale(14),
     justifyContent: 'space-between',
-    minHeight: scale(48),
+    minHeight: scale(56),
   },
   settingItemLeft: {
     flexDirection: 'row',
@@ -363,25 +406,31 @@ const styles = StyleSheet.create({
     marginRight: scale(12),
   },
   settingText: {
-    fontSize: scaleFont(14),
-    fontWeight: '700',
+    fontSize: scaleFont(16),
+    fontWeight: '600',
+    color: TEXT_THEME_COLOR,
     flex: 1,
-    lineHeight: scale(20),
+    lineHeight: scale(22),
   },
   logoutButton: {
-    marginTop: scale(8),
-    borderRadius: scale(12),
+    marginTop: scale(12),
+    borderRadius: scale(16),
     overflow: 'hidden',
+    shadowColor: SECONDARY_THEME_COLOR,
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.3,
+    shadowRadius: scale(8),
+    elevation: 5,
   },
   logoutGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: scale(12),
+    paddingVertical: scale(14),
     paddingHorizontal: scale(18),
   },
   logoutText: {
-    fontSize: scaleFont(14),
-    color: '#FFFFFF',
+    fontSize: scaleFont(16),
+    color: TEXT_THEME_COLOR,
     fontWeight: '700',
   },
   menuIcon: {

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,7 @@ import {
   TouchableOpacity,
   FlatList,
   Image,
-  Animated,
   Platform,
-  Easing,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Toast from 'react-native-toast-message';
@@ -34,16 +32,21 @@ const scaleFont = (size) => {
   return Math.round(scaledSize);
 };
 
+// Theme constants
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)';
+const SELECTED_CATEGORY_BG_COLOR = '#5b9cff';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
+
 const OrderHistory = ({ navigation }) => {
   const dispatch = useDispatch();
   const ordersState = useSelector((state) => state.orders) || { orders: [], loading: false, error: null };
   const { orders, loading, error } = ordersState;
-
-  // Animations
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const buttonScale = useRef(new Animated.Value(1)).current;
-  const skeletonPulse = useRef(new Animated.Value(0.4)).current;
-  const shimmerAnim = useRef(new Animated.Value(0)).current;
 
   // State for dimensions
   const [dimensions, setDimensions] = useState({ width, height });
@@ -79,57 +82,6 @@ const OrderHistory = ({ navigation }) => {
 
     checkTokenAndFetch();
 
-    // Fade-in animation
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 1000,
-      easing: Easing.out(Easing.exp),
-      useNativeDriver: true,
-    }).start();
-
-    // Button pulse animation
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(buttonScale, {
-          toValue: 1.1,
-          duration: 1500,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(buttonScale, {
-          toValue: 1,
-          duration: 1500,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    // Skeleton pulse
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(skeletonPulse, {
-          toValue: 0.7,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(skeletonPulse, {
-          toValue: 0.4,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    // Shimmer animation
-    Animated.loop(
-      Animated.timing(shimmerAnim, {
-        toValue: 1,
-        duration: 1200,
-        useNativeDriver: true,
-      })
-    ).start();
-
     if (error) {
       Toast.show({
         type: 'error',
@@ -138,81 +90,32 @@ const OrderHistory = ({ navigation }) => {
         topOffset: TOAST_TOP_OFFSET,
       });
     }
-  }, [error, dispatch, navigation, fadeAnim, buttonScale, skeletonPulse, shimmerAnim]);
+  }, [error, dispatch, navigation]);
 
   const handleRetry = () => {
     dispatch(fetchOrders());
   };
 
-  const handleButtonPressIn = (anim) => {
-    Animated.spring(anim, {
-      toValue: 0.9,
-      friction: 4,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const handleButtonPressOut = (anim) => {
-    Animated.spring(anim, {
-      toValue: 1,
-      friction: 4,
-      useNativeDriver: true,
-    }).start();
-  };
-
   const renderSkeletonLoader = () => {
-    const shimmerTranslate = shimmerAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [-dimensions.width, dimensions.width],
-    });
-
     return (
       <View>
         {[...Array(3)].map((_, index) => (
-          <Animated.View
-            style={[styles.orderCard, { opacity: skeletonPulse }]}
-            key={`skeleton-${index}`}
-          >
-            <LinearGradient
-              colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']}
-              style={[styles.orderImage, styles.skeletonBox]}
-            />
+          <View style={styles.orderCard} key={`skeleton-${index}`}>
+            <View style={[styles.orderImageContainer, styles.skeletonBox]} />
             <View style={styles.orderDetails}>
-              <View style={[styles.skeletonText, { width: '80%', marginBottom: scale(8) }]} />
-              <View style={[styles.skeletonText, { width: '60%', marginBottom: scale(8) }]} />
-              <View style={[styles.skeletonText, { width: '40%', marginBottom: scale(8) }]} />
+              <View style={[styles.skeletonText, { width: '80%', marginBottom: scale(12) }]} />
+              <View style={[styles.skeletonText, { width: '60%', marginBottom: scale(12) }]} />
+              <View style={[styles.skeletonText, { width: '40%', marginBottom: scale(12) }]} />
               <View style={[styles.skeletonText, { width: '70%' }]} />
-              <Animated.View
-                style={[
-                  styles.shimmerOverlay,
-                  { transform: [{ translateX: shimmerTranslate }] },
-                ]}
-              />
             </View>
-          </Animated.View>
+          </View>
         ))}
       </View>
     );
   };
 
-  const renderOrderItem = ({ item, index }) => {
-    const cardFadeAnim = new Animated.Value(0);
-    const cardTranslateY = new Animated.Value(20);
-
-    Animated.parallel([
-      Animated.timing(cardFadeAnim, {
-        toValue: 1,
-        duration: 600 + index * 200,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(cardTranslateY, {
-        toValue: 0,
-        duration: 600 + index * 200,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start();
+  const renderOrderItem = ({ item }) => {
+    const imageUrl = item.product?.media?.[0]?.url || DEFAULT_IMAGE_URL;
 
     const orderDate = new Date(item.createdAt).toLocaleDateString('en-IN', {
       weekday: 'short',
@@ -239,97 +142,100 @@ const OrderHistory = ({ navigation }) => {
         onPress={() => navigation.navigate('OrderConfirmation', { orderId: item._id, order: item })}
         activeOpacity={0.8}
       >
-          <LinearGradient
-            colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']}
-            style={styles.orderGradient}
-          >
+        <View style={styles.orderContent}>
+          <View style={styles.orderImageContainer}>
             <Image
-              source={{ uri: item.product?.media?.[0]?.url || DEFAULT_IMAGE_URL }}
+              source={{ uri: imageUrl }}
               style={styles.orderImage}
               resizeMode="cover"
             />
-            <View style={styles.orderDetails}>
-              <Text style={styles.orderTitle} numberOfLines={2}>
-                {item.product?.name || 'Unknown Product'}
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusText}>
+                {status}
               </Text>
-              <Text style={styles.orderPrice}>₹{(item.total || 0).toFixed(2)}</Text>
+            </View>
+          </View>
+          <View style={styles.orderDetails}>
+            <Text style={styles.orderTitle} numberOfLines={2}>
+              {item.product?.name || 'Unknown Product'}
+            </Text>
+            <Text style={styles.orderPrice}>₹{(item.total || 0).toFixed(2)}</Text>
+            <View style={styles.orderInfoRow}>
               <Text style={styles.orderDetail}>Qty: {item.quantity || 'N/A'}</Text>
               {item.size && <Text style={styles.orderDetail}>Size: {item.size}</Text>}
               {item.color && <Text style={styles.orderDetail}>Color: {item.color}</Text>}
-              <Text style={styles.orderDetail}>Payment: {paymentMethod}</Text>
-              <Text style={[styles.orderDetail, { color: status === 'Delivered' ? '#00C4B4' : '#FF6B6B' }]}>
-                Status: {status}
-              </Text>
-              <Text style={styles.orderDetail} numberOfLines={2}>
-                Address: {addressText}
-              </Text>
-              <Text style={styles.orderDate}>Ordered: {orderDate}</Text>
             </View>
-          </LinearGradient>
+            <Text style={styles.orderDetail}>Payment: {paymentMethod}</Text>
+            <Text style={styles.orderDetail} numberOfLines={2}>
+              Address: {addressText}
+            </Text>
+            <Text style={styles.orderDate}>Ordered: {orderDate}</Text>
+          </View>
+        </View>
       </TouchableOpacity>
     );
   };
 
   if (loading) {
     return (
-      <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.container}>
+      <LinearGradient colors={BACKGROUND_GRADIENT} style={styles.container} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}>
         <Header
           showLeftIcon={true}
           leftIcon="arrow-back"
           onLeftPress={() => navigation.goBack()}
           title="Order History"
           textStyle={styles.headerText}
+          containerStyle={styles.headerContainer}
         />
         {renderSkeletonLoader()}
       </LinearGradient>
     );
   }
 
-  const retryButtonScale = new Animated.Value(1);
-  const shopButtonScale = new Animated.Value(1);
-
   return (
-    <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.container}>
+    <LinearGradient colors={BACKGROUND_GRADIENT} style={styles.container} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}>
       <Header
         showLeftIcon={true}
         leftIcon="arrow-back"
         onLeftPress={() => navigation.goBack()}
         title="Order History"
         textStyle={styles.headerText}
+        containerStyle={styles.headerContainer}
       />
-      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+      <View style={styles.content}>
         {error ? (
           <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={scale(80)} color={SECONDARY_THEME_COLOR} style={styles.errorIcon} />
             <Text style={styles.errorText}>Failed to load orders</Text>
             <TouchableOpacity
               style={styles.retryButton}
               onPress={handleRetry}
-              onPressIn={() => handleButtonPressIn(retryButtonScale)}
-              onPressOut={() => handleButtonPressOut(retryButtonScale)}
             >
               <LinearGradient
-                colors={['#7B61FF', '#4A2A8D']}
-                style={[styles.buttonGradient, { transform: [{ scale: retryButtonScale }, { scale: buttonScale }] }]}
+                colors={['#5b9cff', '#8ec5fc']}
+                style={styles.buttonGradientInner}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
               >
-                <Text style={styles.retryButtonText}>Retry</Text>
+                <Text style={styles.buttonText}>Retry</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
         ) : orders.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Ionicons name="cart-outline" size={scale(80)} color="#B0B0D0" style={styles.emptyIcon} />
+            <Ionicons name="cart-outline" size={scale(100)} color={SUBTEXT_THEME_COLOR} style={styles.emptyIcon} />
             <Text style={styles.emptyText}>Your order history is empty</Text>
             <TouchableOpacity
               style={styles.shopButton}
               onPress={() => navigation.navigate('HomeScreen')}
-              onPressIn={() => handleButtonPressIn(shopButtonScale)}
-              onPressOut={() => handleButtonPressOut(shopButtonScale)}
             >
               <LinearGradient
-                colors={['#7B61FF', '#4A2A8D']}
-                style={[styles.buttonGradient, { transform: [{ scale: shopButtonScale }, { scale: buttonScale }] }]}
+                colors={['#5b9cff', '#8ec5fc']}
+                style={styles.buttonGradientInner}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
               >
-                <Text style={styles.shopButtonText}>Start Shopping</Text>
+                <Text style={styles.buttonText}>Start Shopping</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -342,7 +248,7 @@ const OrderHistory = ({ navigation }) => {
             showsVerticalScrollIndicator={false}
           />
         )}
-      </Animated.View>
+      </View>
     </LinearGradient>
   );
 };
@@ -350,49 +256,81 @@ const OrderHistory = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: PRODUCT_BG_COLOR,
+  },
+  headerContainer: {
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(20),
+    padding: scale(15),
+    margin: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
   },
   headerText: {
-    fontSize: scaleFont(26),
+    fontSize: scaleFont(24),
     fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 1.2,
-    textShadowColor: 'rgba(123, 97, 255, 0.6)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+    color: TEXT_THEME_COLOR,
+    letterSpacing: 0.8,
+    textAlign: 'center',
   },
   content: {
     flex: 1,
-    paddingHorizontal: scale(16),
+    paddingHorizontal: scale(20),
     paddingTop: scale(12),
   },
   listContainer: {
-    paddingBottom: scale(30),
+    paddingBottom: scale(40),
   },
   orderCard: {
-    borderRadius: scale(20),
-    marginBottom: scale(16),
+    borderRadius: scale(28),
+    marginBottom: scale(20),
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(123, 97, 255, 0.4)',
-    shadowColor: '#7B61FF',
-    shadowOffset: { width: 0, height: scale(6) },
-    shadowOpacity: 0.6,
-    shadowRadius: scale(10),
-    // elevation: 10,
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    backgroundColor: PRODUCT_BG_COLOR,
   },
-  orderGradient: {
+  orderContent: {
     flexDirection: 'row',
-    padding: scale(14),
+    padding: scale(20),
+  },
+  orderImageContainer: {
+    width: scale(140),
+    height: scale(140),
     borderRadius: scale(20),
+    overflow: 'hidden',
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    position: 'relative',
+    marginRight: scale(20),
   },
   orderImage: {
-    width: scale(100),
-    height: scale(100),
-    borderRadius: scale(14),
-    marginRight: scale(14),
-    backgroundColor: '#2E1A5C',
-    borderWidth: 1,
-    borderColor: 'rgba(123, 97, 255, 0.5)',
+    width: scale(140),
+    height: scale(140),
+    borderRadius: scale(20),
+  },
+  statusBadge: {
+    position: 'absolute',
+    top: scale(8),
+    right: scale(8),
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(12),
+    paddingVertical: scale(4),
+    paddingHorizontal: scale(12),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+  },
+  statusText: {
+    fontSize: scaleFont(12),
+    fontWeight: '600',
+    color: TEXT_THEME_COLOR,
   },
   orderDetails: {
     flex: 1,
@@ -401,25 +339,31 @@ const styles = StyleSheet.create({
   orderTitle: {
     fontSize: scaleFont(18),
     fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: scale(6),
+    color: TEXT_THEME_COLOR,
+    marginBottom: scale(8),
     letterSpacing: 0.5,
   },
   orderPrice: {
     fontSize: scaleFont(20),
     fontWeight: '800',
-    color: '#7B61FF',
-    marginBottom: scale(6),
+    color: TEXT_THEME_COLOR,
+    marginBottom: scale(8),
+  },
+  orderInfoRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: scale(8),
   },
   orderDetail: {
     fontSize: scaleFont(14),
-    color: '#B0B0D0',
+    color: SUBTEXT_THEME_COLOR,
+    marginRight: scale(12),
     marginBottom: scale(4),
     fontWeight: '500',
   },
   orderDate: {
-    fontSize: scaleFont(14),
-    color: '#00C4B4',
+    fontSize: scaleFont(12),
+    color: SUBTEXT_THEME_COLOR,
     fontWeight: '600',
     marginTop: scale(4),
   },
@@ -429,28 +373,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: scale(20),
   },
+  errorIcon: {
+    marginBottom: scale(20),
+    opacity: 0.8,
+  },
   errorText: {
     fontSize: scaleFont(20),
-    color: '#FFFFFF',
-    marginBottom: scale(20),
+    color: SECONDARY_THEME_COLOR,
+    marginBottom: scale(24),
     textAlign: 'center',
     fontWeight: '600',
   },
   retryButton: {
-    borderRadius: scale(14),
+    borderRadius: scale(20),
     overflow: 'hidden',
+    shadowColor: PRIMARY_THEME_COLOR,
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.3,
+    shadowRadius: scale(8),
+    elevation: 5,
   },
-  buttonGradient: {
-    paddingVertical: scale(12),
-    paddingHorizontal: scale(36),
+  buttonGradientInner: {
+    paddingVertical: scale(16),
+    paddingHorizontal: scale(40),
     alignItems: 'center',
-    borderRadius: scale(14),
+    borderRadius: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
-  retryButtonText: {
-    fontSize: scaleFont(18),
+  buttonText: {
+    fontSize: scaleFont(16),
     fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 1,
+    color: TEXT_THEME_COLOR,
+    letterSpacing: 0.8,
   },
   emptyContainer: {
     flex: 1,
@@ -464,38 +419,28 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: scaleFont(20),
-    color: '#B0B0D0',
-    marginBottom: scale(20),
+    color: TEXT_THEME_COLOR,
+    marginBottom: scale(24),
     textAlign: 'center',
     fontWeight: '600',
   },
   shopButton: {
-    borderRadius: scale(14),
+    borderRadius: scale(20),
     overflow: 'hidden',
-  },
-  shopButtonText: {
-    fontSize: scaleFont(18),
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 1,
+    shadowColor: PRIMARY_THEME_COLOR,
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.3,
+    shadowRadius: scale(8),
+    elevation: 5,
   },
   skeletonBox: {
-    backgroundColor: 'rgba(123, 97, 255, 0.2)',
-    borderRadius: scale(14),
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(20),
   },
   skeletonText: {
-    backgroundColor: 'rgba(123, 97, 255, 0.2)',
-    height: scale(12),
-    borderRadius: scale(4),
-  },
-  shimmerOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    width: scale(120),
+    backgroundColor: CATEGORY_BG_COLOR,
+    height: scale(16),
+    borderRadius: scale(8),
   },
 });
 

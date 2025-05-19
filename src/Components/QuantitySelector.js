@@ -1,6 +1,18 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+
+// Define theme colors (move to GlobalConstants.js if possible)
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+
+const { width, height } = Dimensions.get('window');
+const scaleFactor = width / 375;
+const scale = (size) => size * scaleFactor;
+const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375));
 
 const QuantitySelector = ({ quantity, onIncrement, onDecrement }) => {
   return (
@@ -14,8 +26,8 @@ const QuantitySelector = ({ quantity, onIncrement, onDecrement }) => {
         >
           <Icon
             name="remove"
-            size={20}
-            color={quantity <= 1 ? '#2A2A5A' : '#A78BFA'}
+            size={scale(20)}
+            color={quantity <= 1 ? SUBTEXT_THEME_COLOR : PRIMARY_THEME_COLOR}
           />
         </TouchableOpacity>
         <Text style={styles.quantity}>{quantity}</Text>
@@ -26,8 +38,8 @@ const QuantitySelector = ({ quantity, onIncrement, onDecrement }) => {
         >
           <Icon
             name="add"
-            size={20}
-            color={quantity >= 10 ? '#2A2A5A' : '#A78BFA'}
+            size={scale(20)}
+            color={quantity >= 10 ? SUBTEXT_THEME_COLOR : PRIMARY_THEME_COLOR}
           />
         </TouchableOpacity>
       </View>
@@ -37,34 +49,37 @@ const QuantitySelector = ({ quantity, onIncrement, onDecrement }) => {
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 10,
+    marginVertical: scale(10),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(8),
+    padding: scale(10),
   },
   title: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: 10,
+    color: TEXT_THEME_COLOR,
+    marginBottom: scale(10),
   },
   quantityContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#2A2A5A',
-    borderRadius: 8,
+    borderWidth: scale(1),
+    borderColor: BORDER_THEME_COLOR,
+    borderRadius: scale(8),
     alignSelf: 'flex-start',
   },
   button: {
-    width: 40,
-    height: 40,
+    width: scale(40),
+    height: scale(40),
     justifyContent: 'center',
     alignItems: 'center',
   },
   quantity: {
-    width: 40,
+    width: scale(40),
     textAlign: 'center',
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
   },
 });
 

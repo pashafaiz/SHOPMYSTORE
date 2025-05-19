@@ -1,20 +1,21 @@
+import img from '../assets/Images/img';
 
 
 export const sliderData = [
     {
         id: '1',
         title: "Buy. Sell. Groups \nAll in one \nMarketplace",
-        image: require('../assets/communication.png'),
+        image:img.banner,
     },
     {
         id: '2',
         title: "Buy. Sell. Groups \nAll in one \nMarketplace",
-        image: require('../assets/communication.png'),
+        image: img.banner1
     },
     {
         id: '3',
         title: "Buy. Sell. Groups \nAll in one \nMarketplace",
-        image: require('../assets/communication.png'),
+        image: img.banner2
     },
 ];
 

@@ -18,15 +18,15 @@ import {
   TOAST_TOP_OFFSET,
   DEFAULT_IMAGE_URL,
 } from '../constants/GlobalConstants';
+import Trace from '../utils/Trace';
 
 const { width, height } = Dimensions.get('window');
 const scaleFactor = Math.min(width, 375) / 375;
 const scale = (size) => size * scaleFactor;
-const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375) * 0.75);
+const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375) * 0.85); 
 
 const OrderConfirmation = ({ route, navigation }) => {
-  const { orderId, order: passedOrder, product: passedProduct } = route.params || {};
-
+  const { orderId, order: passedOrder, product: passedProduct, address, paymentMethod } = route.params || {};
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
@@ -40,8 +40,11 @@ const OrderConfirmation = ({ route, navigation }) => {
     console.log('OrderConfirmation: orderId=', orderId);
     console.log('OrderConfirmation: passedOrder=', JSON.stringify(passedOrder, null, 2));
     console.log('OrderConfirmation: passedProduct=', JSON.stringify(passedProduct, null, 2));
+    console.log('OrderConfirmation: address=', JSON.stringify(address, null, 2));
+    console.log('OrderConfirmation: paymentMethod=', paymentMethod);
     console.log('OrderConfirmation: selected order=', JSON.stringify(order, null, 2));
     console.log('OrderConfirmation: selected product=', JSON.stringify(product, null, 2));
+    Trace("---adreesss---->", route?.params);
 
     // Content animations
     Animated.parallel([
@@ -92,7 +95,7 @@ const OrderConfirmation = ({ route, navigation }) => {
   // Check if order or orderId is missing
   if (!order || !orderId) {
     return (
-      <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.container}>
+      <LinearGradient colors={['#8ec5fc', '#fff']} style={styles.container}>
         <Header
           showLeftIcon={true}
           leftIcon="arrow-back"
@@ -101,7 +104,7 @@ const OrderConfirmation = ({ route, navigation }) => {
             navigation.goBack();
           }}
           title="Order Confirmation"
-          textStyle={{ color: '#FFFFFF' }}
+          textStyle={{ color: '#1a2b4a' }}
         />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Order details not found</Text>
@@ -110,7 +113,7 @@ const OrderConfirmation = ({ route, navigation }) => {
             onPress={() => navigation.goBack()}
           >
             <LinearGradient
-              colors={['#7B61FF', '#AD4DFF']}
+              colors={['#5b9cff', '#3b82f6']}
               style={styles.buttonGradient}
             >
               <Text style={styles.retryButtonText}>Go Back</Text>
@@ -150,23 +153,26 @@ const OrderConfirmation = ({ route, navigation }) => {
     ? order.product.price
     : (order.total - 50 - (order.total - 50) * 0.05) / (order.quantity || 1);
 
-  // Safely handle address
-  const addressText = order.address
-    ? typeof order.address === 'string'
-      ? order.address
-      : typeof order.address === 'object'
-      ? [
-          order.address.address || '',
-          order.address.city || '',
-          order.address.state || '',
-          order.address.zipCode || ''
-        ].filter(Boolean).join(', ') || 'Address not provided'
-      : 'Address not provided'
+  // Safely handle address from route.params
+  const addressText = address && typeof address === 'object'
+    ? [
+        address.address || '',
+        address.city || '',
+        address.state || '',
+        address.zipCode || '',
+      ].filter(Boolean).join(', ')
     : 'Address not provided';
 
-  // Safely handle payment method
-  const formattedPaymentMethod = order.paymentMethod && typeof order.paymentMethod === 'string'
-    ? order.paymentMethod.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+  // Safely handle payment method from route.params
+  const paymentMethodDisplay = {
+    credit_card: 'Credit/Debit Card',
+    upi: 'UPI',
+    net_banking: 'Net Banking',
+    wallet: 'Wallet',
+    cod: 'Cash on Delivery',
+  };
+  const formattedPaymentMethod = paymentMethod && typeof paymentMethod === 'string'
+    ? paymentMethodDisplay[paymentMethod] || paymentMethod.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())
     : 'Not Specified';
 
   const discount = order.promoCode && typeof order.promoCode === 'string' ? 10 : 0;
@@ -174,7 +180,7 @@ const OrderConfirmation = ({ route, navigation }) => {
   const total = typeof order.total === 'number' ? order.total : parseFloat(order.total) || 0;
 
   return (
-    <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.container}>
+    <LinearGradient colors={['#8ec5fc', '#fff']} style={styles.container}>
       <Header
         showLeftIcon={true}
         leftIcon="arrow-back"
@@ -183,7 +189,7 @@ const OrderConfirmation = ({ route, navigation }) => {
           navigation.goBack();
         }}
         title="Order Confirmation"
-        textStyle={{ color: '#FFFFFF' }}
+        textStyle={{ color: '#1a2b4a' }}
       />
 
       <Animated.View
@@ -197,8 +203,8 @@ const OrderConfirmation = ({ route, navigation }) => {
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {/* Success Message */}
-          <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.section}>
-            <Ionicons name="checkmark-circle" size={scale(60)} color="#00C4B4" style={styles.successIcon} />
+          <LinearGradient colors={['#d9e8ff', '#f5f9ff']} style={styles.section}>
+            <Ionicons name="checkmark-circle" size={scale(60)} color="#ff6b8a" style={styles.successIcon} />
             <Text style={styles.successTitle}>Order Confirmed!</Text>
             <Text style={styles.orderId}>Order ID: {order._id}</Text>
             <Text style={styles.successMessage}>
@@ -207,7 +213,7 @@ const OrderConfirmation = ({ route, navigation }) => {
           </LinearGradient>
 
           {/* Order Summary */}
-          <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.section}>
+          <LinearGradient colors={['#d9e8ff', '#f5f9ff']} style={styles.section}>
             <Text style={styles.sectionTitle}>Order Summary</Text>
             <View style={styles.productCard}>
               <Image
@@ -230,18 +236,18 @@ const OrderConfirmation = ({ route, navigation }) => {
           </LinearGradient>
 
           {/* Delivery Address */}
-          <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.section}>
+          <LinearGradient colors={['#d9e8ff', '#f5f9ff']} style={styles.section}>
             <Text style={styles.sectionTitle}>Delivery Address</Text>
             <Text style={styles.addressText}>
               {addressText}
             </Text>
-            {order.address && typeof order.address === 'object' && order.address.alternatePhone && (
-              <Text style={styles.alternatePhone}>Alt: {order.address.alternatePhone}</Text>
+            {address && typeof address === 'object' && address.alternatePhone && (
+              <Text style={styles.alternatePhone}>Alt: {address.alternatePhone}</Text>
             )}
           </LinearGradient>
 
           {/* Payment Details */}
-          <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.section}>
+          <LinearGradient colors={['#d9e8ff', '#f5f9ff']} style={styles.section}>
             <Text style={styles.sectionTitle}>Payment Details</Text>
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Payment Method</Text>
@@ -286,16 +292,12 @@ const OrderConfirmation = ({ route, navigation }) => {
           style={styles.continueButton}
           onPress={handleContinueShopping}
         >
-          <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
             <LinearGradient
-              colors={['#7B61FF', '#AD4DFF']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+               colors={['#5b9cff', '#5b9cff']}
               style={styles.buttonGradient}
             >
               <Text style={styles.continueButtonText}>Continue Shopping</Text>
             </LinearGradient>
-          </Animated.View>
         </TouchableOpacity>
       </Animated.View>
     </LinearGradient>
@@ -318,90 +320,90 @@ const styles = StyleSheet.create({
     padding: scale(16),
     marginBottom: scale(16),
     borderWidth: 1,
-    borderColor: 'rgba(123, 97, 255, 0.2)',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    shadowColor: '#7B61FF',
+    borderColor: 'rgba(91, 156, 255, 0.3)',
+    backgroundColor: '#f5f9ff',
+    shadowColor: 'rgba(0, 0, 0, 0.1)',
     shadowOffset: { width: 0, height: scale(3) },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.2,
     shadowRadius: scale(6),
-    elevation: 6,
+    elevation: 4,
   },
   successIcon: {
     alignSelf: 'center',
     marginBottom: scale(12),
   },
   successTitle: {
-    fontSize: scaleFont(20),
+    fontSize: scaleFont(24), 
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#1a2b4a',
     textAlign: 'center',
     marginBottom: scale(8),
   },
   orderId: {
-    fontSize: scaleFont(12),
+    fontSize: scaleFont(14), 
     fontWeight: '600',
-    color: '#B0B0D0',
+    color: '#5a6b8a',
     textAlign: 'center',
     marginBottom: scale(12),
   },
   successMessage: {
-    fontSize: scaleFont(12),
+    fontSize: scaleFont(14), 
     fontWeight: '400',
-    color: '#E5E7EB',
+    color: '#5a6b8a',
     textAlign: 'center',
-    lineHeight: scale(18),
+    lineHeight: scale(20),
   },
   sectionTitle: {
-    fontSize: scaleFont(17),
+    fontSize: scaleFont(20), 
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#1a2b4a',
     marginBottom: scale(12),
   },
   productCard: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    backgroundColor: '#f5f9ff',
     borderRadius: scale(8),
     padding: scale(14),
     marginBottom: scale(12),
     borderWidth: 1,
-    borderColor: 'rgba(123, 97, 255, 0.1)',
+    borderColor: 'rgba(91, 156, 255, 0.3)',
   },
   productImage: {
-    width: scale(60),
-    height: scale(60),
+    width: scale(70), // Slightly increased
+    height: scale(70),
     borderRadius: scale(6),
     marginRight: scale(14),
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#e5e7eb',
   },
   productDetails: {
     flex: 1,
     justifyContent: 'center',
   },
   productName: {
-    fontSize: scaleFont(15),
+    fontSize: scaleFont(18), 
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#1a2b4a',
     marginBottom: scale(5),
   },
   productPrice: {
-    fontSize: scaleFont(15),
+    fontSize: scaleFont(18), 
     fontWeight: '700',
-    color: '#7B61FF',
+    color: '#5b9cff',
     marginBottom: scale(5),
   },
   productDetail: {
-    fontSize: scaleFont(13),
-    color: '#B0B0D0',
+    fontSize: scaleFont(15), 
+    color: '#5a6b8a',
     marginBottom: scale(3),
   },
   addressText: {
-    fontSize: scaleFont(13),
-    color: '#FFFFFF',
+    fontSize: scaleFont(15), 
+    color: '#1a2b4a',
     marginBottom: scale(3),
   },
   alternatePhone: {
-    fontSize: scaleFont(13),
-    color: '#B0B0D0',
+    fontSize: scaleFont(15), 
+    color: '#5a6b8a',
     marginBottom: scale(3),
   },
   totalRow: {
@@ -412,29 +414,29 @@ const styles = StyleSheet.create({
   totalRowFinal: {
     marginTop: scale(12),
     borderTopWidth: 1,
-    borderTopColor: 'rgba(123, 97, 255, 0.2)',
+    borderTopColor: 'rgba(91, 156, 255, 0.3)',
     paddingTop: scale(10),
   },
   totalLabel: {
-    fontSize: scaleFont(13),
-    color: '#B0B0D0',
+    fontSize: scaleFont(15), 
+    color: '#5a6b8a',
   },
   totalLabelFinal: {
-    fontSize: scaleFont(15),
+    fontSize: scaleFont(18), 
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#1a2b4a',
   },
   totalValue: {
-    fontSize: scaleFont(12),
-    color: '#FFFFFF',
+    fontSize: scaleFont(15), 
+    color: '#1a2b4a',
   },
   totalValueFinal: {
-    fontSize: scaleFont(15),
+    fontSize: scaleFont(18), 
     fontWeight: '700',
-    color: '#7B61FF',
+    color: '#5b9cff',
   },
   discountValue: {
-    color: '#00C4B4',
+    color: '#ff6b8a',
   },
   continueButton: {
     position: 'absolute',
@@ -443,18 +445,18 @@ const styles = StyleSheet.create({
     right: scale(35),
     borderRadius: scale(10),
     overflow: 'hidden',
-    shadowColor: '#7B61FF',
+    shadowColor: 'rgba(0, 0, 0, 0.1)',
     shadowRadius: scale(6),
-    elevation: 6,
+    elevation: 4,
   },
   buttonGradient: {
     paddingVertical: scale(14),
     alignItems: 'center',
   },
   continueButtonText: {
-    fontSize: scaleFont(15),
+    fontSize: scaleFont(18), 
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#ffffff',
   },
   errorContainer: {
     flex: 1,
@@ -463,8 +465,8 @@ const styles = StyleSheet.create({
     padding: scale(16),
   },
   errorText: {
-    fontSize: scaleFont(13),
-    color: '#FFFFFF',
+    fontSize: scaleFont(16), 
+    color: '#1a2b4a',
     marginBottom: scale(20),
     textAlign: 'center',
   },
@@ -474,9 +476,9 @@ const styles = StyleSheet.create({
     marginBottom: scale(10),
   },
   retryButtonText: {
-    fontSize: scaleFont(13),
+    fontSize: scaleFont(16), 
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#ffffff',
     paddingVertical: scale(14),
     textAlign: 'center',
   },

@@ -1,11 +1,10 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef } from 'react';
 import {
   FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  Keyboard,
   Dimensions,
   ScrollView,
   RefreshControl,
@@ -17,10 +16,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Header from '../Components/Header';
 import { categoryData, sliderData } from '../constants/Dummy_Data';
-import Colors from '../constants/Colors';
-import Filterbar from '../Components/Filterbar';
 import Strings from '../constants/Strings';
-// import ProductModal from '../Products/ProductModal';
 import Toast from 'react-native-toast-message';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import AntDesign from 'react-native-vector-icons/AntDesign';
@@ -31,21 +27,26 @@ import {
   fetchProducts,
   submitProduct,
   deleteProduct,
-  setSearch,
-  selectSuggestion,
-  setIsExpanded,
   setCurrentIndex,
-  setActiveFilter,
   setModalVisible,
   setCurrentProduct,
-  setSelectedCategory,
-  setSelectedPrice,
-  setSelectedSort,
   clearFilters,
   setUserData,
+  addRecentlyViewedProduct,
 } from '../redux/slices/dashboardSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
+
+// Define theme colors
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)';
+const SELECTED_CATEGORY_BG_COLOR = '#5b9cff';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
 
 const { width, height } = Dimensions.get('window');
 const scaleFactor = width / 375;
@@ -53,18 +54,14 @@ const scale = (size) => size * scaleFactor;
 const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375));
 const numColumns = 3;
 const itemSize = width / numColumns - scale(20);
-const trendingItemSize = width * 0.4; // Size for trending products to show at least 2.4 items
+const trendingItemSize = width * 0.4;
 
 const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
   const dispatch = useDispatch();
   const {
-    search,
     products,
     filteredProducts,
-    suggestions,
-    isExpanded,
     currentIndex,
-    activeFilter,
     token,
     userId,
     modalVisible,
@@ -72,9 +69,6 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
     loading,
     isActionLoading,
     refreshing,
-    selectedCategory,
-    selectedPrice,
-    selectedSort,
     error,
   } = useSelector((state) => state.dashboard);
 
@@ -85,12 +79,10 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
     console.log('Has openDrawer:', typeof navigation.openDrawer === 'function');
   }, [navigation]);
 
-  // Refs
   const flatListRef = useRef(null);
   const sliderInterval = useRef(null);
   const productsLoaded = useRef(false);
 
-  // Animation values for header
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerTranslateY = scrollY.interpolate({
     inputRange: [0, 100],
@@ -103,26 +95,22 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
     extrapolate: 'clamp',
   });
 
-  // Handle refresh
   const onRefresh = async () => {
     Trace('Refreshing Dashboard Products');
     dispatch(fetchProducts());
   };
 
-  // Handle product submission
   const handleSubmitProduct = async (productData) => {
     Trace('Submitting Product', { productData });
     dispatch(submitProduct({ productData, userId, currentProduct }));
     dispatch(setModalVisible(false));
   };
 
-  // Handle product deletion
   const handleDeleteProduct = async (productId) => {
     Trace('Deleting Product', { productId });
     dispatch(deleteProduct(productId));
   };
 
-  // Initialize component
   useEffect(() => {
     const loadUserData = async () => {
       try {
@@ -145,9 +133,9 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
     };
 
     loadUserData();
-    
+
     if (!productsLoaded.current) {
-      Trace('Fetching Products on Mount#pragma once');
+      Trace('Fetching Products on Mount');
       dispatch(fetchProducts());
       productsLoaded.current = true;
     }
@@ -159,11 +147,10 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
     };
   }, [dispatch]);
 
-  // Auto-scroll slider
   useEffect(() => {
     if (sliderData.length === 0) return;
 
-    sliderInterval.current = setInterval(() => {
+    const slide = () => {
       const nextIndex = (currentIndex + 1) % sliderData.length;
       if (flatListRef.current) {
         flatListRef.current.scrollToIndex({
@@ -172,7 +159,9 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
         });
       }
       dispatch(setCurrentIndex(nextIndex));
-    }, 3000);
+    };
+
+    sliderInterval.current = setInterval(slide, 4000);
 
     return () => {
       if (sliderInterval.current) {
@@ -181,7 +170,6 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
     };
   }, [currentIndex, dispatch]);
 
-  // Handle error with Toast
   useEffect(() => {
     if (error) {
       Trace('Dashboard Error', { error });
@@ -196,13 +184,40 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
     }
   }, [error]);
 
-  // Render product item
+  const premiumCategories = [
+    { id: '1', name: "Men's" },
+    { id: '2', name: "Girl's" },
+    { id: '3', name: 'Kids' },
+    { id: '4', name: 'Accessories' },
+    { id: '5', name: 'Luxury' },
+    { id: '6', name: "Mobile's" },
+    { id: '7', name: "Brand's" },
+    { id: '8', name: 'Trending' },
+  ];
+
+  const RenderCategorySlider = ({ item }) => {
+    return (
+      <TouchableOpacity
+        style={styles.categoryItem}
+        onPress={() => {
+          Trace('Category Selected', { category: item.name });
+          stackNavigation.navigate('CategoryProducts', { category: item.name });
+        }}
+        disabled={isActionLoading}
+      >
+        <Text style={styles.categoryText}>{item.name}</Text>
+      </TouchableOpacity>
+    );
+  };
+
   const RenderProductList = ({ item, index }) => {
     const mediaUrl = item.media || 'https://via.placeholder.com/120';
     const hasDiscount = item.discount > 0;
     const originalPrice = item.originalPrice || item.price;
     const discountedPrice = item.price;
-    const discountPercentage = Math.round(((originalPrice - discountedPrice) / originalPrice) * 100);
+    const discountPercentage = Math.round(
+      ((originalPrice - discountedPrice) / originalPrice) * 100
+    );
 
     return (
       <View style={styles.itemBox}>
@@ -210,9 +225,10 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
           activeOpacity={0.9}
           onPress={() => {
             Trace('Product Clicked', { productId: item.id });
-            stackNavigation.navigate('ProductDetail', { 
+            dispatch(addRecentlyViewedProduct(item));
+            stackNavigation.navigate('ProductDetail', {
               productId: item.id,
-              product: item
+              product: item,
             });
           }}
           disabled={isActionLoading}
@@ -231,7 +247,9 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
             )}
           </View>
           <View style={styles.productInfo}>
-            <Text style={styles.itemText} numberOfLines={1}>{item.name}</Text>
+            <Text style={styles.itemText} numberOfLines={1}>
+              {item.name || 'Unnamed Product'}
+            </Text>
             <View style={styles.priceContainer}>
               <Text style={styles.priceText}>₹{discountedPrice || 'N/A'}</Text>
               {hasDiscount && (
@@ -240,11 +258,11 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
             </View>
             <View style={styles.ratingContainer}>
               {[1, 2, 3, 4, 5].map((star) => (
-                <Icon 
-                  key={star} 
-                  name={star <= Math.round(item.rating || 0) ? 'star' : 'star-border'} 
-                  size={scale(12)} 
-                  color="#FFD700" 
+                <Icon
+                  key={star}
+                  name={star <= Math.round(item.rating || 0) ? 'star' : 'star-border'}
+                  size={scale(12)}
+                  color="#FFD700"
                 />
               ))}
             </View>
@@ -254,23 +272,25 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
     );
   };
 
-  // Render trending product item
   const RenderTrendingProduct = ({ item, index }) => {
     const mediaUrl = item.media || 'https://via.placeholder.com/120';
     const hasDiscount = item.discount > 0;
     const originalPrice = item.originalPrice || item.price;
     const discountedPrice = item.price;
-    const discountPercentage = Math.round(((originalPrice - discountedPrice) / originalPrice) * 100);
+    const discountPercentage = Math.round(
+      ((originalPrice - discountedPrice) / originalPrice) * 100
+    );
 
     return (
-      <TouchableOpacity style={styles.trendingItemBox}>
+      <View style={styles.trendingItemBox}>
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => {
             Trace('Trending Product Clicked', { productId: item.id });
-            stackNavigation.navigate('ProductDetail', { 
+            dispatch(addRecentlyViewedProduct(item));
+            stackNavigation.navigate('ProductDetail', {
               productId: item.id,
-              product: item
+              product: item,
             });
           }}
           disabled={isActionLoading}
@@ -289,7 +309,9 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
             )}
           </View>
           <View style={styles.trendingProductInfo}>
-            <Text style={styles.trendingItemText} numberOfLines={1}>{item.name}</Text>
+            <Text style={styles.trendingItemText} numberOfLines={1}>
+              {item.name || 'Unnamed Product'}
+            </Text>
             <View style={styles.priceContainer}>
               <Text style={styles.priceText}>₹{discountedPrice || 'N/A'}</Text>
               {hasDiscount && (
@@ -298,48 +320,70 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
             </View>
             <View style={styles.ratingContainer}>
               {[1, 2, 3, 4, 5].map((star) => (
-                <Icon 
-                  key={star} 
-                  name={star <= Math.round(item.rating || 0) ? 'star' : 'star-border'} 
-                  size={scale(12)} 
-                  color="#FFD700" 
+                <Icon
+                  key={star}
+                  name={star <= Math.round(item.rating || 0) ? 'star' : 'star-border'}
+                  size={scale(12)}
+                  color="#FFD700"
                 />
               ))}
             </View>
           </View>
         </TouchableOpacity>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.shopNowButton}
+          onPress={() => {
+            Trace('Shop Now Button Clicked', { productId: item.id });
+            dispatch(addRecentlyViewedProduct(item));
+            stackNavigation.navigate('ProductDetail', {
+              productId: item.id,
+              product: item,
+            });
+          }}
+          disabled={isActionLoading}
+        >
+          <Text style={styles.shopNowText}>Shop Now</Text>
+        </TouchableOpacity>
+      </View>
     );
   };
 
-  const RenderSliderList = ({ item }) => {
+  const RenderSliderList = ({ item, index }) => {
     const translateX = useRef(new Animated.Value(width)).current;
-    
+    const progress = useRef(new Animated.Value(0)).current;
+
     useEffect(() => {
-      Animated.spring(translateX, {
+      Animated.timing(translateX, {
         toValue: 0,
         duration: 800,
+        easing: Easing.linear,
         useNativeDriver: true,
       }).start();
-    }, []);
+
+      progress.setValue(0);
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: 4000,
+        easing: Easing.linear,
+        useNativeDriver: false,
+      }).start();
+    }, [index]);
+
+    const progressWidth = progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0%', '100%'],
+    });
 
     return (
-      <Animated.View style={[styles.slide, { transform: [{ translateX }] }]}>
+      <Animated.View style={[styles.slide]}>
         <FastImage
           source={item.image}
           style={styles.sliderImage}
-          resizeMode={FastImage.resizeMode.cover}
+          resizeMode={FastImage.resizeMode.contain}
         />
-        <LinearGradient
-          colors={['rgba(0, 0, 0, 0.1)', 'rgba(0, 0, 0, 0.8)']}
-          style={styles.sliderOverlay}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-        >
-          <Text style={styles.sliderTitle}>{item.title}</Text>
-          <Text style={styles.sliderSubtitle}>Shop the latest collection</Text>
-          <TouchableOpacity 
-            style={styles.shopNowButton}
+        <View style={styles.sliderOverlay}>
+          <TouchableOpacity
+            style={styles.sliderShopNowButton}
             onPress={() => {
               Trace('Shop Now Clicked');
               stackNavigation.navigate('Categories');
@@ -347,7 +391,10 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
           >
             <Text style={styles.shopNowText}>SHOP NOW</Text>
           </TouchableOpacity>
-        </LinearGradient>
+        </View>
+        <View style={styles.progressBarContainer}>
+          <Animated.View style={[styles.progressBar, { width: progressWidth }]} />
+        </View>
       </Animated.View>
     );
   };
@@ -367,133 +414,67 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
           topOffset: scale(20),
         });
       }
-    } else if (iconName === "notifications") {
-       navigation.navigate("Notifications")
-    }
-    else{
-      navigation.navigate("NotificationsScreen")
+    } else if (iconName === 'notifications') {
+      navigation.navigate('Notifications');
+    } else {
+      navigation.navigate('NotificationsScreen');
     }
   };
 
   return (
-    <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.container}>
+    <LinearGradient colors={BACKGROUND_GRADIENT} style={styles.container}>
       <ScrollView
         refreshControl={
-          <RefreshControl 
+          <RefreshControl
             refreshing={refreshing || loading}
-            onRefresh={onRefresh} 
-            colors={['#7B61FF']} 
-            tintColor="#7B61FF" 
-            progressViewOffset={scale(100)} 
+            onRefresh={onRefresh}
+            colors={[PRIMARY_THEME_COLOR]}
+            tintColor={PRIMARY_THEME_COLOR}
+            progressViewOffset={scale(100)}
           />
         }
         onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } }}],
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: false }
-        ) && onScroll}
+        )}
         scrollEnabled={!isActionLoading}
         contentContainerStyle={styles.scrollContainer}
       >
-        <Animated.View style={[styles.headerContainer, {
-          transform: [{ translateY: headerTranslateY }],
-          opacity: headerOpacity
-        }]}>
+        <Animated.View
+          style={[
+            styles.headerContainer,
+            {
+              transform: [{ translateY: headerTranslateY }],
+              opacity: headerOpacity,
+            },
+          ]}
+        >
           <Header
-            isSearch={true}
-            searchValue={search}
-            onSearchChange={(text) => dispatch(setSearch(text))}
             showLeftIcon={true}
+            isSearch={true}
+            onSearchPress={() => {
+              navigation.navigate('Search');
+            }}
             leftIcon="menu"
             onLeftPress={() => handleHeaderIconPress('menu')}
             showRightIcon1={true}
             rightIcon1="notifications-outline"
             onRightPress1={() => handleHeaderIconPress('notifications')}
             showRightIcon2={true}
-            rightIcon2='chatbubble-ellipses-outline'
-            onRightIcon2Press={()=>handleHeaderIconPress("message")}
+            rightIcon2="chatbubble-ellipses-outline"
+            onRightIcon2Press={() => handleHeaderIconPress('message')}
           />
         </Animated.View>
 
-        {suggestions.length > 0 && (
-          <View style={styles.suggestionsContainer}>
-            <ScrollView
-              style={styles.suggestionScroll}
-              nestedScrollEnabled={true}
-              onScroll={({ nativeEvent }) => {
-                if (!isExpanded && nativeEvent.contentOffset.y > 0) {
-                  dispatch(setIsExpanded(true));
-                }
-              }}
-            >
-              {(isExpanded ? suggestions : suggestions.slice(0, 5)).map((item) => (
-                <TouchableOpacity
-                  key={item.id?.toString() || Math.random().toString()}
-                  onPress={() => dispatch(selectSuggestion(item.name))}
-                  style={styles.suggestionItem}
-                  disabled={isActionLoading}
-                >
-                  <Text style={styles.suggestionText}>{item.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            {!isExpanded && suggestions.length > 5 && (
-              <Text style={styles.loadMoreText}>⬇ Scroll to load more...</Text>
-            )}
-          </View>
-        )}
-
-        <View style={styles.filtersWrapper}>
-          <View style={styles.filterContainer}>
-            <View style={styles.filterItem}>
-              <Filterbar
-                title="Category"
-                isVisible={activeFilter === 'category'}
-                onToggle={() => dispatch(setActiveFilter(activeFilter === 'category' ? null : 'category'))}
-                options={[...new Set(products.map(product => product.category))].filter(Boolean)}
-                selectedOption={selectedCategory}
-                onOptionSelect={(value) => {
-                  dispatch(setSelectedCategory(value === selectedCategory ? '' : value));
-                  dispatch(setActiveFilter(null));
-                }}
-              />
-            </View>
-            <View style={styles.filterItem}>
-              <Filterbar
-                title="Price Range"
-                isVisible={activeFilter === 'price'}
-                onToggle={() => dispatch(setActiveFilter(activeFilter === 'price' ? null : 'price'))}
-                options={['Under ₹500', '₹500 - ₹1000', '₹1000 - ₹2000', 'Over ₹2000']}
-                selectedOption={selectedPrice}
-                onOptionSelect={(value) => {
-                  dispatch(setSelectedPrice(value === selectedPrice ? '' : value));
-                  dispatch(setActiveFilter(null));
-                }}
-              />
-            </View>
-            <View style={styles.filterItem}>
-              <Filterbar
-                title="Sort By"
-                isVisible={activeFilter === 'sort'}
-                onToggle={() => dispatch(setActiveFilter(activeFilter === 'sort' ? null : 'sort'))}
-                options={['Newest First', 'Price: Low to High', 'Price: High to Low', 'Popular']}
-                selectedOption={selectedSort}
-                onOptionSelect={(value) => {
-                  dispatch(setSelectedSort(value === selectedSort ? '' : value));
-                  dispatch(setActiveFilter(null));
-                }}
-              />
-            </View>
-          </View>
-          {(selectedCategory || selectedPrice || selectedSort) && (
-            <View style={styles.clearFiltersContainer}>
-              <TouchableOpacity 
-                style={styles.clearFiltersButton}
-                onPress={() => dispatch(clearFilters())}
-              >
-                <Icon name="close" size={scale(16)} color="#7B61FF" />
-              </TouchableOpacity>
-            </View>
-          )}
+        <View style={styles.categorySliderContainer}>
+          <FlatList
+            data={premiumCategories}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => <RenderCategorySlider item={item} />}
+            contentContainerStyle={styles.categorySliderContent}
+          />
         </View>
 
         {sliderData.length > 0 && (
@@ -505,7 +486,7 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
               pagingEnabled
               showsHorizontalScrollIndicator={false}
               keyExtractor={(item, index) => `slider-${index}`}
-              renderItem={({ item }) => <RenderSliderList item={item} />}
+              renderItem={({ item, index }) => <RenderSliderList item={item} index={index} />}
               snapToInterval={width - scale(40)}
               decelerationRate="fast"
               onScrollToIndexFailed={({ index }) => {
@@ -517,12 +498,12 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
             />
             <View style={styles.pagination}>
               {sliderData.map((_, index) => (
-                <View 
-                  key={index} 
+                <View
+                  key={index}
                   style={[
                     styles.paginationDot,
-                    currentIndex === index && styles.paginationDotActive
-                  ]} 
+                    currentIndex === index && styles.paginationDotActive,
+                  ]}
                 />
               ))}
             </View>
@@ -531,43 +512,47 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Trending Products</Text>
-          <TouchableOpacity onPress={() => {
-            Trace('See All Trending Products Clicked');
-            stackNavigation.navigate('Categories');
-          }}>
+          <TouchableOpacity
+            onPress={() => {
+              Trace('See All Trending Products Clicked');
+              stackNavigation.navigate('Categories');
+            }}
+          >
             <Text style={styles.seeAll}>See All</Text>
           </TouchableOpacity>
         </View>
 
         <FlatList
-          data={filteredProducts.slice(0, 10)}
+          data={products.slice(0, 10)}
           keyExtractor={(item, index) => `trending-${item.id}-${index}`}
           renderItem={({ item, index }) => <RenderTrendingProduct item={item} index={index} />}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.trendingListContainer}
-          snapToInterval={trendingItemSize + scale(10)}
+          snapToInterval={trendingItemSize + scale(30)}
           decelerationRate="fast"
         />
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Featured Products</Text>
-          <TouchableOpacity onPress={() => {
-            Trace('View All Products Clicked');
-            stackNavigation.navigate('Categories', { products });
-          }}>
-            <AntDesign name="arrowsalt" size={scale(20)} color="#7B61FF" />
+          <TouchableOpacity
+            onPress={() => {
+              Trace('View All Products Clicked');
+              stackNavigation.navigate('Categories', { products });
+            }}
+          >
+            <AntDesign name="arrowsalt" size={scale(20)} color={PRIMARY_THEME_COLOR} />
           </TouchableOpacity>
         </View>
 
-        {filteredProducts.length === 0 ? (
+        {products.length === 0 ? (
           <View style={styles.noProductsContainer}>
-            <Icon name="error-outline" size={scale(50)} color="#FF3E6D" />
+            <Icon name="error-outline" size={scale(50)} color={SECONDARY_THEME_COLOR} />
             <Text style={styles.noProductsText}>No Products Found</Text>
           </View>
         ) : (
           <View style={styles.productsGrid}>
-            {filteredProducts.slice(0, 6).map((item, index) => (
+            {products.slice(0, 6).map((item, index) => (
               <RenderProductList key={item.id} item={item} index={index} />
             ))}
           </View>
@@ -575,23 +560,6 @@ const DashBoard = ({ navigation: stackNavigation, onScroll }) => {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
-
-      {/* Product Modal */}
-      {/* <ProductModal
-        visible={modalVisible}
-        onClose={() => dispatch(setModalVisible(false))}
-        onSubmit={handleSubmitProduct}
-        product={currentProduct}
-        onDelete={handleDeleteProduct}
-      /> */}
-
-      {/* Loading overlay */}
-      {/* {isActionLoading && (
-        <View style={styles.loaderOverlay}>
-          <ActivityIndicator size="large" color="#7B61FF" />
-          <Text style={styles.loaderText}>Loading...</Text>
-        </View>
-      )} */}
     </LinearGradient>
   );
 };
@@ -609,7 +577,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 100,
-    backgroundColor: 'rgba(10, 10, 30, 0.9)',
+    backgroundColor: PRODUCT_BG_COLOR,
   },
   sliderContainer: {
     height: height * 0.25,
@@ -623,10 +591,12 @@ const styles = StyleSheet.create({
     borderRadius: scale(15),
     overflow: 'hidden',
     elevation: 5,
-    shadowColor: '#7B61FF',
-    shadowOffset: { width: 0, height: scale(10) },
-    shadowOpacity: 0.3,
-    shadowRadius: scale(15),
+    shadowColor: 'rgba(0, 0, 0, 0.1)',
+    shadowOffset: { width: 0, height: scale(5) },
+    shadowOpacity: 0.2,
+    shadowRadius: scale(10),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sliderImage: {
     width: '100%',
@@ -638,33 +608,36 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: scale(20),
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
-  sliderTitle: {
-    fontSize: scaleFont(22),
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    marginBottom: scale(5),
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  sliderSubtitle: {
-    fontSize: scaleFont(14),
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: scale(15),
-  },
-  shopNowButton: {
-    backgroundColor: '#7B61FF',
+  sliderShopNowButton: {
+    backgroundColor: PRIMARY_THEME_COLOR,
     paddingVertical: scale(8),
     paddingHorizontal: scale(20),
     borderRadius: scale(20),
     alignSelf: 'flex-start',
   },
+  shopNowButton: {
+    backgroundColor: '#76c1f8',
+    borderRadius: scale(10),
+    width: scale(90),
+    height: scale(30),
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'absolute',
+    bottom: scale(-15),
+    right: scale(0),
+    zIndex: 20,
+    shadowColor: 'rgba(0, 0, 0, 0.2)',
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.3,
+    shadowRadius: scale(4),
+  },
   shopNowText: {
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
     fontWeight: 'bold',
-    fontSize: scaleFont(12),
-    letterSpacing: 1,
+    fontSize: scaleFont(10),
+    textAlign: 'center',
   },
   pagination: {
     position: 'absolute',
@@ -678,12 +651,24 @@ const styles = StyleSheet.create({
     width: scale(8),
     height: scale(8),
     borderRadius: scale(4),
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    backgroundColor: BORDER_THEME_COLOR,
     marginHorizontal: scale(4),
   },
   paginationDotActive: {
-    backgroundColor: '#7B61FF',
+    backgroundColor: PRIMARY_THEME_COLOR,
     width: scale(20),
+  },
+  progressBarContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: scale(4),
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: PRIMARY_THEME_COLOR,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -696,27 +681,29 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: scaleFont(18),
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
     letterSpacing: 0.5,
   },
   seeAll: {
     fontSize: scaleFont(14),
-    color: '#7B61FF',
+    color: PRIMARY_THEME_COLOR,
     fontWeight: '600',
   },
   trendingListContainer: {
     paddingHorizontal: scale(15),
     paddingBottom: scale(10),
+    overflow: 'visible',
   },
   trendingItemBox: {
     width: trendingItemSize,
     marginRight: scale(10),
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginBottom: scale(20),
+    backgroundColor: 'rgba(142, 197, 252, 0.2)',
     borderRadius: scale(12),
-    overflow: 'hidden',
+    overflow: 'visible',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    shadowColor: '#000',
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: 'rgba(0, 0, 0, 0.1)',
     shadowRadius: scale(10),
   },
   trendingProductImg: {
@@ -730,10 +717,11 @@ const styles = StyleSheet.create({
   },
   trendingProductInfo: {
     padding: scale(10),
+    paddingBottom: scale(20),
   },
   trendingItemText: {
     fontSize: scaleFont(12),
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
     fontWeight: '600',
     marginBottom: scale(5),
   },
@@ -746,12 +734,12 @@ const styles = StyleSheet.create({
   itemBox: {
     width: itemSize,
     marginBottom: scale(15),
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(142, 197, 252, 0.2)',
     borderRadius: scale(12),
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    shadowColor: '#000',
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: 'rgba(0, 0, 0, 0.1)',
     shadowRadius: scale(10),
   },
   product_Img: {
@@ -767,13 +755,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: scale(10),
     left: scale(10),
-    backgroundColor: '#FF3E6D',
+    backgroundColor: SECONDARY_THEME_COLOR,
     paddingHorizontal: scale(8),
     paddingVertical: scale(3),
     borderRadius: scale(12),
   },
   badgeText: {
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
     fontSize: scaleFont(10),
     fontWeight: 'bold',
   },
@@ -782,7 +770,7 @@ const styles = StyleSheet.create({
   },
   itemText: {
     fontSize: scaleFont(12),
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
     fontWeight: '600',
     marginBottom: scale(5),
   },
@@ -794,11 +782,11 @@ const styles = StyleSheet.create({
   priceText: {
     fontSize: scaleFont(11),
     fontWeight: '700',
-    color: '#7B61FF',
+    color: PRIMARY_THEME_COLOR,
   },
   originalPriceText: {
     fontSize: scaleFont(8),
-    color: '#B0B0D0',
+    color: SUBTEXT_THEME_COLOR,
     textDecorationLine: 'line-through',
     marginLeft: scale(5),
   },
@@ -809,69 +797,28 @@ const styles = StyleSheet.create({
   bottomSpacer: {
     height: scale(30),
   },
-  suggestionsContainer: {
-    backgroundColor: 'rgba(30, 30, 63, 0.9)',
-    marginHorizontal: scale(15),
-    padding: scale(10),
-    borderRadius: scale(10),
-    borderWidth: 1,
-    borderColor: 'rgba(123, 97, 255, 0.3)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: scale(2) },
-    shadowOpacity: 0.3,
-    shadowRadius: scale(4),
-    elevation: 5,
-    maxHeight: height * 0.3,
-  },
-  suggestionScroll: {
-    maxHeight: scale(220),
-  },
-  suggestionItem: {
-    paddingVertical: scale(8),
-    borderBottomWidth: 1,
-    borderColor: 'rgba(123, 97, 255, 0.2)',
-    borderRadius: scale(5),
-    paddingHorizontal: scale(15),
-    marginVertical: scale(2),
-  },
-  suggestionText: {
-    fontSize: scaleFont(16),
-    color: '#E5E7EB',
-  },
-  loadMoreText: {
-    fontSize: scaleFont(14),
-    color: '#A0A0A0',
-    textAlign: 'center',
-    marginTop: scale(8),
-    fontStyle: 'italic',
-  },
-  filtersWrapper: {
-    flexDirection: 'column',
+  categorySliderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginHorizontal: scale(10),
     marginVertical: scale(10),
   },
-  filterContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  categorySliderContent: {
+    paddingHorizontal: scale(10),
   },
-  filterItem: {
-    flex: 1,
-    marginHorizontal: scale(4),
-    minWidth: scale(70),
-  },
-  clearFiltersContainer: {
-    alignItems: 'center',
-    marginTop: scale(8),
-  },
-  clearFiltersButton: {
-    width: scale(32),
-    height: scale(32),
-    borderRadius: scale(16),
-    backgroundColor: 'rgba(123, 97, 255, 0.2)',
+  categoryItem: {
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(20),
+    paddingVertical: scale(8),
+    paddingHorizontal: scale(15),
+    marginRight: scale(10),
     borderWidth: 1,
-    borderColor: 'rgba(123, 97, 255, 0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: BORDER_THEME_COLOR,
+  },
+  categoryText: {
+    fontSize: scaleFont(14),
+    color: TEXT_THEME_COLOR,
+    fontWeight: '600',
   },
   noProductsContainer: {
     alignItems: 'center',
@@ -879,26 +826,8 @@ const styles = StyleSheet.create({
   },
   noProductsText: {
     fontSize: scaleFont(18),
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
     marginTop: scale(15),
-    fontWeight: '500',
-  },
-  loaderOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'red',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 2000,
-    elevation: 20,
-  },
-  loaderText: {
-    marginTop: scale(10),
-    fontSize: scaleFont(16),
-    color: '#FFFFFF',
     fontWeight: '500',
   },
 });

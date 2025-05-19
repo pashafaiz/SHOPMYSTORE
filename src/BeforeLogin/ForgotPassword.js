@@ -13,7 +13,25 @@ import {
   NETWORK_ERROR,
 } from '../constants/GlobalConstants';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+const scaleFactor = Math.min(width, 375) / 375;
+const scale = (size) => Math.round(size * scaleFactor);
+const scaleFont = (size) => {
+  const fontScale = Math.min(width, height) / 375;
+  const scaledSize = size * fontScale * (Platform.OS === 'ios' ? 0.9 : 0.85);
+  return Math.round(scaledSize);
+};
+
+// Theme constants
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
+const SUCCESS_COLOR = '#4CAF50';
 
 const ForgotPassword = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -190,11 +208,11 @@ const ForgotPassword = ({ navigation }) => {
       <View style={styles.stepContainer}>
         <View style={[styles.stepLine, step >= 1 && styles.activeStepLine]} />
         <View style={[styles.stepDot, step >= 1 && styles.activeStepDot]}>
-          {step > 1 && <Icon name="check" size={14} color="#FFF" />}
+          {step > 1 && <Icon name="check" size={scale(14)} color={TEXT_THEME_COLOR} />}
         </View>
         <View style={[styles.stepLine, step >= 2 && styles.activeStepLine]} />
         <View style={[styles.stepDot, step >= 2 && styles.activeStepDot]}>
-          {step > 2 && <Icon name="check" size={14} color="#FFF" />}
+          {step > 2 && <Icon name="check" size={scale(14)} color={TEXT_THEME_COLOR} />}
         </View>
         <View style={[styles.stepLine, step >= 3 && styles.activeStepLine]} />
         <View style={[styles.stepDot, step >= 3 && styles.activeStepDot]} />
@@ -215,11 +233,11 @@ const ForgotPassword = ({ navigation }) => {
             <Text style={styles.subtitle}>Enter your email to receive a verification code</Text>
             
             <View style={styles.inputContainer}>
-              <Icon name="email" size={22} color="#AEAEAE" style={styles.inputIcon} />
+              <Icon name="email" size={scale(22)} color={SUBTEXT_THEME_COLOR} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Email"
-                placeholderTextColor="#AEAEAE"
+                placeholderTextColor={SUBTEXT_THEME_COLOR}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -235,17 +253,17 @@ const ForgotPassword = ({ navigation }) => {
               disabled={loading}
             >
               <LinearGradient
-                colors={['#7B5BFF', '#A68EFF']}
+                colors={['#5b9cff', '#8ec5fc']}
                 style={styles.gradientButton}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
                 {loading ? (
-                  <ActivityIndicator size="small" color="#FFF"/>
+                  <ActivityIndicator size="small" color={TEXT_THEME_COLOR} />
                 ) : (
                   <>
                     <Text style={styles.buttonText}>Send Verification Code</Text>
-                    <Icon name="send" size={20} color="#FFFFFF" style={styles.buttonIcon} />
+                    <Icon name="send" size={scale(20)} color={TEXT_THEME_COLOR} style={styles.buttonIcon} />
                   </>
                 )}
               </LinearGradient>
@@ -263,11 +281,11 @@ const ForgotPassword = ({ navigation }) => {
             <Text style={styles.subtitle}>Check your email for the verification code</Text>
             
             <View style={styles.inputContainer}>
-              <Icon name="vpn-key" size={22} color="#AEAEAE" style={styles.inputIcon} />
+              <Icon name="vpn-key" size={scale(22)} color={SUBTEXT_THEME_COLOR} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Verification Code"
-                placeholderTextColor="#AEAEAE"
+                placeholderTextColor={SUBTEXT_THEME_COLOR}
                 value={code}
                 onChangeText={setCode}
                 keyboardType="number-pad"
@@ -283,17 +301,17 @@ const ForgotPassword = ({ navigation }) => {
               disabled={loading}
             >
               <LinearGradient
-                colors={['#7B5BFF', '#A68EFF']}
+                colors={['#5b9cff', '#8ec5fc']}
                 style={styles.gradientButton}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
                 {loading ? (
-                  <ActivityIndicator size="small" color="#FFF" />
+                  <ActivityIndicator size="small" color={TEXT_THEME_COLOR} />
                 ) : (
                   <>
                     <Text style={styles.buttonText}>Verify Code</Text>
-                    <Icon name="check-circle" size={20} color="#FFFFFF" style={styles.buttonIcon} />
+                    <Icon name="check-circle" size={scale(20)} color={TEXT_THEME_COLOR} style={styles.buttonIcon} />
                   </>
                 )}
               </LinearGradient>
@@ -319,11 +337,11 @@ const ForgotPassword = ({ navigation }) => {
             <Text style={styles.subtitle}>Create a new password</Text>
             
             <View style={styles.inputContainer}>
-              <Icon name="lock" size={22} color="#AEAEAE" style={styles.inputIcon} />
+              <Icon name="lock" size={scale(22)} color={SUBTEXT_THEME_COLOR} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="New Password"
-                placeholderTextColor="#AEAEAE"
+                placeholderTextColor={SUBTEXT_THEME_COLOR}
                 value={newPassword}
                 onChangeText={setNewPassword}
                 secureTextEntry
@@ -332,11 +350,11 @@ const ForgotPassword = ({ navigation }) => {
             </View>
             
             <View style={styles.inputContainer}>
-              <Icon name="lock-outline" size={22} color="#AEAEAE" style={styles.inputIcon} />
+              <Icon name="lock-outline" size={scale(22)} color={SUBTEXT_THEME_COLOR} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Confirm New Password"
-                placeholderTextColor="#AEAEAE"
+                placeholderTextColor={SUBTEXT_THEME_COLOR}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry
@@ -351,17 +369,17 @@ const ForgotPassword = ({ navigation }) => {
               disabled={loading}
             >
               <LinearGradient
-                colors={['#7B5BFF', '#A68EFF']}
+                colors={['#5b9cff', '#8ec5fc']}
                 style={styles.gradientButton}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
                 {loading ? (
-                  <ActivityIndicator size="small" color="#FFF" />
+                  <ActivityIndicator size="small" color={TEXT_THEME_COLOR} />
                 ) : (
                   <>
                     <Text style={styles.buttonText}>Reset Password</Text>
-                    <Icon name="lock-reset" size={20} color="#FFFFFF" style={styles.buttonIcon} />
+                    <Icon name="lock-reset" size={scale(20)} color={TEXT_THEME_COLOR} style={styles.buttonIcon} />
                   </>
                 )}
               </LinearGradient>
@@ -374,19 +392,20 @@ const ForgotPassword = ({ navigation }) => {
   };
 
   return (
-    <LinearGradient 
-      colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} 
-      style={styles.container}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-    >
+    <View style={styles.container}>
+      <LinearGradient 
+        colors={BACKGROUND_GRADIENT} 
+        style={styles.backgroundGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+      />
       <Header
         title="Forgot Password"
         showLeftIcon={true}
         leftIcon="arrow-back"
         onLeftPress={() => navigation.goBack()}
-        transparent
-        style={styles.header}
+        textStyle={styles.headerText}
+        containerStyle={styles.header}
       />
       
       <View style={styles.content}>
@@ -406,7 +425,7 @@ const ForgotPassword = ({ navigation }) => {
             style={styles.messageContainer}
           >
             <Text style={styles.errorText}>
-              <Icon name="error" size={16} color="#FF6B6B" /> {error}
+              <Icon name="error" size={scale(16)} color={SECONDARY_THEME_COLOR} /> {error}
             </Text>
           </Animatable.View>
         ) : null}
@@ -418,154 +437,199 @@ const ForgotPassword = ({ navigation }) => {
             style={styles.messageContainer}
           >
             <Text style={styles.successText}>
-              <Icon name="check-circle" size={16} color="#4CAF50" /> {success}
+              <Icon name="check-circle" size={scale(16)} color={SUCCESS_COLOR} /> {success}
             </Text>
           </Animatable.View>
         ) : null}
         
         {renderStep()}
       </View>
-    </LinearGradient>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: PRODUCT_BG_COLOR,
+  },
+  backgroundGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
+  header: {
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(20),
+    padding: scale(15),
+    margin: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    elevation: 5,
+  },
+  headerText: {
+    fontSize: scaleFont(20),
+    fontWeight: '700',
+    color: TEXT_THEME_COLOR,
+    textAlign: 'center',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 30,
-    paddingTop: 20,
-  },
-  header: {
-    borderBottomWidth: 0,
-    elevation: 0,
+    padding: scale(20),
   },
   headerContainer: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: scale(30),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(20),
+    padding: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    elevation: 5,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 25,
+    fontSize: scaleFont(22),
+    fontWeight: '800',
+    color: TEXT_THEME_COLOR,
+    marginBottom: scale(25),
     textAlign: 'center',
+    letterSpacing: 0.8,
   },
   subtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: 30,
+    fontSize: scaleFont(14),
+    color: SUBTEXT_THEME_COLOR,
+    marginBottom: scale(30),
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: scale(20),
+    fontWeight: '500',
   },
   stepContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 30,
-    width: '80%',
+    marginBottom: scale(30),
+    width: scale(200),
   },
   stepLine: {
     flex: 1,
-    height: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    height: scale(3),
+    backgroundColor: BORDER_THEME_COLOR,
   },
   activeStepLine: {
-    backgroundColor: '#7B5BFF',
+    backgroundColor: PRIMARY_THEME_COLOR,
   },
   stepDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: scale(24),
+    height: scale(24),
+    borderRadius: scale(12),
+    backgroundColor: BORDER_THEME_COLOR,
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 5,
+    marginHorizontal: scale(5),
   },
   activeStepDot: {
-    backgroundColor: '#7B5BFF',
+    backgroundColor: PRIMARY_THEME_COLOR,
   },
   formContainer: {
     width: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 15,
-    padding: 25,
-    shadowColor: '#7B5BFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(20),
+    padding: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    elevation: 5,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    paddingHorizontal: 18,
-    marginBottom: 20,
-    height: 55,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(16),
+    paddingHorizontal: scale(14),
+    marginBottom: scale(20),
+    height: scale(56),
+    borderWidth: scale(1),
+    borderColor: BORDER_THEME_COLOR,
   },
   inputIcon: {
-    marginRight: 12,
+    marginRight: scale(12),
   },
   input: {
     flex: 1,
     height: '100%',
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(16),
   },
   button: {
-    borderRadius: 12,
+    borderRadius: scale(16),
     overflow: 'hidden',
-    marginBottom: 20,
-    shadowColor: '#7B5BFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
+    marginBottom: scale(20),
+    shadowColor: PRIMARY_THEME_COLOR,
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.3,
+    shadowRadius: scale(8),
     elevation: 5,
   },
   buttonDisabled: {
     opacity: 0.7,
   },
   gradientButton: {
-    paddingVertical: 16,
+    paddingVertical: scale(16),
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
+    borderWidth: scale(1),
+    borderColor: BORDER_THEME_COLOR,
   },
   buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: TEXT_THEME_COLOR,
+    fontSize: scaleFont(16),
     fontWeight: '600',
-    marginRight: 10,
+    marginRight: scale(10),
   },
   buttonIcon: {
-    marginLeft: 5,
+    marginLeft: scale(5),
   },
   linkText: {
-    color: '#A68EFF',
+    color: PRIMARY_THEME_COLOR,
     textAlign: 'center',
-    marginTop: 15,
-    fontSize: 14,
+    marginTop: scale(15),
+    fontSize: scaleFont(14),
+    fontWeight: '500',
   },
   messageContainer: {
-    marginBottom: 20,
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginBottom: scale(20),
+    padding: scale(14),
+    borderRadius: scale(12),
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderWidth: scale(1),
+    borderColor: BORDER_THEME_COLOR,
   },
   errorText: {
-    color: '#FF6B6B',
+    color: SECONDARY_THEME_COLOR,
     textAlign: 'center',
-    fontSize: 14,
+    fontSize: scaleFont(14),
+    fontWeight: '500',
   },
   successText: {
-    color: '#4CAF50',
+    color: SUCCESS_COLOR,
     textAlign: 'center',
-    fontSize: 14,
+    fontSize: scaleFont(14),
+    fontWeight: '500',
   },
 });
+
 export default ForgotPassword;

@@ -8,7 +8,7 @@ import {
   Text,
   Animated,
   Easing,
-  LogBox
+  LogBox,
 } from 'react-native';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { store } from './src/redux/store';
@@ -20,7 +20,7 @@ import { checkAuth } from './src/redux/slices/authSlice';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemeProvider } from './src/constants/ThemeContext';
-import { getMessaging, requestPermission, getToken, onMessage, onTokenRefresh } from '@react-native-firebase/messaging';
+import { getMessaging, requestPermission, getToken, onMessage } from '@react-native-firebase/messaging';
 import { getInstallations, getId } from '@react-native-firebase/installations';
 import { createNotification, addLocalNotification } from './src/redux/slices/notificationsSlice';
 import {
@@ -77,6 +77,7 @@ const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight |
 
 const navigationRef = React.createRef();
 LogBox.ignoreAllLogs(true);
+
 const Particle = ({ index, fadeAnim }) => {
   const orbitAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.4)).current;
@@ -331,17 +332,6 @@ const AppContent = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const pulseAnim1 = useRef(new Animated.Value(1)).current;
-  const pulseAnim2 = useRef(new Animated.Value(1)).current;
-  const pulseAnim3 = useRef(new Animated.Value(1)).current;
-  const orbitXRing1 = useRef(new Animated.Value(0)).current;
-  const orbitYRing1 = useRef(new Animated.Value(0)).current;
-  const orbitXRing2 = useRef(new Animated.Value(0)).current;
-  const orbitYRing2 = useRef(new Animated.Value(0)).current;
-  const orbitXRing3 = useRef(new Animated.Value(0)).current;
-  const orbitYRing3 = useRef(new Animated.Value(0)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
-  const shimmerAnim = useRef(new Animated.Value(0)).current;
-  const flashAnim = useRef(new Animated.Value(0)).current;
   const sparkleOpacityAnim = useRef(new Animated.Value(0)).current;
   const starGlowAnim = useRef(new Animated.Value(1)).current;
   const titleLetterTranslateX = useRef(
@@ -426,75 +416,16 @@ const AppContent = () => {
       await debouncedShowNotificationToast(remoteMessage);
     });
 
-    const unsubscribeBackground = onMessage(getMessaging(), remoteMessage => {
-      console.log('Notification opened from background:', JSON.stringify(remoteMessage, null, 2));
-      if (remoteMessage) {
-        showNotificationToast(remoteMessage, dispatch, user, showSplash, initialRoute, navigationRef);
-      }
-    });
-
-    getMessaging().getInitialNotification().then(remoteMessage => {
-      if (remoteMessage) {
-        console.log('Notification opened from quit state:', JSON.stringify(remoteMessage, null, 2));
-        showNotificationToast(remoteMessage, dispatch, user, showSplash, initialRoute, navigationRef);
-      }
-    });
-
-    const checkPendingNotifications = async () => {
-      try {
-        const pendingMessage = await AsyncStorage.getItem('pendingNotification');
-        if (pendingMessage) {
-          const remoteMessage = JSON.parse(pendingMessage);
-          console.log('Found pending notification:', JSON.stringify(remoteMessage, null, 2));
-          await showNotificationToast(remoteMessage, dispatch, user, showSplash, initialRoute, navigationRef);
-          await AsyncStorage.removeItem('pendingNotification');
-        }
-      } catch (error) {
-        console.error('Error processing pending notification:', error);
-      }
-    };
-
     const initializeNotifications = async () => {
       await requestUserPermission();
       await getAndSaveFCMToken();
       await getInstallationId();
-      await checkPendingNotifications();
-
-      const unsubscribeTokenRefresh = onTokenRefresh(getMessaging(), async newToken => {
-        console.log('FCM Token refreshed:', newToken);
-        await AsyncStorage.setItem('fcmToken', newToken);
-        if (user?.id) {
-          const authToken = await AsyncStorage.getItem('userToken');
-          if (!authToken) {
-            throw new Error('Authentication token missing');
-          }
-          await axios.post(
-            `${BASE_URL}/api/notifications/save-fcm-token`,
-            {
-              userId: user.id,
-              fcmToken: newToken,
-            },
-            {
-              headers: {
-                Authorization: `Bearer ${authToken}`,
-                'Content-Type': 'application/json',
-              },
-            }
-          );
-          console.log('Refreshed FCM token saved to backend');
-        }
-      });
-
-      return () => {
-        unsubscribeTokenRefresh();
-      };
     };
 
     initializeNotifications();
 
     return () => {
       unsubscribeForeground();
-      unsubscribeBackground();
     };
   }, [dispatch, showSplash, initialRoute, user, debouncedShowNotificationToast]);
 
@@ -526,22 +457,6 @@ const AppContent = () => {
             useNativeDriver: true,
           }),
         ])
-      ),
-      Animated.loop(
-        Animated.timing(orbitXRing1, {
-          toValue: 1,
-          duration: 2500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        })
-      ),
-      Animated.loop(
-        Animated.timing(orbitYRing1, {
-          toValue: 1,
-          duration: 2800,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        })
       ),
     ]);
 
@@ -661,18 +576,6 @@ const AppContent = () => {
             duration: 800,
             useNativeDriver: true,
           }),
-          Animated.sequence([
-            Animated.timing(flashAnim, {
-              toValue: 0.6,
-              duration: 200,
-              useNativeDriver: true,
-            }),
-            Animated.timing(flashAnim, {
-              toValue: 0,
-              duration: 600,
-              useNativeDriver: true,
-            }),
-          ]),
         ]).start(() => setShowSplash(false));
       }, 2500);
     }, 3500);
@@ -691,51 +594,6 @@ const AppContent = () => {
     }
   }, [showSplash, isAuthenticated, dispatch]);
 
-  const glowInterpolate = glowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['rgba(159, 95, 255, 0.2)', 'rgba(159, 95, 255, 0.9)'],
-  });
-
-  const shimmerInterpolate = shimmerAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.1, 0.3],
-  });
-
-  const starGlowInterpolate = starGlowAnim.interpolate({
-    inputRange: [0, 1, 1.1],
-    outputRange: ['rgba(255, 255, 255, 0)', 'rgba(255, 255, 255, 0.8)', 'rgba(255, 255, 255, 1)'],
-  });
-
-  const ring1X = orbitXRing1.interpolate({
-    inputRange: [0, 1],
-    outputRange: [scale(-20), scale(20)],
-  });
-
-  const ring1Y = orbitYRing1.interpolate({
-    inputRange: [0, 1],
-    outputRange: [scale(-20), scale(20)],
-  });
-
-  const ring2X = orbitXRing2.interpolate({
-    inputRange: [0, 1],
-    outputRange: [scale(20), scale(-20)],
-  });
-
-  const ring2Y = orbitYRing2.interpolate({
-    inputRange: [0, 1],
-    outputRange: [scale(20), scale(-20)],
-  });
-
-  const ring3X = orbitXRing3.interpolate({
-    inputRange: [0, 1],
-    outputRange: [scale(-15), scale(15)],
-  });
-
-  const ring3Y = orbitYRing3.interpolate({
-    inputRange: [0, 1],
-    outputRange: [scale(-15), scale(15)],
-  });
-
   if (showSplash || initialRoute === null) {
     return (
       <View style={styles.splashContainer}>
@@ -746,43 +604,14 @@ const AppContent = () => {
           end={{ x: 1, y: 1 }}
         />
         <Animated.View
-          style={[styles.shimmerOverlay, { opacity: shimmerInterpolate }]}
-        />
-        <Animated.View
-          style={[styles.flashOverlay, { opacity: flashAnim }]}
-        />
-
-        <Animated.View
           style={[
             styles.ring1,
             {
-              transform: [{ scale: pulseAnim1 }, { translateX: ring1X }, { translateY: ring1Y }],
+              transform: [{ scale: pulseAnim1 }],
               opacity: fadeAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.3] }),
-              borderColor: glowInterpolate,
             },
           ]}
         />
-        <Animated.View
-          style={[
-            styles.ring2,
-            {
-              transform: [{ scale: pulseAnim2 }, { translateX: ring2X }, { translateY: ring2Y }],
-              opacity: fadeAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.25] }),
-              borderColor: glowInterpolate,
-            },
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.ring3,
-            {
-              transform: [{ scale: pulseAnim3 }, { translateX: ring3X }, { translateY: ring3Y }],
-              opacity: fadeAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.35] }),
-              borderColor: glowInterpolate,
-            },
-          ]}
-        />
-
         <Animated.View
           style={[
             styles.animationContainer,
@@ -835,7 +664,6 @@ const AppContent = () => {
             styles.starContainer,
             {
               transform: [{ scale: starGlowAnim }],
-              backgroundColor: starGlowInterpolate,
             },
           ]}
         >
@@ -858,7 +686,7 @@ const AppContent = () => {
           backgroundColor="#1A0033"
           translucent={false}
         />
-        <View style={{ height: STATUS_BAR_HEIGHT, backgroundColor: '#1A0B3B' }} />
+        <View style={{ height: STATUS_BAR_HEIGHT, backgroundColor: '#8ec5fc' }} />
         <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
           <Navigator initialRouteName={initialRoute} />
           <Toast />
@@ -899,22 +727,6 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
-  },
-  shimmerOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: '#FFFFFF',
-  },
-  flashOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: '#FFFFFF',
   },
   animationContainer: {
     alignItems: 'center',
@@ -957,26 +769,9 @@ const styles = StyleSheet.create({
     height: scale(160),
     borderRadius: scale(80),
     borderWidth: scale(3),
+    borderColor: 'rgba(159, 95, 255, 0.3)',
     backgroundColor: 'transparent',
     elevation: 10,
-  },
-  ring2: {
-    position: 'absolute',
-    width: scale(200),
-    height: scale(200),
-    borderRadius: scale(100),
-    borderWidth: scale(3),
-    backgroundColor: 'transparent',
-    elevation: 10,
-  },
-  ring3: {
-    position: 'absolute',
-    width: scale(120),
-    height: scale(120),
-    borderRadius: scale(60),
-    borderWidth: scale(2),
-    backgroundColor: 'transparent',
-    elevation: 8,
   },
   starContainer: {
     position: 'absolute',
@@ -1002,7 +797,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#4A2A8D',
+    backgroundColor: '#fff',
   },
   errorContainer: {
     flex: 1,

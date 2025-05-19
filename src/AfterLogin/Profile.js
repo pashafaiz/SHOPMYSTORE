@@ -41,7 +41,6 @@ import img from '../assets/Images/img';
 import Header from '../Components/Header';
 import CustomModal from '../Components/CustomModal';
 import Button from '../Components/Button';
-import ProductModal from '../Products/ProductModal';
 import Line from '../Components/Line';
 import Toast from 'react-native-toast-message';
 import Trace from '../utils/Trace';
@@ -54,6 +53,19 @@ import Animated, {
   FadeIn,
   Easing,
 } from 'react-native-reanimated';
+
+// Define theme colors
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)';
+const SELECTED_CATEGORY_BG_COLOR = '#5b9cff';
+const PREMIUM_BADGE_COLOR = '#fef08a';
+const PREMIUM_TEXT_COLOR = '#1a2b4a';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
 
 const { width, height } = Dimensions.get('window');
 const scaleFactor = width / 375;
@@ -89,7 +101,7 @@ const AnimatedItem = ({ children, onPress, onPressIn, onPressOut, index, onLongP
   }, [opacityValue, index]);
 
   return (
-    <Animated.View entering={FadeIn.delay(index * 50)} style={animatedStyle}>
+    <Animated.View  style={animatedStyle}>
       <TouchableOpacity
         activeOpacity={0.9}
         onPress={onPress}
@@ -110,8 +122,44 @@ const AnimatedItem = ({ children, onPress, onPressIn, onPressOut, index, onLongP
 };
 
 const renderMedia = (item) => {
-  const mediaUrl = item?.media?.[0]?.url || 'https://via.placeholder.com/120';
+  // Log the item and media field for debugging
+  console.log('renderMedia item:', { id: item?.id || item?._id, media: item?.media });
+
+  // Handle different media field formats
+  let mediaUrl = 'https://via.placeholder.com/120';
+  let thumbnailUrl = 'https://via.placeholder.com/120';
+
+  if (item?.media) {
+    if (Array.isArray(item.media)) {
+      // Case 1: media is an array (e.g., [{ url: '...' }, ...] or ['...', ...])
+      const firstMedia = item.media[0];
+      if (firstMedia) {
+        mediaUrl = typeof firstMedia === 'string' ? firstMedia : firstMedia?.url || mediaUrl;
+        thumbnailUrl = item?.thumbnail || (typeof firstMedia === 'string' ? firstMedia : firstMedia?.thumbnail || mediaUrl);
+      }
+    } else if (typeof item.media === 'string') {
+      // Case 2: media is a single string
+      mediaUrl = item.media;
+      thumbnailUrl = item?.thumbnail || item.media;
+    } else if (typeof item.media === 'object' && item.media.url) {
+      // Case 3: media is a single object with url
+      mediaUrl = item.media.url;
+      thumbnailUrl = item?.thumbnail || item.media.thumbnail || item.media.url;
+    }
+  }
+
+  // Normalize URL (ensure it starts with http:// or https://)
+  if (mediaUrl && !mediaUrl.startsWith('http')) {
+    mediaUrl = `https://${mediaUrl}`;
+  }
+  if (thumbnailUrl && !thumbnailUrl.startsWith('http')) {
+    thumbnailUrl = `https://${thumbnailUrl}`;
+  }
+
+  // Determine if it's a video based on file extension
   const isVideo = mediaUrl?.toLowerCase().endsWith('.mp4') || mediaUrl?.toLowerCase().endsWith('.mov');
+
+  console.log('renderMedia processed:', { mediaUrl, thumbnailUrl, isVideo });
 
   return (
     <View style={styles.mediaContainer}>
@@ -121,21 +169,29 @@ const renderMedia = (item) => {
           style={styles.mediaImage}
           resizeMode="cover"
           paused={true}
-          poster={item?.thumbnail || 'https://via.placeholder.com/120'}
+          poster={thumbnailUrl}
           posterResizeMode="cover"
           repeat={false}
+          onError={(error) => {
+            console.log('Video error:', error);
+            Trace('Video Render Error', { mediaUrl, error: error.message });
+          }}
         />
       ) : (
         <FastImage
           source={{ uri: mediaUrl }}
           style={styles.mediaImage}
-          resizeMode="cover"
+          resizeMode={FastImage.resizeMode.cover}
           defaultSource={{ uri: 'https://via.placeholder.com/120' }}
+          onError={(error) => {
+            console.log('FastImage error:', error);
+            Trace('Image Render Error', { mediaUrl, error: error.nativeEvent });
+          }}
         />
       )}
       {isVideo && (
         <View style={styles.playIcon}>
-          <MaterialCommunityIcons name="play" size={scale(24)} color="#FFFFFF" />
+          <MaterialCommunityIcons name="play" size={scale(24)} color={TEXT_THEME_COLOR} />
         </View>
       )}
     </View>
@@ -144,7 +200,6 @@ const renderMedia = (item) => {
 
 // Profile Component
 const Profile = ({ onScroll, route }) => {
-
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const {
@@ -158,15 +213,13 @@ const Profile = ({ onScroll, route }) => {
     successMessage,
     errorMessage,
     refreshing,
-    removingFromCart, // Added for cart removal loader
-    removingFromWishlist, // Added for wishlist removal loader
+    removingFromCart,
+    removingFromWishlist,
   } = useSelector((state) => state.profile);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [imageModalVisible, setImageModalVisible] = useState(false);
-  const [productModalVisible, setProductModalVisible] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [productOptionsModalVisible, setProductOptionsModalVisible] = useState(false);
-  const [currentProduct, setCurrentProduct] = useState(null);
   const [fullName, setFullName] = useState('');
   const [userName, setUserName] = useState('');
   const [profileImage, setProfileImage] = useState(null);
@@ -277,22 +330,22 @@ const Profile = ({ onScroll, route }) => {
     });
   };
 
-const confirmLogout = () => {
-  setSidebarVisible(false);
-  Trace('Logout Confirmation Toast Shown');
-  Toast.show({
-    type: 'info',
-    text1: 'Are you sure?',
-    text2: 'Tap to confirm logout',
-    position: 'top',
-    topOffset: scale(20),
-    visibilityTime: 5000,
-    onPress: () => {
-      handleLogout();
-      Toast.hide();
-    }
-  });
-};
+  const confirmLogout = () => {
+    setSidebarVisible(false);
+    Trace('Logout Confirmation Toast Shown');
+    Toast.show({
+      type: 'info',
+      text1: 'Are you sure?',
+      text2: 'Tap to confirm logout',
+      position: 'top',
+      topOffset: scale(20),
+      visibilityTime: 5000,
+      onPress: () => {
+        handleLogout();
+        Toast.hide();
+      },
+    });
+  };
 
   const handleUpdateProfile = () => {
     dispatch(updateProfile({ fullName, userName }));
@@ -346,27 +399,20 @@ const confirmLogout = () => {
     });
   };
 
-  const handleSubmitProduct = (productData) => {
-    dispatch(submitProduct({ productData, currentProduct })).then(() => {
-      if (user?.userType === 'seller') {
-        dispatch(fetchUserProducts(userId));
-      }
-    });
-    setProductModalVisible(false);
-  };
-
   const handleEditProduct = (product) => {
     try {
-      Trace('Editing Product', { product });
-      setCurrentProduct(product);
-      setProductModalVisible(true);
+      Trace('Editing Product', { productId: product.id });
+      navigation.navigate('ProductScreen', {
+        product,
+        screenType: 'edit',
+      });
       setProductOptionsModalVisible(false);
     } catch (err) {
       Trace('Edit Product Error', { error: err.message });
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Failed to open edit modal',
+        text2: 'Failed to open edit screen',
         position: 'top',
         topOffset: scale(20),
       });
@@ -386,77 +432,78 @@ const confirmLogout = () => {
 
   const handleRemoveFromCart = (productId, product) => {
     if (productId) {
-      setSelectedProduct(product); // Set the product being removed
+      setSelectedProduct(product);
       dispatch(removeFromCart(productId));
     }
   };
 
   const handleRemoveFromWishlist = (productId, product) => {
     if (productId) {
-      setSelectedProduct(product); 
+      setSelectedProduct(product);
       dispatch(removeFromWishlist(productId));
     }
   };
 
-const renderProductItem = ({ item, index }) => {
-  const originalPrice = parseFloat(item?.originalPrice || item?.price || 0).toFixed(2);
-  const discount = parseFloat(item?.discount || 0);
-  const discountedPrice = (originalPrice - (originalPrice * discount) / 100).toFixed(2);
-  const isPremium = item?.premium || false;
+  const renderProductItem = ({ item, index }) => {
+    const originalPrice = parseFloat(item?.originalPrice || item?.price || 0).toFixed(2);
+    const discount = parseFloat(item?.discount || 0);
+    const discountedPrice = (originalPrice - (originalPrice * discount) / 100).toFixed(2);
+    const isPremium = item?.premium || false;
 
-  let specifications = [];
-  try {
-    specifications = item.specifications ? 
-      (typeof item.specifications === 'string' ? 
-        JSON.parse(item.specifications) : 
-        item.specifications) : 
-      [];
-  } catch (err) {
-    console.error('Error parsing specifications:', err);
-  }
+    let specifications = [];
+    try {
+      specifications = item.specifications
+        ? typeof item.specifications === 'string'
+          ? JSON.parse(item.specifications)
+          : item.specifications
+        : [];
+    } catch (err) {
+      console.error('Error parsing specifications:', err);
+    }
 
-  return (
-    <AnimatedItem
-      index={index}
-      onPress={() => navigation.navigate('ProductDetail', { 
-        productId: item.id,
-        product: {
-          ...item,
-          specifications
+    return (
+      <AnimatedItem
+        index={index}
+        onPress={() =>
+          navigation.navigate('ProductDetail', {
+            productId: item.id,
+            product: {
+              ...item,
+              specifications,
+            },
+          })
         }
-      })}
-      onLongPress={() => showProductOptions(item)}
-    >
-      <View style={styles.itemContainer}>
-        {renderMedia(item)}
-        {isPremium && (
-          <View style={styles.premiumBadge}>
-            <Text style={styles.badgeText}>PREMIUM</Text>
-          </View>
-        )}
-        {discount > 0 && (
-          <View style={styles.discountBadge}>
-            <Text style={styles.badgeText}>{discount}% OFF</Text>
-          </View>
-        )}
-        <View style={styles.itemInfo}>
-          <Text style={styles.itemTitle} numberOfLines={1}>
-            {item.name || 'Unnamed Product'}
-          </Text>
-          {discount > 0 ? (
-            <View style={styles.priceContainer}>
-              <Text style={styles.discountedPrice}>₹{discountedPrice}</Text>
-              <Text style={styles.originalPrice}>₹{originalPrice}</Text>
+        onLongPress={() => showProductOptions(item)}
+      >
+        <View style={styles.itemContainer}>
+          {renderMedia(item)}
+          {isPremium && (
+            <View style={styles.premiumBadge}>
+              <Text style={styles.badgeText}>PREMIUM</Text>
             </View>
-          ) : (
-            <Text style={styles.itemPrice}>₹{originalPrice}</Text>
           )}
+          {discount > 0 && (
+            <View style={styles.discountBadge}>
+              <Text style={styles.badgeText}>{discount}% OFF</Text>
+            </View>
+          )}
+          <View style={styles.itemInfo}>
+            <Text style={styles.itemTitle} numberOfLines={1}>
+              {item.name || 'Unnamed Product'}
+            </Text>
+            {discount > 0 ? (
+              <View style={styles.priceContainer}>
+                <Text style={styles.discountedPrice}>₹{discountedPrice}</Text>
+                <Text style={styles.originalPrice}>₹{originalPrice}</Text>
+              </View>
+            ) : (
+              <Text style={styles.itemPrice}>₹{originalPrice}</Text>
+            )}
+          </View>
         </View>
-      </View>
-    </AnimatedItem>
-  );
-};
-
+      </AnimatedItem>
+    );
+  };
 
   const renderReelItem = ({ item, index }) => {
     return (
@@ -499,8 +546,11 @@ const renderProductItem = ({ item, index }) => {
             </Text>
             <Text style={styles.itemPrice}>₹{price}</Text>
           </View>
-          <TouchableOpacity style={styles.closeIcon} onPress={() => handleRemoveFromCart(item._id, item)}>
-            <AntDesign name="close" size={scale(16)} color="#EF4444" />
+          <TouchableOpacity
+            style={styles.closeIcon}
+            onPress={() => handleRemoveFromCart(item._id, item)}
+          >
+            <AntDesign name="close" size={scale(16)} color={SECONDARY_THEME_COLOR} />
           </TouchableOpacity>
         </View>
       </AnimatedItem>
@@ -527,8 +577,11 @@ const renderProductItem = ({ item, index }) => {
             </Text>
             <Text style={styles.itemPrice}>₹{price}</Text>
           </View>
-          <TouchableOpacity style={styles.closeIcon} onPress={() => handleRemoveFromWishlist(item._id, item)}>
-            <AntDesign name="close" size={scale(16)} color="#EF4444" />
+          <TouchableOpacity
+            style={styles.closeIcon}
+            onPress={() => handleRemoveFromWishlist(item._id, item)}
+          >
+            <AntDesign name="close" size={scale(16)} color={SECONDARY_THEME_COLOR} />
           </TouchableOpacity>
         </View>
       </AnimatedItem>
@@ -550,32 +603,50 @@ const renderProductItem = ({ item, index }) => {
   };
 
   return (
-    <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.container}>
+    <LinearGradient colors={BACKGROUND_GRADIENT} style={styles.container}>
       <ScrollView
         onScroll={onScroll}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#A855F7']} tintColor="#A855F7" />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[PRIMARY_THEME_COLOR]}
+            tintColor={PRIMARY_THEME_COLOR}
+          />
         }
       >
-        <View style={styles.profileCard}>
-          
-        <View style={styles.iconContainer}>
+        <LinearGradient colors={BACKGROUND_GRADIENT} style={styles.profileCard}>
+          <View style={styles.iconContainer}>
             {route?.params?.cart === true && (
-              <TouchableOpacity style={styles.backIcon} onPress={() => navigation.goBack()}>
-                <Icon name="arrow-back" size={scale(24)} color="#FFFFFF" />
+              <TouchableOpacity
+                style={styles.backIcon}
+                onPress={() => navigation.goBack()}
+              >
+                <Icon name="arrow-back" size={scale(24)} color={TEXT_THEME_COLOR} />
               </TouchableOpacity>
-            ) }
-            <TouchableOpacity style={[styles.settingsIcon,route?.params?.cart === true && {bottom:25}]} onPress={() => setSidebarVisible(true)}>
-                <Icon name="settings" size={scale(24)} color="#FFFFFF" />
-              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.settingsIcon,
+                route?.params?.cart === true && { bottom: 25 },
+              ]}
+              onPress={() => setSidebarVisible(true)}
+            >
+              <Icon name="settings" size={scale(24)} color={TEXT_THEME_COLOR} />
+            </TouchableOpacity>
           </View>
-          <Pressable onPress={() => setImageModalVisible(true)} style={styles.profileImageContainer}>
+          <Pressable
+            onPress={() => setImageModalVisible(true)}
+            style={styles.profileImageContainer}
+          >
             <FastImage
               source={profileImage ? { uri: profileImage } : img.user}
               style={styles.profileImage}
               resizeMode="cover"
-              onError={(error) => Trace('Profile Image Error', { error: error.nativeEvent })}
+              onError={(error) =>
+                Trace('Profile Image Error', { error: error.nativeEvent })
+              }
             />
             <View style={styles.editIcon}>
               <Text style={styles.editIconText}>✏️</Text>
@@ -583,7 +654,8 @@ const renderProductItem = ({ item, index }) => {
           </Pressable>
           <Text style={styles.name}>{user?.fullName || 'Maria May'}</Text>
           <Text style={styles.bio}>
-            Username: {user?.userName || 'N/A'} {'\n'} Email: {user?.email || 'N/A'} {'\n'} Phone: {user?.phoneNumber || 'N/A'}
+            Username: {user?.userName || 'N/A'} {'\n'} Email:{' '}
+            {user?.email || 'N/A'} {'\n'} Phone: {user?.phoneNumber || 'N/A'}
           </Text>
           <View style={styles.statsRow}>
             {user?.userType === 'seller' && (
@@ -597,7 +669,7 @@ const renderProductItem = ({ item, index }) => {
               <Text style={styles.statLabel}>Reels</Text>
             </View>
           </View>
-        </View>
+        </LinearGradient>
 
         <View style={styles.collectionsSection}>
           <View style={styles.tabsContainer}>
@@ -614,9 +686,18 @@ const renderProductItem = ({ item, index }) => {
                   <MaterialCommunityIcons
                     name={tab.icon}
                     size={scale(20)}
-                    color={activeTab === tab.id ? '#A855F7' : '#B0B0D0'}
+                    color={
+                      activeTab === tab.id
+                        ? TEXT_THEME_COLOR
+                        : PRIMARY_THEME_COLOR
+                    }
                   />
-                  <Text style={[styles.tabText, activeTab === tab.id && styles.activeTabText]}>
+                  <Text
+                    style={[
+                      styles.tabText,
+                      activeTab === tab.id && styles.activeTabText,
+                    ]}
+                  >
                     {tab.label}
                   </Text>
                 </TouchableOpacity>
@@ -631,20 +712,12 @@ const renderProductItem = ({ item, index }) => {
               renderSkeletonLoader()
             ) : products.length > 0 ? (
               <>
-                {/* <TouchableOpacity
-                  style={styles.addButton}
-                  onPress={() => {
-                    Trace('Add Product Clicked');
-                    setCurrentProduct(null);
-                    setProductModalVisible(true);
-                  }}
-                >
-                  <AntDesign name="plussquare" size={scale(20)} color="#A855F7" />
-                </TouchableOpacity> */}
                 <FlatList
                   data={products}
                   renderItem={renderProductItem}
-                  keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+                  keyExtractor={(item) =>
+                    item.id?.toString() || Math.random().toString()
+                  }
                   numColumns={numColumns}
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={styles.collectionsList}
@@ -653,16 +726,20 @@ const renderProductItem = ({ item, index }) => {
             ) : (
               <View style={styles.emptyStateContainer}>
                 <Image source={img.post} style={styles.emptyStateIcon} />
-                <Text style={styles.emptyStateTitle}>Create your first product</Text>
+                <Text style={styles.emptyStateTitle}>
+                  Create your first product
+                </Text>
                 <TouchableOpacity
                   style={styles.uploadButton}
                   onPress={() => {
                     Trace('Add Product Clicked');
-                    setCurrentProduct(null);
-                    setProductModalVisible(true);
+                    navigation.navigate('ProductScreen', { screenType: 'add' });
                   }}
                 >
-                  <LinearGradient colors={['#A855F7', '#7B61FF']} style={styles.uploadButtonGradient}>
+                  <LinearGradient
+                    colors={[CATEGORY_BG_COLOR, PRIMARY_THEME_COLOR]}
+                    style={styles.uploadButtonGradient}
+                  >
                     <Text style={styles.uploadButtonText}>Add Product</Text>
                   </LinearGradient>
                 </TouchableOpacity>
@@ -675,7 +752,11 @@ const renderProductItem = ({ item, index }) => {
                   style={styles.addButton}
                   onPress={() => navigation.navigate('UploadReel')}
                 >
-                  <AntDesign name="plussquare" size={scale(20)} color="#A855F7" />
+                  <AntDesign
+                    name="plussquare"
+                    size={scale(20)}
+                    color={PRIMARY_THEME_COLOR}
+                  />
                 </TouchableOpacity>
                 <FlatList
                   data={reels}
@@ -689,7 +770,9 @@ const renderProductItem = ({ item, index }) => {
             ) : (
               <View style={styles.emptyStateContainer}>
                 <Image source={img.camera} style={styles.emptyStateIcon} />
-                <Text style={styles.emptyStateTitle}>Capture the moment with a friend</Text>
+                <Text style={styles.emptyStateTitle}>
+                  Capture the moment with a friend
+                </Text>
                 <TouchableOpacity
                   style={styles.uploadButton}
                   onPress={() => {
@@ -697,7 +780,10 @@ const renderProductItem = ({ item, index }) => {
                     navigation.navigate('UploadReel');
                   }}
                 >
-                  <LinearGradient colors={['#A855F7', '#7B61FF']} style={styles.uploadButtonGradient}>
+                  <LinearGradient
+                    colors={[CATEGORY_BG_COLOR, PRIMARY_THEME_COLOR]}
+                    style={styles.uploadButtonGradient}
+                  >
                     <Text style={styles.uploadButtonText}>Upload Reel</Text>
                   </LinearGradient>
                 </TouchableOpacity>
@@ -746,21 +832,30 @@ const renderProductItem = ({ item, index }) => {
           onRequestClose={() => setEditModalVisible(false)}
           title="Edit Profile"
           buttons={[
-            { text: 'Cancel', onPress: () => setEditModalVisible(false), style: styles.modalButtonCancel },
-            { text: 'Save', onPress: handleUpdateProfile, style: styles.modalButtonSave, textStyle: styles.modalButtonText },
+            {
+              text: 'Cancel',
+              onPress: () => setEditModalVisible(false),
+              style: styles.modalButtonCancel,
+            },
+            {
+              text: 'Save',
+              onPress: handleUpdateProfile,
+              style: styles.modalButtonSave,
+              textStyle: styles.modalButtonText,
+            },
           ]}
         >
           <TextInput
             style={styles.input}
             placeholder="Full Name"
-            placeholderTextColor="#B0B0D0"
+            placeholderTextColor={SUBTEXT_THEME_COLOR}
             value={fullName}
             onChangeText={setFullName}
           />
           <TextInput
             style={[styles.input, { marginTop: scale(15) }]}
             placeholder="Username"
-            placeholderTextColor="#B0B0D0"
+            placeholderTextColor={SUBTEXT_THEME_COLOR}
             autoCapitalize="none"
             value={userName}
             onChangeText={setUserName}
@@ -773,32 +868,47 @@ const renderProductItem = ({ item, index }) => {
           onRequestClose={() => setImageModalVisible(false)}
           title="Update Profile Picture"
           buttons={[
-            { text: 'Choose from Gallery', onPress: openGallery, style: styles.modalButton },
+            {
+              text: 'Choose from Gallery',
+              onPress: openGallery,
+              style: styles.modalButton,
+            },
             { text: 'Open Camera', onPress: openCamera, style: styles.modalButton },
-            { text: 'Cancel', onPress: () => setImageModalVisible(false), style: styles.modalButtonCancel },
+            {
+              text: 'Cancel',
+              onPress: () => setImageModalVisible(false),
+              style: styles.modalButtonCancel,
+            },
           ]}
         />
 
         {user?.userType === 'seller' && (
-          <>
-            <ProductModal
-              visible={productModalVisible}
-              onClose={() => setProductModalVisible(false)}
-              onSubmit={handleSubmitProduct}
-              product={currentProduct}
-            />
-            <CustomModal
-              visible={productOptionsModalVisible}
-              containerStyle={{ alignSelf: 'center' }}
-              onRequestClose={() => setProductOptionsModalVisible(false)}
-              title="Product Options"
-              buttons={[
-                { text: 'Edit', onPress: () => handleEditProduct(selectedProduct), style: styles.modalButton, textStyle: { fontSize: 13 } },
-                { text: 'Delete', onPress: () => handleDeleteProduct(selectedProduct?.id), style: styles.modalButtonDelete, textStyle: { fontSize: 13 } },
-                { text: 'Cancel', onPress: () => setProductOptionsModalVisible(false), style: styles.modalButtonCancel, textStyle: { fontSize: 12 } },
-              ]}
-            />
-          </>
+          <CustomModal
+            visible={productOptionsModalVisible}
+            containerStyle={{ alignSelf: 'center' }}
+            onRequestClose={() => setProductOptionsModalVisible(false)}
+            title="Product Options"
+            buttons={[
+              {
+                text: 'Edit',
+                onPress: () => handleEditProduct(selectedProduct),
+                style: styles.modalButton,
+                textStyle: { fontSize: scaleFont(13) },
+              },
+              {
+                text: 'Delete',
+                onPress: () => handleDeleteProduct(selectedProduct?.id),
+                style: styles.modalButtonDelete,
+                textStyle: { fontSize: scaleFont(13) },
+              },
+              {
+                text: 'Cancel',
+                onPress: () => setProductOptionsModalVisible(false),
+                style: styles.modalButtonCancel,
+                textStyle: { fontSize: scaleFont(12) },
+              },
+            ]}
+          />
         )}
 
         {sidebarVisible && (
@@ -808,15 +918,41 @@ const renderProductItem = ({ item, index }) => {
             onRequestClose={() => setSidebarVisible(false)}
             animationType="fade"
           >
-            <Pressable style={styles.sidebarOverlay} onPress={() => setSidebarVisible(false)}>
+            <Pressable
+              style={styles.sidebarOverlay}
+              onPress={() => setSidebarVisible(false)}
+            >
               <View style={styles.sidebar}>
-                <TouchableOpacity style={styles.sidebarItem} onPress={() => { Trace('Edit Profile Clicked'); setEditModalVisible(true); setSidebarVisible(false); }}>
+                <TouchableOpacity
+                  style={styles.sidebarItem}
+                  onPress={() => {
+                    Trace('Edit Profile Clicked');
+                    setEditModalVisible(true);
+                    setSidebarVisible(false);
+                  }}
+                >
                   <Text style={styles.sidebarText}>Edit Profile</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.sidebarItem} onPress={confirmLogout}>
+                <TouchableOpacity
+                  style={styles.sidebarItem}
+                  onPress={confirmLogout}
+                >
                   <Text style={styles.sidebarText}>Logout</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.sidebarItem} onPress={() => { Trace('Settings Clicked'); Toast.show({ type: 'info', text1: 'Info', text2: 'Settings coming soon', position: 'top', topOffset: scale(20) }); setSidebarVisible(false); }}>
+                <TouchableOpacity
+                  style={styles.sidebarItem}
+                  onPress={() => {
+                    Trace('Settings Clicked');
+                    Toast.show({
+                      type: 'info',
+                      text1: 'Info',
+                      text2: 'Settings coming soon',
+                      position: 'top',
+                      topOffset: scale(20),
+                    });
+                    setSidebarVisible(false);
+                  }}
+                >
                   <Text style={styles.sidebarText}>Settings</Text>
                 </TouchableOpacity>
               </View>
@@ -841,12 +977,14 @@ const styles = StyleSheet.create({
     paddingVertical: scale(20),
     borderRadius: scale(15),
     marginHorizontal: scale(10),
-    backgroundColor: 'rgba(26, 26, 58, 0.9)',
+    backgroundColor: PRODUCT_BG_COLOR,
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: scale(5) },
     shadowOpacity: 0.2,
     shadowRadius: scale(10),
+    borderWidth: 1,
+    borderColor: BORDER_THEME_COLOR,
   },
   iconContainer: {
     width: '100%',
@@ -857,7 +995,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
     paddingHorizontal: scale(0),
   },
-  backIcon:{
+  backIcon: {
     alignSelf: 'flex-start',
     paddingHorizontal: scale(0),
   },
@@ -870,13 +1008,13 @@ const styles = StyleSheet.create({
     height: scale(80),
     borderRadius: scale(40),
     borderWidth: 2,
-    borderColor: '#A855F7',
+    borderColor: PRIMARY_THEME_COLOR,
   },
   editIcon: {
     position: 'absolute',
     bottom: -scale(5),
     right: -scale(5),
-    backgroundColor: '#A855F7',
+    backgroundColor: PRIMARY_THEME_COLOR,
     borderRadius: scale(10),
     width: scale(20),
     height: scale(20),
@@ -885,17 +1023,17 @@ const styles = StyleSheet.create({
   },
   editIconText: {
     fontSize: scale(12),
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
   },
   name: {
     fontSize: scaleFont(20),
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
     marginBottom: scale(5),
   },
   bio: {
     fontSize: scaleFont(14),
-    color: '#B0B0D0',
+    color: SUBTEXT_THEME_COLOR,
     textAlign: 'center',
     paddingHorizontal: scale(20),
     marginBottom: scale(10),
@@ -912,11 +1050,11 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: scaleFont(16),
     fontWeight: '600',
-    color: '#A855F7',
+    color: PRIMARY_THEME_COLOR,
   },
   statLabel: {
     fontSize: scaleFont(12),
-    color: '#B0B0D0',
+    color: SUBTEXT_THEME_COLOR,
   },
   collectionsSection: {
     marginTop: scale(20),
@@ -925,14 +1063,16 @@ const styles = StyleSheet.create({
   tabsContainer: {
     paddingVertical: scale(10),
     paddingHorizontal: scale(20),
-    backgroundColor: 'rgba(42, 42, 90, 0.9)',
+    backgroundColor: PRODUCT_BG_COLOR,
     borderTopLeftRadius: scale(20),
     borderTopRightRadius: scale(20),
     elevation: 3,
+    borderWidth: 1,
+    borderColor: BORDER_THEME_COLOR,
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: CATEGORY_BG_COLOR,
     borderRadius: scale(25),
     padding: scale(5),
   },
@@ -945,20 +1085,20 @@ const styles = StyleSheet.create({
     borderRadius: scale(20),
   },
   activeTab: {
-    backgroundColor: 'rgba(168, 85, 247, 0.2)',
+    backgroundColor: SELECTED_CATEGORY_BG_COLOR,
   },
   tabText: {
     fontSize: scaleFont(14),
-    color: '#B0B0D0',
+    color: SUBTEXT_THEME_COLOR,
     marginLeft: scale(5),
     fontWeight: '500',
   },
   activeTabText: {
-    color: '#A855F7',
+    color: TEXT_THEME_COLOR,
     fontWeight: '600',
   },
   line: {
-    borderColor: '#B0B0D0',
+    borderColor: BORDER_THEME_COLOR,
     marginBottom: scale(10),
     width: '90%',
     alignSelf: 'center',
@@ -970,7 +1110,7 @@ const styles = StyleSheet.create({
     marginBottom: scale(10),
   },
   addButtonText: {
-    color: '#A855F7',
+    color: PRIMARY_THEME_COLOR,
     fontSize: scaleFont(14),
     marginLeft: scale(5),
     fontWeight: '500',
@@ -985,12 +1125,11 @@ const styles = StyleSheet.create({
     width: scale(80),
     height: scale(80),
     marginBottom: scale(20),
-    tintColor: '#B0B0D0',
   },
   emptyStateTitle: {
     fontSize: scaleFont(16),
     fontWeight: '500',
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
     textAlign: 'center',
     marginBottom: scale(20),
   },
@@ -1006,21 +1145,20 @@ const styles = StyleSheet.create({
   uploadButtonText: {
     fontSize: scaleFont(14),
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
   },
   itemContainer: {
     width: itemSize,
     margin: scale(5),
-    backgroundColor: 'rgba(42, 42, 74, 0.9)',
+    backgroundColor: PRODUCT_BG_COLOR,
     borderRadius: scale(12),
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: BORDER_THEME_COLOR,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: scale(5) },
     shadowOpacity: 0.2,
     shadowRadius: scale(10),
-    elevation: 3,
   },
   mediaContainer: {
     width: '100%',
@@ -1038,7 +1176,7 @@ const styles = StyleSheet.create({
     top: '50%',
     left: '50%',
     transform: [{ translateX: -scale(12) }, { translateY: -scale(12) }],
-    backgroundColor: 'rgba(168, 85, 247, 0.8)',
+    backgroundColor: CATEGORY_BG_COLOR,
     borderRadius: scale(20),
     padding: scale(8),
   },
@@ -1048,27 +1186,27 @@ const styles = StyleSheet.create({
   },
   itemTitle: {
     fontSize: scaleFont(12),
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: scale(5),
-    height: scale(20), // Fixed height for consistency
+    height: scale(20),
   },
   itemPrice: {
     fontSize: scaleFont(10),
     fontWeight: '700',
-    color: '#A855F7',
+    color: PRIMARY_THEME_COLOR,
   },
   discountedPrice: {
     fontSize: scaleFont(10),
     fontWeight: '700',
-    color: '#A855F7',
+    color: PRIMARY_THEME_COLOR,
     marginRight: scale(4),
   },
   originalPrice: {
     fontSize: scaleFont(8),
     fontWeight: '500',
-    color: '#B0B0D0',
+    color: SUBTEXT_THEME_COLOR,
     textDecorationLine: 'line-through',
   },
   priceContainer: {
@@ -1080,7 +1218,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: scale(5),
     right: scale(5),
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    backgroundColor: CATEGORY_BG_COLOR,
     borderRadius: scale(10),
     padding: scale(4),
   },
@@ -1088,7 +1226,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: scale(8),
     right: scale(8),
-    backgroundColor: '#FF3E6D',
+    backgroundColor: SECONDARY_THEME_COLOR,
     paddingHorizontal: scale(6),
     paddingVertical: scale(2),
     borderRadius: scale(4),
@@ -1097,20 +1235,20 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: scale(8),
     left: scale(8),
-    backgroundColor: '#FFD700',
+    backgroundColor: PREMIUM_BADGE_COLOR,
     paddingHorizontal: scale(8),
     paddingVertical: scale(3),
     borderRadius: scale(12),
   },
   badgeText: {
     fontSize: scaleFont(10),
-    color: '#000000',
+    color: PREMIUM_TEXT_COLOR,
     fontWeight: 'bold',
   },
   collectionsList: {
     paddingHorizontal: itemSpacing,
     paddingBottom: scale(10),
-    alignItems: 'center', // Center items in the grid
+    alignItems: 'center',
   },
   sidebarOverlay: {
     flex: 1,
@@ -1121,18 +1259,20 @@ const styles = StyleSheet.create({
   sidebar: {
     width: width * 0.3,
     padding: scale(10),
-    backgroundColor: '#2A2A4A',
+    backgroundColor: PRODUCT_BG_COLOR,
     borderBottomLeftRadius: scale(20),
+    borderWidth: 1,
+    borderColor: BORDER_THEME_COLOR,
   },
   sidebarItem: {
     paddingVertical: scale(12),
     paddingHorizontal: scale(10),
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomColor: BORDER_THEME_COLOR,
   },
   sidebarText: {
     fontSize: scaleFont(12),
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
     fontWeight: '500',
   },
   modalContainer: {
@@ -1152,7 +1292,7 @@ const styles = StyleSheet.create({
     marginVertical: scale(5),
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#A855F7',
+    borderColor: PRIMARY_THEME_COLOR,
   },
   modalButtonDelete: {
     backgroundColor: 'transparent',
@@ -1162,7 +1302,7 @@ const styles = StyleSheet.create({
     marginVertical: scale(5),
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#EF4444',
+    borderColor: SECONDARY_THEME_COLOR,
   },
   modalButtonCancel: {
     backgroundColor: 'transparent',
@@ -1172,7 +1312,7 @@ const styles = StyleSheet.create({
     marginVertical: scale(5),
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#6B7280',
+    borderColor: SUBTEXT_THEME_COLOR,
   },
   modalButtonSave: {
     backgroundColor: 'transparent',
@@ -1182,37 +1322,37 @@ const styles = StyleSheet.create({
     marginVertical: scale(5),
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#10B981',
+    borderColor: PRIMARY_THEME_COLOR,
   },
   modalButtonText: {
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
     fontSize: scaleFont(16),
     fontWeight: '600',
   },
   input: {
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: BORDER_THEME_COLOR,
     borderRadius: scale(8),
     padding: scale(10),
     fontSize: scaleFont(16),
-    color: '#FFFFFF',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    color: TEXT_THEME_COLOR,
+    backgroundColor: CATEGORY_BG_COLOR,
     width: '100%',
   },
   skeletonItem: {
     width: itemSize,
     margin: scale(5),
-    backgroundColor: 'rgba(42, 42, 74, 0.9)',
+    backgroundColor: PRODUCT_BG_COLOR,
     borderRadius: scale(12),
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: BORDER_THEME_COLOR,
     elevation: 3,
   },
   skeletonImage: {
     width: '100%',
     height: itemSize * 1.2,
-    backgroundColor: 'rgba(58, 58, 90, 0.5)',
+    backgroundColor: CATEGORY_BG_COLOR,
     borderTopLeftRadius: scale(12),
     borderTopRightRadius: scale(12),
   },
@@ -1223,7 +1363,7 @@ const styles = StyleSheet.create({
   skeletonText: {
     width: '80%',
     height: scale(14),
-    backgroundColor: 'rgba(58, 58, 90, 0.5)',
+    backgroundColor: CATEGORY_BG_COLOR,
     borderRadius: scale(4),
     marginVertical: scale(4),
   },

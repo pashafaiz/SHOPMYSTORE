@@ -17,6 +17,9 @@ import {
   FILTER_LIMIT,
   PRICE_RANGES,
   SORT_OPTIONS,
+  RATING_OPTIONS,
+  DISCOUNT_OPTIONS,
+  BRAND_OPTIONS,
   USER_TOKEN_KEY,
   TOAST_POSITION,
   TOAST_TOP_OFFSET,
@@ -45,8 +48,14 @@ export const fetchProducts = createAsyncThunk(
           category: product.category || DEFAULT_CATEGORY,
           createdAt: product.createdAt || new Date().toISOString(),
           views: product.views || 0,
+          rating: product.rating || 0,
+          discount: product.discount || 0,
+          brand: product.brand || 'Others',
+          stock: product.stock || 0, // Added stock
+          offer: product.offer || '', // Added offer
         }));
-        return normalizedProducts;
+        const brands = [...new Set(normalizedProducts.map((p) => p.brand).filter(Boolean))];
+        return { products: normalizedProducts, brands };
       } else {
         return rejectWithValue(data.message || FETCH_PRODUCTS_ERROR);
       }
@@ -67,7 +76,13 @@ export const submitProduct = createAsyncThunk(
         return rejectWithValue(NO_TOKEN_ERROR);
       }
 
-      const productPayload = { ...productData, createdBy: userId };
+      const productPayload = {
+        ...productData,
+        createdBy: userId,
+        stock: productData.stock || 0, // Ensure stock is included
+        brand: productData.brand || 'Unknown Brand', // Ensure brand is included
+        offer: productData.offer || '', // Ensure offer is included
+      };
       const endpoint = currentProduct
         ? `${BASE_URL}${PRODUCTS_ENDPOINT}/${currentProduct.id}`
         : `${BASE_URL}${PRODUCTS_ENDPOINT}`;
@@ -134,6 +149,7 @@ const dashboardSlice = createSlice({
     products: [],
     filteredProducts: [],
     suggestions: [],
+    brands: [],
     isExpanded: false,
     currentIndex: 0,
     activeFilter: null,
@@ -147,7 +163,12 @@ const dashboardSlice = createSlice({
     selectedCategory: '',
     selectedPrice: '',
     selectedSort: '',
+    selectedRating: '',
+    selectedDiscount: '',
+    selectedBrand: '',
     error: null,
+    recentSearches: [],
+    recentlyViewedProducts: [],
   },
   reducers: {
     setSearch: (state, action) => {
@@ -156,8 +177,12 @@ const dashboardSlice = createSlice({
         state.suggestions = [];
         state.filteredProducts = state.products.slice(0, FILTER_LIMIT);
       } else {
-        const results = state.products.filter((item) =>
-          item.name?.toLowerCase().includes(action.payload.toLowerCase())
+        const searchTerm = action.payload.toLowerCase();
+        const results = state.products.filter(
+          (item) =>
+            item.name?.toLowerCase().includes(searchTerm) ||
+            item.category?.toLowerCase().includes(searchTerm) ||
+            item.brand?.toLowerCase().includes(searchTerm) // Added brand to search
         );
         state.suggestions = results;
         state.filteredProducts = results.slice(0, FILTER_LIMIT);
@@ -167,8 +192,14 @@ const dashboardSlice = createSlice({
     selectSuggestion: (state, action) => {
       state.search = action.payload;
       state.suggestions = [];
+      const searchTerm = action.payload.toLowerCase();
       state.filteredProducts = state.products
-        .filter((item) => item.name?.toLowerCase().includes(action.payload.toLowerCase()))
+        .filter(
+          (item) =>
+            item.name?.toLowerCase().includes(searchTerm) ||
+            item.category?.toLowerCase().includes(searchTerm) ||
+            item.brand?.toLowerCase().includes(searchTerm) // Added brand to search
+        )
         .slice(0, FILTER_LIMIT);
     },
     setIsExpanded: (state, action) => {
@@ -238,28 +269,122 @@ const dashboardSlice = createSlice({
       }
       state.filteredProducts = result.slice(0, FILTER_LIMIT);
     },
+    setSelectedRating: (state, action) => {
+      state.selectedRating = action.payload;
+      let result = [...state.products];
+      if (action.payload) {
+        const ratingValue = parseInt(action.payload, 10);
+        if (!isNaN(ratingValue)) {
+          result = result.filter((product) => Math.round(product.rating || 0) >= ratingValue);
+        }
+      }
+      state.filteredProducts = result.slice(0, FILTER_LIMIT);
+    },
+    setSelectedDiscount: (state, action) => {
+      state.selectedDiscount = action.payload;
+      let result = [...state.products];
+      if (action.payload) {
+        const discountValue = parseInt(action.payload, 10);
+        if (!isNaN(discountValue)) {
+          result = result.filter((product) => (product.discount || 0) >= discountValue);
+        }
+      }
+      state.filteredProducts = result.slice(0, FILTER_LIMIT);
+    },
+    setSelectedBrand: (state, action) => {
+      state.selectedBrand = action.payload;
+      let result = [...state.products];
+      if (action.payload) {
+        result = result.filter((product) => product.brand === action.payload);
+      }
+      state.filteredProducts = result.slice(0, FILTER_LIMIT);
+    },
     clearFilters: (state) => {
       state.selectedCategory = '';
       state.selectedPrice = '';
       state.selectedSort = '';
+      state.selectedRating = '';
+      state.selectedDiscount = '';
+      state.selectedBrand = '';
+      state.search = '';
+      state.suggestions = [];
       state.filteredProducts = state.products.slice(0, FILTER_LIMIT);
     },
     setUserData: (state, action) => {
       state.userId = action.payload.userId;
       state.token = action.payload.token;
     },
+    addRecentSearch: (state, action) => {
+      const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      const searchTerms = Array.isArray(action.payload) ? action.payload : [action.payload];
+      const newSearches = searchTerms
+        .filter((term) => term && !state.recentSearches.some((s) => s.term === term))
+        .map((term) => ({ term, timestamp: now }));
+      state.recentSearches = [
+        ...newSearches,
+        ...state.recentSearches.filter((item) => now - item.timestamp < ONE_DAY_MS),
+      ].slice(0, 10);
+      AsyncStorage.setItem('recentSearches', JSON.stringify(state.recentSearches)).catch(
+        (err) => {
+          Trace('Failed to save recent searches', { error: err.message });
+        }
+      );
+    },
+    removeRecentSearch: (state, action) => {
+      state.recentSearches = state.recentSearches.filter(
+        (item) => item.term !== action.payload
+      );
+      AsyncStorage.setItem('recentSearches', JSON.stringify(state.recentSearches)).catch(
+        (err) => {
+          Trace('Failed to save recent searches', { error: err.message });
+        }
+      );
+    },
+    clearRecentSearches: (state) => {
+      state.recentSearches = [];
+      AsyncStorage.removeItem('recentSearches').catch((err) => {
+        Trace('Failed to clear recent searches', { error: err.message });
+      });
+    },
+    addRecentlyViewedProduct: (state, action) => {
+      const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      const product = { ...action.payload, timestamp: now };
+      state.recentlyViewedProducts = state.recentlyViewedProducts.filter(
+        (p) => p.id !== product.id
+      );
+      state.recentlyViewedProducts = [
+        product,
+        ...state.recentlyViewedProducts.filter(
+          (item) => now - item.timestamp < ONE_DAY_MS
+        ),
+      ].slice(0, 10);
+      AsyncStorage.setItem(
+        'recentlyViewedProducts',
+        JSON.stringify(state.recentlyViewedProducts)
+      ).catch((err) => {
+        Trace('Failed to save recently viewed products', { error: err.message });
+      });
+    },
+    clearRecentlyViewedProducts: (state) => {
+      state.recentlyViewedProducts = [];
+      AsyncStorage.removeItem('recentlyViewedProducts').catch((err) => {
+        Trace('Failed to clear recently viewed products', { error: err.message });
+      });
+    },
   },
   extraReducers: (builder) => {
     builder
-      // Fetch Products
       .addCase(fetchProducts.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchProducts.fulfilled, (state, action) => {
         state.loading = false;
-        state.products = action.payload;
-        state.filteredProducts = action.payload.slice(0, FILTER_LIMIT);
+        state.products = action.payload.products;
+        state.brands = action.payload.brands;
+        state.filteredProducts = action.payload.products.slice(0, FILTER_LIMIT);
       })
       .addCase(fetchProducts.rejected, (state, action) => {
         state.loading = false;
@@ -272,7 +397,6 @@ const dashboardSlice = createSlice({
           topOffset: TOAST_TOP_OFFSET,
         });
       })
-      // Submit Product
       .addCase(submitProduct.pending, (state) => {
         state.isActionLoading = true;
       })
@@ -290,7 +414,6 @@ const dashboardSlice = createSlice({
           topOffset: TOAST_TOP_OFFSET,
         });
       })
-      // Delete Product
       .addCase(deleteProduct.pending, (state) => {
         state.isActionLoading = true;
       })
@@ -321,8 +444,16 @@ export const {
   setSelectedCategory,
   setSelectedPrice,
   setSelectedSort,
+  setSelectedRating,
+  setSelectedDiscount,
+  setSelectedBrand,
   clearFilters,
   setUserData,
+  addRecentSearch,
+  removeRecentSearch,
+  clearRecentSearches,
+  addRecentlyViewedProduct,
+  clearRecentlyViewedProducts,
 } = dashboardSlice.actions;
 
 export default dashboardSlice.reducer;

@@ -19,6 +19,16 @@ import Animated, {
   withSpring,
   FadeIn,
 } from 'react-native-reanimated';
+import { CATEGORY_BG_COLOR } from '../constants/GlobalConstants';
+
+// Theme constants
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
 
 const { width } = Dimensions.get('window');
 const scaleSize = (size) => Math.round(size * (width / 375));
@@ -33,7 +43,7 @@ const CustomModal = ({
   containerStyle = {},
   overlayStyle = {},
   titleStyle = {},
-  dismissOnOverlayPress = false,
+  dismissOnOverlayPress = true,
 }) => {
   const scaleValue = useSharedValue(0.95);
   const opacityValue = useSharedValue(0);
@@ -65,18 +75,19 @@ const CustomModal = ({
             style={{ width: '100%' }}
           >
             <SafeAreaView>
-              <Animated.View style={animatedStyle}>
+              <Animated.View style={[animatedStyle, { alignSelf: 'center' }]}>
                 <LinearGradient
-                  colors={['#2A2A5A', '#3A3A7A']}
+                  colors={BACKGROUND_GRADIENT}
                   style={[styles.container, containerStyle]}
                 >
                   <ScrollView
                     contentContainerStyle={{ alignItems: 'center' }}
                     keyboardShouldPersistTaps="handled"
                   >
-                    {title && <Text style={[styles.title, titleStyle]}>{title}</Text>}
+                    {title && (
+                      <Text style={[styles.title, titleStyle]}>{title}</Text>
+                    )}
                     {children}
-
                     <View
                       style={[
                         styles.buttonRow,
@@ -89,7 +100,13 @@ const CustomModal = ({
                           onPress={btn.onPress}
                           style={[styles.button, btn.style]}
                         >
-                          <Text style={[styles.buttonText, btn.textStyle]}>{btn.text}</Text>
+                          <View
+                            style={styles.buttonGradient}
+                          >
+                            <Text style={[styles.buttonText, btn.textStyle]}>
+                              {btn.text}
+                            </Text>
+                          </View>
                         </TouchableOpacity>
                       ))}
                     </View>
@@ -104,44 +121,54 @@ const CustomModal = ({
   );
 };
 
-export default CustomModal;
-
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: '#00000099',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   container: {
-    padding: scaleSize(25),
+    padding: scaleSize(20),
     width: width * 0.8,
-    borderRadius: scaleSize(20),
+    borderRadius: scaleSize(15),
     alignItems: 'center',
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderWidth: 1,
+    borderColor: BORDER_THEME_COLOR,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scaleSize(5) },
+    shadowOpacity: 0.2,
+    shadowRadius: scaleSize(10),
   },
   title: {
     fontSize: scaleFont(18),
     fontWeight: '600',
-    marginBottom: scaleSize(20),
+    marginBottom: scaleSize(15),
     textAlign: 'center',
-    color: '#FFFFFF',
+    color: TEXT_THEME_COLOR,
   },
   buttonRow: {
     flexDirection: 'row',
-    marginTop: scaleSize(20),
+    marginTop: scaleSize(15),
     width: '100%',
     justifyContent: 'space-between',
   },
   button: {
     flex: 1,
-    padding: scaleSize(12),
-    alignItems: 'center',
     marginHorizontal: scaleSize(5),
-    borderRadius: scaleSize(10),
-    backgroundColor: '#ddd',
+    borderRadius: scaleSize(8),
+    overflow: 'hidden',
+  },
+  buttonGradient: {
+    // padding: scaleSize(12),
+    alignItems: 'center',
   },
   buttonText: {
-    fontSize: scaleFont(16),
-    color: '#FFFFFF',
+    fontSize: scaleFont(14),
+    fontWeight: '600',
   },
 });
+
+export default CustomModal;

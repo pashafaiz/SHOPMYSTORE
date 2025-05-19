@@ -19,6 +19,43 @@ const fetchWithTimeout = async (url, options, timeout) => {
   return Promise.race([fetch(url, options), timeoutPromise]);
 };
 
+// Create Razorpay order
+export const createRazorpayOrder = createAsyncThunk(
+  'checkout/createRazorpayOrder',
+  async ({ amount }, { rejectWithValue }) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        throw new Error('Authentication token is missing');
+      }
+
+      const response = await fetchWithTimeout(
+        `${BASE_URL}${ORDER_ENDPOINT}/create-razorpay-order`,
+        {
+          method: HTTP_METHODS.POST,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ amount }),
+        },
+        API_TIMEOUT_SHORT
+      );
+
+      const data = await response.json();
+      console.log('createRazorpayOrder response:', data);
+      if (!response.ok) {
+        throw new Error(data.msg || 'Failed to create Razorpay order');
+      }
+
+      return data.order;
+    } catch (error) {
+      console.error('Create Razorpay order error:', error);
+      return rejectWithValue(error.message || NETWORK_ERROR);
+    }
+  }
+);
+
 // Fetch product details for checkout
 export const fetchCheckoutProductDetails = createAsyncThunk(
   'checkout/fetchCheckoutProductDetails',
@@ -240,7 +277,7 @@ export const placeOrder = createAsyncThunk(
 // Fetch order details
 export const fetchOrderDetails = createAsyncThunk(
   'checkout/fetchOrderDetails',
-  async ({ orderId }, { rejectWithValue }) => {
+  async ({ orderId }, {組みwithValue }) => {
     try {
       if (!orderId || typeof orderId !== 'string') {
         throw new Error('Invalid order ID');
@@ -311,6 +348,24 @@ const checkoutSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // Create Razorpay Order
+      .addCase(createRazorpayOrder.pending, (state) => {
+        state.isActionLoading = true;
+        state.error = null;
+      })
+      .addCase(createRazorpayOrder.fulfilled, (state, action) => {
+        state.isActionLoading = false;
+      })
+      .addCase(createRazorpayOrder.rejected, (state, action) => {
+        state.isActionLoading = false;
+        state.error = action.payload;
+        Toast.show({
+          type: 'error',
+          text1: action.payload,
+          position: TOAST_POSITION,
+          topOffset: TOAST_TOP_OFFSET,
+        });
+      })
       // Fetch Checkout Product Details
       .addCase(fetchCheckoutProductDetails.pending, (state) => {
         state.loading = true;
@@ -339,7 +394,7 @@ const checkoutSlice = createSlice({
         state.loading = false;
         state.addresses = action.payload;
         const defaultAddress = action.payload.find((addr) => addr.isDefault);
-        state.selectedAddressId = defaultAddress ? defaultAddress._id : null;
+        state.selectedAddressId = defaultAddress ? defaultAddress._id : null
       })
       .addCase(fetchAddresses.rejected, (state, action) => {
         state.loading = false;

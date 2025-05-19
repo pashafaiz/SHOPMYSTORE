@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -29,17 +29,30 @@ import {
   fetchUserProducts,
   fetchUserReels,
   submitProduct,
+  deleteProduct,
   clearMessages,
 } from '../redux/slices/profileSlice';
-import ProductModal from '../Products/ProductModal';
+import CustomModal from '../Components/CustomModal';
 import img from '../assets/Images/img';
+import {
+  PRODUCT_BG_COLOR,
+  CATEGORY_BG_COLOR,
+  SELECTED_CATEGORY_BG_COLOR,
+  PRIMARY_COLOR,
+  SECONDARY_COLOR,
+  TEXT_COLOR,
+  SUBTEXT_COLOR,
+  BORDER_COLOR,
+  BACKGROUND_GRADIENT,
+  DEFAULT_IMAGE_URL,
+} from '../constants/GlobalConstants';
 
 const { width, height } = Dimensions.get('window');
 const scaleFactor = width / 375;
 const scale = (size) => size * scaleFactor;
 const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375));
 const numColumns = 3;
-const itemSpacing = scale(10);
+const itemSpacing = scale(8);
 const itemSize = (width - (itemSpacing * (numColumns + 1))) / numColumns;
 
 // Skeleton Loader Component
@@ -61,22 +74,22 @@ const AnimatedItem = ({ children, onPress, index, onLongPress }) => {
   const opacityValue = useSharedValue(0);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: withSpring(scaleValue.value, { damping: 10 }) }],
+    transform: [{ scale: withSpring(scaleValue.value, { damping: 12 }) }],
     opacity: opacityValue.value,
   }));
 
   useEffect(() => {
-    opacityValue.value = withSpring(1, { delay: index * 100, easing: Easing.out(Easing.quad) });
+    opacityValue.value = withSpring(1, { delay: index * 80, easing: Easing.out(Easing.quad) });
   }, [opacityValue, index]);
 
   return (
-    <Animated.View entering={FadeIn.delay(index * 50)} style={animatedStyle}>
+    <Animated.View entering={FadeIn.delay(index * 40)} style={animatedStyle}>
       <TouchableOpacity
-        activeOpacity={0.9}
+        activeOpacity={0.85}
         onPress={onPress}
         onLongPress={onLongPress}
         onPressIn={() => {
-          scaleValue.value = 0.95;
+          scaleValue.value = 0.97;
         }}
         onPressOut={() => {
           scaleValue.value = 1;
@@ -90,7 +103,7 @@ const AnimatedItem = ({ children, onPress, index, onLongPress }) => {
 
 // Render Media (Image or Video)
 const renderMedia = (item) => {
-  const mediaUrl = item?.media?.[0]?.url || 'https://via.placeholder.com/120';
+  const mediaUrl = item?.media?.[0] || DEFAULT_IMAGE_URL;
   const isVideo = mediaUrl?.toLowerCase().endsWith('.mp4') || mediaUrl?.toLowerCase().endsWith('.mov');
 
   return (
@@ -99,11 +112,11 @@ const renderMedia = (item) => {
         source={{ uri: mediaUrl }}
         style={styles.mediaImage}
         resizeMode="cover"
-        defaultSource={{ uri: 'https://via.placeholder.com/120' }}
+        defaultSource={{ uri: DEFAULT_IMAGE_URL }}
       />
       {isVideo && (
         <View style={styles.playIcon}>
-          <MaterialCommunityIcons name="play" size={scale(24)} color="#FFFFFF" />
+          <MaterialCommunityIcons name="play" size={scale(18)} color={TEXT_COLOR} />
         </View>
       )}
     </View>
@@ -125,8 +138,8 @@ const SellerDashboard = () => {
   } = useSelector((state) => state.profile);
 
   const [activeTab, setActiveTab] = useState('products');
-  const [productModalVisible, setProductModalVisible] = useState(false);
-  const [currentProduct, setCurrentProduct] = useState(null);
+  const [customModalVisible, setCustomModalVisible] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   const headerOpacity = useSharedValue(0);
   const headerStyle = useAnimatedStyle(() => ({
@@ -184,14 +197,34 @@ const SellerDashboard = () => {
     });
   }, [dispatch, userId]);
 
-  const handleSubmitProduct = (productData) => {
-    dispatch(submitProduct({ productData, currentProduct })).then((result) => {
+  const handleEditProduct = (product) => {
+    Trace('Navigating to ProductScreen for Edit', { productId: product.id });
+    navigation.navigate('ProductScreen', { product, screenType: 'edit' });
+    setCustomModalVisible(false);
+  };
+
+  const handleAddProduct = () => {
+    Trace('Navigating to ProductScreen for Add');
+    navigation.navigate('ProductScreen', { product: null, screenType: 'add' });
+  };
+
+  const handleDeleteProduct = (productId) => {
+    Trace('Deleting Product', { productId });
+    dispatch(deleteProduct(productId)).then((result) => {
       if (result.meta.requestStatus === 'fulfilled') {
         dispatch(fetchUserProducts(userId));
       }
     });
-    setProductModalVisible(false);
+    setCustomModalVisible(false);
   };
+
+  const showProductOptions = (product) => {
+    setSelectedProduct(product);
+    Trace('Product Options Modal Shown', { productId: product?.id });
+    setCustomModalVisible(true);
+  };
+
+  const totalStock = products.reduce((sum, product) => sum + (product.stock || 0), 0);
 
   const renderProductItem = ({ item, index }) => {
     const originalPrice = parseFloat(item?.originalPrice || item?.price || 0).toFixed(2);
@@ -202,21 +235,26 @@ const SellerDashboard = () => {
       <AnimatedItem
         index={index}
         onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
-        onLongPress={() => {
-          setCurrentProduct(item);
-          setProductModalVisible(true);
-        }}
+        onLongPress={() => showProductOptions(item)}
       >
         <View style={styles.itemContainer}>
           {renderMedia(item)}
-          {discount > 0 && (
+          {discount > 0 && !item.offer && (
             <View style={styles.discountBadge}>
               <Text style={styles.badgeText}>{discount}% OFF</Text>
+            </View>
+          )}
+          {item.offer && (
+            <View style={styles.offerBadge}>
+              <Text style={styles.badgeText}>{item.offer}</Text>
             </View>
           )}
           <View style={styles.itemInfo}>
             <Text style={styles.itemTitle} numberOfLines={1}>
               {item.name || 'Unnamed Product'}
+            </Text>
+            <Text style={styles.itemBrand} numberOfLines={1}>
+              {item.brand || 'Unknown Brand'}
             </Text>
             {discount > 0 ? (
               <View style={styles.priceContainer}>
@@ -226,6 +264,9 @@ const SellerDashboard = () => {
             ) : (
               <Text style={styles.itemPrice}>₹{originalPrice}</Text>
             )}
+            <Text style={styles.itemStock}>
+              Stock: {item.stock || 0}
+            </Text>
           </View>
         </View>
       </AnimatedItem>
@@ -273,16 +314,9 @@ const SellerDashboard = () => {
   ];
 
   return (
-    <LinearGradient colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']} style={styles.container}>
+    <LinearGradient colors={BACKGROUND_GRADIENT} style={styles.container}>
       <Animated.View style={[styles.header, headerStyle]}>
-        <Text style={styles.headerTitle}>Your Seller Profile</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-          <FastImage
-            source={user?.profileImage ? { uri: user.profileImage } : img.user}
-            style={styles.profileImage}
-            resizeMode="cover"
-          />
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Seller Dashboard</Text>
       </Animated.View>
 
       <ScrollView
@@ -291,21 +325,50 @@ const SellerDashboard = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#A855F7']}
-            tintColor="#A855F7"
+            colors={[PRIMARY_COLOR]}
+            tintColor={PRIMARY_COLOR}
+            progressBackgroundColor={PRODUCT_BG_COLOR}
           />
         }
       >
+        <View style={styles.profileSection}>
+          <FastImage
+            source={user?.profileImage ? { uri: user.profileImage } : img.user}
+            style={styles.profileImage}
+            resizeMode="cover"
+          />
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName}>{user?.fullName || 'User Name'}</Text>
+            <Text style={styles.profileEmail}>{user?.email || 'user@example.com'}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.editProfileButton}
+            onPress={() => navigation.navigate('Profile')}
+          >
+            <LinearGradient
+              colors={[CATEGORY_BG_COLOR, PRIMARY_COLOR]}
+              style={styles.editProfileButtonGradient}
+            >
+              <Text style={styles.editProfileButtonText}>Edit Profile</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.statsSection}>
           <View style={styles.statCard}>
-            <MaterialCommunityIcons name="shopping" size={scale(24)} color="#A855F7" />
+            <MaterialCommunityIcons name="shopping" size={scale(24)} color={PRIMARY_COLOR} />
             <Text style={styles.statValue}>{products.length}</Text>
-            <Text style={styles.statLabel}>Products</Text>
+            {/* <Text style={styles.statLabel}>Products</Text> */}
           </View>
           <View style={styles.statCard}>
-            <MaterialCommunityIcons name="play-box" size={scale(24)} color="#A855F7" />
+            <MaterialCommunityIcons name="play-box" size={scale(24)} color={PRIMARY_COLOR} />
             <Text style={styles.statValue}>{reels.length}</Text>
-            <Text style={styles.statLabel}>Reels</Text>
+            {/* <Text style={styles.statLabel}>Reels</Text> */}
+          </View>
+          <View style={styles.statCard}>
+            <MaterialCommunityIcons name="package-variant" size={scale(24)} color={PRIMARY_COLOR} />
+            <Text style={styles.statValue}>{totalStock}</Text>
+            {/* <Text style={styles.statLabel}>Stock</Text> */}
           </View>
         </View>
 
@@ -322,12 +385,9 @@ const SellerDashboard = () => {
               >
                 <MaterialCommunityIcons
                   name={tab.icon}
-                  size={scale(20)}
-                  color={activeTab === tab.id ? '#A855F7' : '#B0B0D0'}
+                  size={scale(24)}
+                  color={activeTab === tab.id ? TEXT_COLOR : SUBTEXT_COLOR}
                 />
-                <Text style={[styles.tabText, activeTab === tab.id && styles.activeTabText]}>
-                  {tab.label}
-                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -341,15 +401,13 @@ const SellerDashboard = () => {
               <>
                 <TouchableOpacity
                   style={styles.addButton}
-                  onPress={() => {
-                    Trace('Add Product Clicked');
-                    setCurrentProduct(null);
-                    setProductModalVisible(true);
-                  }}
+                  onPress={handleAddProduct}
                 >
-                  <LinearGradient colors={['#A855F7', '#7B61FF']} style={styles.addButtonGradient}>
-                    <MaterialCommunityIcons name="plus" size={scale(20)} color="#FFFFFF" />
-                    <Text style={styles.addButtonText}>Add Product</Text>
+                  <LinearGradient
+                    colors={[CATEGORY_BG_COLOR, PRIMARY_COLOR]}
+                    style={styles.addButtonGradient}
+                  >
+                    <MaterialCommunityIcons name="plus-circle" size={scale(24)} color={TEXT_COLOR} />
                   </LinearGradient>
                 </TouchableOpacity>
                 <FlatList
@@ -363,17 +421,20 @@ const SellerDashboard = () => {
               </>
             ) : (
               <View style={styles.emptyStateContainer}>
-                <FastImage source={img.post} style={styles.emptyStateIcon} />
+                <FastImage
+                  source={img.post}
+                  style={styles.emptyStateIcon}
+                  tintColor={SUBTEXT_COLOR}
+                />
                 <Text style={styles.emptyStateTitle}>Create your first product</Text>
                 <TouchableOpacity
                   style={styles.uploadButton}
-                  onPress={() => {
-                    Trace('Add Product Clicked');
-                    setCurrentProduct(null);
-                    setProductModalVisible(true);
-                  }}
+                  onPress={handleAddProduct}
                 >
-                  <LinearGradient colors={['#A855F7', '#7B61FF']} style={styles.uploadButtonGradient}>
+                  <LinearGradient
+                    colors={[CATEGORY_BG_COLOR, PRIMARY_COLOR]}
+                    style={styles.uploadButtonGradient}
+                  >
                     <Text style={styles.uploadButtonText}>Add Product</Text>
                   </LinearGradient>
                 </TouchableOpacity>
@@ -386,9 +447,11 @@ const SellerDashboard = () => {
                   style={styles.addButton}
                   onPress={() => navigation.navigate('UploadReel')}
                 >
-                  <LinearGradient colors={['#A855F7', '#7B61FF']} style={styles.addButtonGradient}>
-                    <MaterialCommunityIcons name="plus" size={scale(20)} color="#FFFFFF" />
-                    <Text style={styles.addButtonText}>Add Reel</Text>
+                  <LinearGradient
+                    colors={[CATEGORY_BG_COLOR, PRIMARY_COLOR]}
+                    style={styles.addButtonGradient}
+                  >
+                    <MaterialCommunityIcons name="plus-circle" size={scale(24)} color={TEXT_COLOR} />
                   </LinearGradient>
                 </TouchableOpacity>
                 <FlatList
@@ -396,19 +459,26 @@ const SellerDashboard = () => {
                   renderItem={renderReelItem}
                   keyExtractor={(item) => item._id}
                   numColumns={numColumns}
-                  showsVerticalScrollIndicator={false}
+                  showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.collectionsList}
                 />
               </>
             ) : (
               <View style={styles.emptyStateContainer}>
-                <FastImage source={img.camera} style={styles.emptyStateIcon} />
+                <FastImage
+                  source={img.camera}
+                  style={styles.emptyStateIcon}
+                  tintColor={SUBTEXT_COLOR}
+                />
                 <Text style={styles.emptyStateTitle}>Share your first reel</Text>
                 <TouchableOpacity
                   style={styles.uploadButton}
                   onPress={() => navigation.navigate('UploadReel')}
                 >
-                  <LinearGradient colors={['#A855F7', '#7B61FF']} style={styles.uploadButtonGradient}>
+                  <LinearGradient
+                    colors={[CATEGORY_BG_COLOR, PRIMARY_COLOR]}
+                    style={styles.uploadButtonGradient}
+                  >
                     <Text style={styles.uploadButtonText}>Upload Reel</Text>
                   </LinearGradient>
                 </TouchableOpacity>
@@ -418,14 +488,32 @@ const SellerDashboard = () => {
         </View>
       </ScrollView>
 
-      {productModalVisible && (
-        <ProductModal
-          visible={productModalVisible}
-          onClose={() => setProductModalVisible(false)}
-          onSubmit={handleSubmitProduct}
-          product={currentProduct}
-        />
-      )}
+      <CustomModal
+        visible={customModalVisible}
+        containerStyle={{ alignSelf: 'center' }}
+        onRequestClose={() => setCustomModalVisible(false)}
+        title="Product Options"
+        buttons={[
+          {
+            text: 'Edit',
+            onPress: () => handleEditProduct(selectedProduct),
+            style: styles.modalButton,
+            textStyle: { fontSize: scaleFont(13) },
+          },
+          {
+            text: 'Delete',
+            onPress: () => handleDeleteProduct(selectedProduct?.id),
+            style: styles.modalButtonDelete,
+            textStyle: { fontSize: scaleFont(13) },
+          },
+          {
+            text: 'Cancel',
+            onPress: () => setCustomModalVisible(false),
+            style: styles.modalButtonCancel,
+            textStyle: { fontSize: scaleFont(12) },
+          },
+        ]}
+      />
     </LinearGradient>
   );
 };
@@ -433,136 +521,195 @@ const SellerDashboard = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: PRODUCT_BG_COLOR,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: scale(20),
-    paddingVertical: scale(15),
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    paddingVertical: scale(14),
+    backgroundColor: '#8ec5fc',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale(5),
+    elevation: 3,
   },
   headerTitle: {
-    fontSize: scaleFont(18),
+    fontSize: scaleFont(22),
     fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  profileImage: {
-    width: scale(40),
-    height: scale(40),
-    borderRadius: scale(20),
-    borderWidth: 2,
-    borderColor: '#A855F7',
+    color: TEXT_COLOR,
   },
   scrollContent: {
     paddingBottom: scale(30),
   },
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    margin: scale(15),
+    padding: scale(15),
+    borderRadius: scale(15),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderWidth: 1,
+    borderColor: BORDER_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(6),
+    elevation: 4,
+  },
+  profileImage: {
+    width: scale(64),
+    height: scale(64),
+    borderRadius: scale(32),
+    borderWidth: scale(3),
+    borderColor: PRIMARY_COLOR,
+  },
+  profileInfo: {
+    flex: 1,
+    marginHorizontal: scale(12),
+  },
+  profileName: {
+    fontSize: scaleFont(15),
+    fontWeight: '700',
+    color: TEXT_COLOR,
+  },
+  profileEmail: {
+    fontSize: scaleFont(12),
+    color: SUBTEXT_COLOR,
+    marginTop: scale(5),
+  },
+  editProfileButton: {
+    borderRadius: scale(10),
+    overflow: 'hidden',
+  },
+  editProfileButtonGradient: {
+    paddingVertical: scale(6),
+    paddingHorizontal: scale(14),
+    alignItems: 'center',
+  },
+  editProfileButtonText: {
+    fontSize: scaleFont(11),
+    fontWeight: '600',
+    color: TEXT_COLOR,
+  },
   statsSection: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    padding: scale(20),
+    paddingHorizontal: scale(15),
+    paddingVertical: scale(12),
   },
   statCard: {
-    backgroundColor: 'rgba(42, 42, 90, 0.9)',
-    padding: scale(15),
-    borderRadius: scale(12),
+    width: scale(70),
+    height: scale(70),
+    borderRadius: scale(20),
+    backgroundColor: CATEGORY_BG_COLOR,
     alignItems: 'center',
-    width: scale(150),
-    elevation: 5,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: BORDER_COLOR,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: scale(5) },
-    shadowOpacity: 0.2,
-    shadowRadius: scale(10),
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(6),
   },
   statValue: {
     fontSize: scaleFont(20),
     fontWeight: '700',
-    color: '#A855F7',
+    color: PRIMARY_COLOR,
     marginVertical: scale(5),
   },
   statLabel: {
-    fontSize: scaleFont(14),
-    color: '#B0B0D0',
+    fontSize: scaleFont(13),
+    color: SUBTEXT_COLOR,
+    fontWeight: '500',
   },
   tabsContainer: {
-    paddingVertical: scale(10),
-    paddingHorizontal: scale(20),
-    backgroundColor: 'rgba(42, 42, 90, 0.9)',
-    borderTopLeftRadius: scale(20),
-    borderTopRightRadius: scale(20),
-    elevation: 3,
+    paddingVertical: scale(5),
+    paddingHorizontal: scale(15),
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: scale(25),
-    padding: scale(5),
+    justifyContent: 'center',
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(20),
+    padding: scale(6),
+    borderWidth: 1,
+    borderColor: BORDER_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale(5),
+    elevation: 3,
   },
   tab: {
-    flex: 1,
-    flexDirection: 'row',
+    width: scale(158),
+    height: scale(40),
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: scale(10),
-    borderRadius: scale(20),
+    borderRadius: scale(14),
+    marginHorizontal: scale(8),
   },
   activeTab: {
-    backgroundColor: 'rgba(168, 85, 247, 0.2)',
-  },
-  tabText: {
-    fontSize: scaleFont(14),
-    color: '#B0B0D0',
-    marginLeft: scale(5),
-    fontWeight: '500',
-  },
-  activeTabText: {
-    color: '#A855F7',
-    fontWeight: '600',
+    backgroundColor: SELECTED_CATEGORY_BG_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.2,
+    shadowRadius: scale(4),
+    elevation: 4,
   },
   contentSection: {
-    paddingBottom: scale(20),
+    paddingHorizontal: scale(10),
+    paddingBottom: scale(15),
   },
   addButton: {
-    marginHorizontal: scale(20),
-    marginVertical: scale(10),
-    borderRadius: scale(8),
+    alignSelf: 'flex-start',
+    marginHorizontal: scale(15),
+    marginVertical: scale(8),
+    borderRadius: scale(20),
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(6),
+    elevation: 4,
   },
   addButtonGradient: {
-    flexDirection: 'row',
+    padding: scale(8),
     alignItems: 'center',
-    padding: scale(12),
     justifyContent: 'center',
-  },
-  addButtonText: {
-    color: '#FFFFFF',
-    fontSize: scaleFont(14),
-    fontWeight: '600',
-    marginLeft: scale(5),
   },
   emptyStateContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: scale(40),
-    paddingHorizontal: scale(20),
+    paddingVertical: scale(35),
+    margin: scale(15),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(15),
+    borderWidth: 1,
+    borderColor: BORDER_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(6),
   },
   emptyStateIcon: {
-    width: scale(80),
-    height: scale(80),
+    width: scale(64),
+    height: scale(64),
     marginBottom: scale(20),
-    tintColor: '#B0B0D0',
   },
   emptyStateTitle: {
-    fontSize: scaleFont(16),
-    fontWeight: '500',
-    color: '#FFFFFF',
+    fontSize: scaleFont(15),
+    fontWeight: '600',
+    color: TEXT_COLOR,
     textAlign: 'center',
     marginBottom: scale(20),
   },
   uploadButton: {
-    borderRadius: scale(8),
+    borderRadius: scale(12),
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(6),
   },
   uploadButtonGradient: {
     paddingVertical: scale(12),
@@ -572,21 +719,20 @@ const styles = StyleSheet.create({
   uploadButtonText: {
     fontSize: scaleFont(14),
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: TEXT_COLOR,
   },
   itemContainer: {
     width: itemSize,
-    margin: scale(5),
-    backgroundColor: 'rgba(42, 42, 74, 0.9)',
+    margin: itemSpacing / 4,
+    backgroundColor: PRODUCT_BG_COLOR,
     borderRadius: scale(12),
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: BORDER_COLOR,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: scale(5) },
-    shadowOpacity: 0.2,
-    shadowRadius: scale(10),
-    elevation: 3,
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(6),
   },
   mediaContainer: {
     width: '100%',
@@ -598,15 +744,17 @@ const styles = StyleSheet.create({
     height: '100%',
     borderTopLeftRadius: scale(12),
     borderTopRightRadius: scale(12),
+    borderWidth: scale(2),
+    borderColor: BORDER_COLOR,
   },
   playIcon: {
     position: 'absolute',
     top: '50%',
     left: '50%',
-    transform: [{ translateX: -scale(12) }, { translateY: -scale(12) }],
-    backgroundColor: 'rgba(168, 85, 247, 0.8)',
-    borderRadius: scale(20),
-    padding: scale(8),
+    transform: [{ translateX: -scale(9) }, { translateY: -scale(9) }],
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(14),
+    padding: scale(5),
   },
   itemInfo: {
     padding: scale(10),
@@ -614,28 +762,39 @@ const styles = StyleSheet.create({
   },
   itemTitle: {
     fontSize: scaleFont(12),
-    color: '#FFFFFF',
+    color: TEXT_COLOR,
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: scale(5),
     height: scale(20),
   },
-  itemPrice: {
+  itemBrand: {
     fontSize: scaleFont(10),
+    color: SUBTEXT_COLOR,
+    textAlign: 'center',
+    marginBottom: scale(5),
+  },
+  itemPrice: {
+    fontSize: scaleFont(11),
     fontWeight: '700',
-    color: '#A855F7',
+    color: PRIMARY_COLOR,
   },
   discountedPrice: {
-    fontSize: scaleFont(10),
+    fontSize: scaleFont(11),
     fontWeight: '700',
-    color: '#A855F7',
-    marginRight: scale(4),
+    color: PRIMARY_COLOR,
+    marginRight: scale(5),
   },
   originalPrice: {
-    fontSize: scaleFont(8),
+    fontSize: scaleFont(9),
     fontWeight: '500',
-    color: '#B0B0D0',
+    color: SUBTEXT_COLOR,
     textDecorationLine: 'line-through',
+  },
+  itemStock: {
+    fontSize: scaleFont(10),
+    color: SUBTEXT_COLOR,
+    marginTop: scale(5),
   },
   priceContainer: {
     flexDirection: 'row',
@@ -646,37 +805,51 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: scale(8),
     right: scale(8),
-    backgroundColor: '#FF3E6D',
-    paddingHorizontal: scale(6),
+    backgroundColor: SECONDARY_COLOR,
+    paddingHorizontal: scale(4),
+    paddingVertical: scale(2),
+    borderRadius: scale(4),
+  },
+  offerBadge: {
+    position: 'absolute',
+    top: scale(8),
+    left: scale(8),
+    backgroundColor: PRIMARY_COLOR,
+    paddingHorizontal: scale(4),
     paddingVertical: scale(2),
     borderRadius: scale(4),
   },
   badgeText: {
-    fontSize: scaleFont(10),
-    color: '#000000',
-    fontWeight: 'bold',
+    fontSize: scaleFont(8),
+    color: TEXT_COLOR,
+    fontWeight: '700',
   },
   collectionsList: {
     paddingHorizontal: itemSpacing,
-    paddingBottom: scale(10),
+    paddingBottom: scale(12),
     alignItems: 'center',
   },
   skeletonItem: {
     width: itemSize,
-    margin: scale(5),
-    backgroundColor: 'rgba(42, 42, 74, 0.9)',
+    margin: itemSpacing / 2,
+    backgroundColor: PRODUCT_BG_COLOR,
     borderRadius: scale(12),
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    elevation: 3,
+    borderColor: BORDER_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(6),
+    elevation: 4,
   },
   skeletonImage: {
     width: '100%',
     height: itemSize * 1.2,
-    backgroundColor: 'rgba(58, 58, 90, 0.5)',
+    backgroundColor: CATEGORY_BG_COLOR,
     borderTopLeftRadius: scale(12),
     borderTopRightRadius: scale(12),
+    opacity: 0.7,
   },
   skeletonInfo: {
     padding: scale(10),
@@ -685,9 +858,40 @@ const styles = StyleSheet.create({
   skeletonText: {
     width: '80%',
     height: scale(14),
-    backgroundColor: 'rgba(58, 58, 90, 0.5)',
+    backgroundColor: CATEGORY_BG_COLOR,
     borderRadius: scale(4),
     marginVertical: scale(4),
+    opacity: 0.7,
+  },
+  modalButton: {
+    backgroundColor: 'transparent',
+    paddingVertical: scale(10),
+    paddingHorizontal: scale(20),
+    borderRadius: scale(8),
+    marginVertical: scale(5),
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: PRIMARY_COLOR,
+  },
+  modalButtonDelete: {
+    backgroundColor: 'transparent',
+    paddingVertical: scale(10),
+    paddingHorizontal: scale(20),
+    borderRadius: scale(8),
+    marginVertical: scale(5),
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: SECONDARY_COLOR,
+  },
+  modalButtonCancel: {
+    backgroundColor: 'transparent',
+    paddingVertical: scale(10),
+    paddingHorizontal: scale(20),
+    borderRadius: scale(8),
+    marginVertical: scale(5),
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: SUBTEXT_COLOR,
   },
 });
 

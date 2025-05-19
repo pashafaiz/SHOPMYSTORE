@@ -1,5 +1,17 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+
+// Define theme colors (move to GlobalConstants.js if possible)
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+
+const { width, height } = Dimensions.get('window');
+const scaleFactor = width / 375;
+const scale = (size) => size * scaleFactor;
+const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375));
 
 const SizeSelector = ({ sizes, selectedSize, onSelect }) => {
   return (
@@ -32,40 +44,43 @@ const SizeSelector = ({ sizes, selectedSize, onSelect }) => {
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 10,
+    marginVertical: scale(10),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(8),
+    padding: scale(10),
   },
   title: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: 10,
+    color: TEXT_THEME_COLOR,
+    marginBottom: scale(10),
   },
   sizeContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
   sizeButton: {
-    width: 50,
-    height: 40,
+    width: scale(50),
+    height: scale(40),
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#2A2A5A',
-    borderRadius: 8,
-    marginRight: 10,
-    marginBottom: 10,
+    borderWidth: scale(1),
+    borderColor: BORDER_THEME_COLOR,
+    borderRadius: scale(8),
+    marginRight: scale(10),
+    marginBottom: scale(10),
   },
   selectedSizeButton: {
-    backgroundColor: '#A78BFA',
-    borderColor: '#A78BFA',
+    backgroundColor: PRIMARY_THEME_COLOR,
+    borderColor: PRIMARY_THEME_COLOR,
   },
   sizeText: {
-    fontSize: 14,
-    color: '#A78BFA',
+    fontSize: scaleFont(14),
+    color: SUBTEXT_THEME_COLOR,
   },
   selectedSizeText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
+    color: TEXT_THEME_COLOR,
+    fontWeight: '700',
   },
 });
 

@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, createAction } from '@reduxjs/toolkit';
 import Toast from 'react-native-toast-message';
 import Trace from '../../utils/Trace';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,6 +15,9 @@ import {
   API_TIMEOUT_SHORT,
   DEFAULT_IMAGE_URL,
 } from '../../constants/GlobalConstants';
+
+// Define the resetProductState action
+export const resetProductState = createAction('productDetail/resetProductState');
 
 // Utility function for fetch with timeout
 const fetchWithTimeout = async (url, options, timeout) => {
@@ -72,11 +75,22 @@ export const fetchProductDetails = createAsyncThunk(
         throw new Error('Product data missing in response');
       }
 
+      // Use media directly from API response
+      const normalizedProduct = {
+        ...productData.product,
+        media_streams: Array.isArray(productData.product.media_streams)
+          ? productData.product.media_streams.map((stream) => ({
+              url: stream.url || DEFAULT_IMAGE_URL,
+              mediaType: stream.mediaType || 'image',
+            }))
+          : [{ url: DEFAULT_IMAGE_URL, mediaType: 'image' }],
+      };
+
       // Fetch user profile
       let userData = { user: { userName: 'unknown', avatar: null, _id: null } };
       try {
         const userResponse = await fetchWithTimeout(
-          `${BASE_URL}${USER_PROFILE_ENDPOINT}/${productData.product.createdBy}`,
+          `${BASE_URL}${USER_PROFILE_ENDPOINT}/${productData.product.createdBy._id}`,
           {
             method: HTTP_METHODS.GET,
             headers: {
@@ -161,13 +175,14 @@ export const fetchProductDetails = createAsyncThunk(
       // Normalize related products
       const normalizedRelatedProducts = (relatedData.products || []).map((product) => ({
         ...product,
+        id: product.id || product._id,
         media: Array.isArray(product.media) && product.media.length > 0
-          ? (typeof product.media[0] === 'string' ? product.media[0] : product.media[0]?.url || DEFAULT_IMAGE_URL)
+          ? product.media[0].url || DEFAULT_IMAGE_URL
           : DEFAULT_IMAGE_URL,
       }));
 
       return {
-        product: productData.product,
+        product: normalizedProduct,
         user: {
           userName: userData.user?.userName || 'unknown',
           profileImage: typeof userData.user?.avatar === 'string' ? userData.user.avatar : null,
@@ -378,15 +393,15 @@ const productDetailSlice = createSlice({
     cartItems: [],
     userId: '',
     token: '',
-    loading: false,
+    loading: true, // Initialize as true to show loader on mount
     refreshing: false,
-    isActionLoading: false,
     currentMediaIndex: 0,
     isLiked: false,
     isInCart: false,
     videoProgress: 0,
     videoDuration: 0,
     error: null,
+    currentProductId: null,
   },
   reducers: {
     setCurrentMediaIndex: (state, action) => {
@@ -407,43 +422,36 @@ const productDetailSlice = createSlice({
         return;
       }
 
-      // Check if product already exists in recently viewed
-      const existingIndex = state.recentlyViewed.findIndex(
-        (item) => item.id === productId || item._id === productId
+      // Remove any existing product with the same ID
+      state.recentlyViewed = state.recentlyViewed.filter(
+        (item) => item.id !== productId && item._id !== productId
       );
 
-      if (existingIndex >= 0) {
-        // If exists, move it to the beginning and update timestamp
-        const [existingProduct] = state.recentlyViewed.splice(existingIndex, 1);
-        state.recentlyViewed.unshift({
-          ...existingProduct,
-          timestamp: Date.now(),
-        });
-      } else {
-        // Prepare the media URL
-        const mediaUrl =
-          Array.isArray(product.media) && product.media.length > 0
-            ? typeof product.media[0] === 'string'
-              ? product.media[0]
-              : product.media[0]?.url || DEFAULT_IMAGE_URL
-            : DEFAULT_IMAGE_URL;
+      // Prepare the media URL
+      const mediaUrl =
+        Array.isArray(product.media_streams) && product.media_streams.length > 0
+          ? product.media_streams[0].url || DEFAULT_IMAGE_URL
+          : DEFAULT_IMAGE_URL;
 
-        // Add new product to the beginning of the array
-        state.recentlyViewed.unshift({
-          id: productId,
-          _id: productId,
-          name: product.name || 'Unknown Product',
-          media: mediaUrl,
-          price: product.price || 0,
-          originalPrice: product.originalPrice || null,
-          discount: product.discount || null,
-          category: product.category || 'Unknown',
-          brand: product.brand || 'Unknown Brand',
-          rating: product.rating || 4,
-          reviewCount: product.reviewCount || 0,
-          timestamp: Date.now(),
-        });
-      }
+      console.log('Saving recently viewed product:', { productId, mediaUrl }); // Debug log
+
+      // Add new product to the beginning of the array
+      state.recentlyViewed.unshift({
+        id: productId,
+        _id: productId,
+        name: product.name || 'Unknown Product',
+        media: mediaUrl,
+        price: product.price || 0,
+        originalPrice: product.originalPrice || null,
+        discount: product.discount || null,
+        category: product.category || 'Unknown',
+        brand: product.brand || 'Unknown Brand',
+        rating: product.rating || 0,
+        reviewCount: product.reviewCount || 0,
+        offer: product.offer || '',
+        stock: product.stock || 0,
+        timestamp: Date.now(),
+      });
 
       // Limit to 10 items
       if (state.recentlyViewed.length > 10) {
@@ -474,39 +482,68 @@ const productDetailSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // Reset Product State
+      .addCase(resetProductState, (state) => {
+        state.product = null;
+        state.user = null;
+        state.relatedProducts = [];
+        state.cartItems = [];
+        state.isInCart = false;
+        state.isLiked = false;
+        state.currentMediaIndex = 0;
+        state.videoProgress = 0;
+        state.videoDuration = 0;
+        state.error = null;
+        state.loading = true;
+        state.currentProductId = null;
+      })
       // Fetch Product Details
-      .addCase(fetchProductDetails.pending, (state) => {
+      .addCase(fetchProductDetails.pending, (state, action) => {
         state.loading = true;
         state.error = null;
+        state.currentProductId = action.meta.arg.productId;
+        // Clear previous product data
+        state.product = null;
+        state.user = null;
+        state.relatedProducts = [];
+        state.cartItems = [];
+        state.isInCart = false;
+        state.isLiked = false;
         if (state.refreshing) state.refreshing = false;
       })
       .addCase(fetchProductDetails.fulfilled, (state, action) => {
-        state.loading = false;
-        state.product = action.payload.product;
-        state.user = action.payload.user;
-        state.relatedProducts = action.payload.relatedProducts;
-        state.cartItems = action.payload.cartItems;
-        state.userId = action.payload.userId;
-        state.token = action.payload.token;
-        state.isInCart = action.payload.isInCart;
-        state.isLiked = action.payload.isLiked;
+        // Only update if the response matches the current product ID
+        if (state.currentProductId === action.meta.arg.productId) {
+          state.loading = false;
+          state.product = action.payload.product;
+          state.user = action.payload.user;
+          state.relatedProducts = action.payload.relatedProducts;
+          state.cartItems = action.payload.cartItems;
+          state.userId = action.payload.userId;
+          state.token = action.payload.token;
+          state.isInCart = action.payload.isInCart;
+          state.isLiked = action.payload.isLiked;
+          state.currentProductId = null;
+        }
       })
       .addCase(fetchProductDetails.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-        Toast.show({
-          type: 'error',
-          text1: action.payload,
-          position: TOAST_POSITION,
-          topOffset: TOAST_TOP_OFFSET,
-        });
+        if (state.currentProductId === action.meta.arg.productId) {
+          state.loading = false;
+          state.error = action.payload;
+          state.currentProductId = null;
+          Toast.show({
+            type: 'error',
+            text1: action.payload,
+            position: TOAST_POSITION,
+            topOffset: TOAST_TOP_OFFSET,
+          });
+        }
       })
       // Toggle Like
       .addCase(toggleLike.pending, (state) => {
-        state.isActionLoading = true;
+        // No loader needed
       })
       .addCase(toggleLike.fulfilled, (state, action) => {
-        state.isActionLoading = false;
         state.isLiked = action.payload.isWishlisted;
         if (state.product) {
           state.product.likeCount = action.payload.isWishlisted
@@ -521,7 +558,6 @@ const productDetailSlice = createSlice({
         });
       })
       .addCase(toggleLike.rejected, (state, action) => {
-        state.isActionLoading = false;
         Toast.show({
           type: 'error',
           text1: action.payload,
@@ -531,21 +567,18 @@ const productDetailSlice = createSlice({
       })
       // Add to Cart
       .addCase(addToCart.pending, (state) => {
-        state.isActionLoading = true;
+        // No loader needed
       })
       .addCase(addToCart.fulfilled, (state, action) => {
-        state.isActionLoading = false;
         state.isInCart = true;
-        state.cartItems = action.payload.cartItems;
         Toast.show({
           type: 'success',
-          text1: 'Product added to cart',
+          text1: 'Added to cart',
           position: TOAST_POSITION,
           topOffset: TOAST_TOP_OFFSET,
         });
       })
       .addCase(addToCart.rejected, (state, action) => {
-        state.isActionLoading = false;
         Toast.show({
           type: 'error',
           text1: action.payload,
@@ -555,21 +588,20 @@ const productDetailSlice = createSlice({
       })
       // Remove from Cart
       .addCase(removeFromCart.pending, (state) => {
-        state.isActionLoading = true;
+        // No loader needed
       })
       .addCase(removeFromCart.fulfilled, (state, action) => {
-        state.isActionLoading = false;
         state.isInCart = false;
         state.cartItems = action.payload.cartItems;
         Toast.show({
           type: 'success',
-          text1: 'Product removed from cart',
+          text1: 'Removed from cart',
           position: TOAST_POSITION,
           topOffset: TOAST_TOP_OFFSET,
         });
       })
       .addCase(removeFromCart.rejected, (state, action) => {
-        state.isActionLoading = false;
+        state.isInCart = false;
         Toast.show({
           type: 'error',
           text1: action.payload,
@@ -578,11 +610,20 @@ const productDetailSlice = createSlice({
         });
       })
       // Load Recently Viewed
+      .addCase(loadRecentlyViewed.pending, (state) => {
+        // No loader needed
+      })
       .addCase(loadRecentlyViewed.fulfilled, (state, action) => {
         state.recentlyViewed = action.payload;
       })
       .addCase(loadRecentlyViewed.rejected, (state, action) => {
-        Trace('Error loading recently viewed:', action.payload);
+        state.recentlyViewed = [];
+        Toast.show({
+          type: 'error',
+          text1: action.payload,
+          position: TOAST_POSITION,
+          topOffset: TOAST_TOP_OFFSET,
+        });
       });
   },
 });

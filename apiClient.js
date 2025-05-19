@@ -40,32 +40,36 @@ const request = async (config, retries = 3) => {
   }
 };
 
-
 export const createProductApi = async (token, productData) => {
   const formData = new FormData();
-  
-  // Append all product fields
-  formData.append('name', productData.name);
+
+  // Required fields
+  formData.append('name', productData.name || '');
+  formData.append('price', productData.price.toString() || '0');
+  formData.append('originalPrice', productData.originalPrice.toString() || '0');
+  formData.append('discount', productData.discount.toString() || '0');
+  formData.append('category', productData.category || '');
+  formData.append('createdBy', productData.createdBy || '');
+
+  // Optional fields
   formData.append('description', productData.description || '');
-  formData.append('price', productData.price.toString());
-  formData.append('originalPrice', productData.originalPrice.toString());
-  formData.append('discount', productData.discount.toString());
-  formData.append('category', productData.category);
-  formData.append('createdBy', productData.createdBy);
-  
+  formData.append('stock', productData.stock.toString() || '0');
+  formData.append('brand', productData.brand || '');
+  formData.append('offer', productData.offer || '');
+
   // Append arrays as JSON strings
-  if (productData.sizes) formData.append('sizes', JSON.stringify(productData.sizes));
-  if (productData.colors) formData.append('colors', JSON.stringify(productData.colors));
-  if (productData.highlights) formData.append('highlights', JSON.stringify(productData.highlights));
-  if (productData.specifications) formData.append('specifications', JSON.stringify(productData.specifications));
-  if (productData.tags) formData.append('tags', JSON.stringify(productData.tags));
+  formData.append('sizes', JSON.stringify(productData.sizes || []));
+  formData.append('colors', JSON.stringify(productData.colors || []));
+  formData.append('highlights', JSON.stringify(productData.highlights || []));
+  formData.append('specifications', JSON.stringify(productData.specifications || []));
+  formData.append('tags', JSON.stringify(productData.tags || []));
 
   // Append media files
   productData.media.forEach((media, index) => {
     formData.append('media', {
       uri: media.uri,
       name: media.fileName || `media_${Date.now()}_${index}.${media.type?.split('/')[1] || 'jpg'}`,
-      type: media.type || 'image/jpeg'
+      type: media.type || 'image/jpeg',
     });
   });
 
@@ -74,41 +78,46 @@ export const createProductApi = async (token, productData) => {
     url: `${BASE_URL}/products`,
     headers: {
       'Content-Type': 'multipart/form-data',
-      'Authorization': `Bearer ${token}`
+      Authorization: `Bearer ${token}`,
     },
     data: formData,
-    timeout: 60000
+    timeout: 60000,
   });
 };
 
 export const updateProductApi = async (token, id, productData) => {
   const formData = new FormData();
-  
-  // Append all product fields
-  formData.append('name', productData.name);
+
+  // Required fields
+  formData.append('name', productData.name || '');
+  formData.append('price', productData.price.toString() || '0');
+  formData.append('originalPrice', productData.originalPrice.toString() || '0');
+  formData.append('discount', productData.discount.toString() || '0');
+  formData.append('category', productData.category || '');
+
+  // Optional fields
   formData.append('description', productData.description || '');
-  formData.append('price', productData.price.toString());
-  formData.append('originalPrice', productData.originalPrice.toString());
-  formData.append('discount', productData.discount.toString());
-  formData.append('category', productData.category);
-  
+  formData.append('stock', productData.stock.toString() || '0');
+  formData.append('brand', productData.brand || '');
+  formData.append('offer', productData.offer || '');
+
   // Append arrays as JSON strings
-  if (productData.sizes) formData.append('sizes', JSON.stringify(productData.sizes));
-  if (productData.colors) formData.append('colors', JSON.stringify(productData.colors));
-  if (productData.highlights) formData.append('highlights', JSON.stringify(productData.highlights));
-  if (productData.specifications) formData.append('specifications', JSON.stringify(productData.specifications));
-  if (productData.tags) formData.append('tags', JSON.stringify(productData.tags));
+  formData.append('sizes', JSON.stringify(productData.sizes || []));
+  formData.append('colors', JSON.stringify(productData.colors || []));
+  formData.append('highlights', JSON.stringify(productData.highlights || []));
+  formData.append('specifications', JSON.stringify(productData.specifications || []));
+  formData.append('tags', JSON.stringify(productData.tags || []));
 
   // Append media files
   productData.media.forEach((media, index) => {
-    if (media.uri.startsWith('file://')) {
+    if (media.uri.startsWith('http')) {
+      formData.append('existingMedia', media.uri);
+    } else {
       formData.append('media', {
         uri: media.uri,
         name: media.fileName || `media_${Date.now()}_${index}.${media.type?.split('/')[1] || 'jpg'}`,
-        type: media.type || 'image/jpeg'
+        type: media.type || 'image/jpeg',
       });
-    } else {
-      formData.append('existingMedia', media.uri);
     }
   });
 
@@ -117,19 +126,18 @@ export const updateProductApi = async (token, id, productData) => {
     url: `${BASE_URL}/products/${id}`,
     headers: {
       'Content-Type': 'multipart/form-data',
-      'Authorization': `Bearer ${token}`
+      Authorization: `Bearer ${token}`,
     },
     data: formData,
-    timeout: 60000
+    timeout: 60000,
   });
 };
-
 
 export const getAllProductsApi = async () => {
   return request({
     method: 'GET',
     url: `${BASE_URL}/products`,
-    timeout: 15150,
+    timeout: 15000,
   });
 };
 
@@ -346,17 +354,17 @@ export const addToCartApi = async (token, productId) => {
       method: 'POST',
       url: `${BASE_URL}/products/cart/${productId}`,
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
       timeout: 15000,
     });
     return { ok: true, data: response.data };
   } catch (error) {
     console.error('Add to cart error:', error.response?.data || error.message);
-    return { 
-      ok: false, 
-      data: error.response?.data || { msg: 'Failed to add to cart' } 
+    return {
+      ok: false,
+      data: error.response?.data || { msg: 'Failed to add to cart' },
     };
   }
 };

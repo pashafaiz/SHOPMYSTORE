@@ -25,9 +25,9 @@ export const createProduct = createAsyncThunk(
   'productModal/createProduct',
   async (productData, { rejectWithValue }) => {
     try {
-      const { name, description, price, category, media, createdBy } = productData;
-      if (!name || !description || !price || !category || !media.length || !createdBy) {
-        throw new Error('All fields are required, including at least one media file');
+      const { name, description, price, category, media, createdBy, stock, brand, offer } = productData;
+      if (!name || !description || !price || !category || !media.length || !createdBy || !brand || stock < 0) {
+        throw new Error('Name, description, price, category, brand, stock (>= 0), and at least one media file are required');
       }
 
       const token = await AsyncStorage.getItem(USER_TOKEN_KEY);
@@ -40,6 +40,9 @@ export const createProduct = createAsyncThunk(
       formData.append('price', price);
       formData.append('category', category.toLowerCase());
       formData.append('createdBy', createdBy);
+      formData.append('stock', stock); // Added stock
+      formData.append('brand', brand); // Added brand
+      if (offer) formData.append('offer', offer); // Added offer (optional)
 
       media.forEach((item, index) => {
         formData.append('media', {
@@ -53,7 +56,7 @@ export const createProduct = createAsyncThunk(
       const response = await fetchWithTimeout(
         `${BASE_URL}${PRODUCTS_ENDPOINT}`,
         {
-          method: HTTP_METHODS.PUT,
+          method: HTTP_METHODS.POST, // Corrected to POST
           headers: {
             Authorization: token ? `Bearer ${token}` : '',
           },
@@ -95,9 +98,9 @@ export const updateProduct = createAsyncThunk(
         throw new Error('Invalid or missing product ID');
       }
 
-      const { name, description, price, category, media, createdBy } = productData;
-      if (!name || !description || !price || !category || !media.length || !createdBy) {
-        throw new Error('All fields are required, including at least one media file');
+      const { name, description, price, category, media, createdBy, stock, brand, offer } = productData;
+      if (!name || !description || !price || !category || !media.length || !createdBy || !brand || stock < 0) {
+        throw new Error('Name, description, price, category, brand, stock (>= 0), and at least one media file are required');
       }
 
       const token = await AsyncStorage.getItem(USER_TOKEN_KEY);
@@ -110,6 +113,9 @@ export const updateProduct = createAsyncThunk(
       formData.append('price', price);
       formData.append('category', category.toLowerCase());
       formData.append('createdBy', createdBy);
+      formData.append('stock', stock); // Added stock
+      formData.append('brand', brand); // Added brand
+      if (offer) formData.append('offer', offer); // Added offer (optional)
 
       media.forEach((item, index) => {
         formData.append('media', {
@@ -167,6 +173,9 @@ const productModalSlice = createSlice({
     price: '',
     media: [],
     category: '',
+    stock: '0', // Added stock
+    brand: '', // Added brand
+    offer: '', // Added offer
     userId: '',
     isLoading: false,
     errorMessage: null,
@@ -190,7 +199,7 @@ const productModalSlice = createSlice({
       state.media = action.payload;
     },
     addMedia: (state, action) => {
-      state.media = [...state.media, ...action.payload].slice(0, 5);
+      state.media = [...state.media, ...action.payload].slice(0, 10); // Increased to 10
     },
     removeMedia: (state, action) => {
       state.media = state.media.filter((_, index) => index !== action.payload);
@@ -201,12 +210,24 @@ const productModalSlice = createSlice({
     setDropdownVisible: (state, action) => {
       state.dropdownVisible = action.payload;
     },
+    setStock: (state, action) => { // Added setStock
+      state.stock = action.payload;
+    },
+    setBrand: (state, action) => { // Added setBrand
+      state.brand = action.payload;
+    },
+    setOffer: (state, action) => { // Added setOffer
+      state.offer = action.payload;
+    },
     resetForm: (state) => {
       state.name = '';
       state.description = '';
       state.price = '';
       state.media = [];
       state.category = '';
+      state.stock = '0'; // Reset stock
+      state.brand = ''; // Reset brand
+      state.offer = ''; // Reset offer
       state.errorMessage = null;
     },
     setProductData: (state, action) => {
@@ -223,6 +244,9 @@ const productModalSlice = createSlice({
       state.category = product.category
         ? product.category.charAt(0).toUpperCase() + product.category.slice(1).toLowerCase()
         : '';
+      state.stock = product.stock?.toString() || '0'; // Set stock
+      state.brand = product.brand || ''; // Set brand
+      state.offer = product.offer || ''; // Set offer
     },
     clearError: (state) => {
       state.errorMessage = null;
@@ -230,7 +254,6 @@ const productModalSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Create Product
       .addCase(createProduct.pending, (state) => {
         state.isLoading = true;
         state.errorMessage = null;
@@ -248,7 +271,7 @@ const productModalSlice = createSlice({
       })
       .addCase(createProduct.rejected, (state, action) => {
         state.isLoading = false;
-        state.errorMessage = action.payload || 'Failed to create product';
+        state_macroMessage = action.payload || 'Failed to create product';
         Trace('Create product failed:', { error: action.payload });
         Toast.show({
           type: 'error',
@@ -258,7 +281,6 @@ const productModalSlice = createSlice({
           topOffset: TOAST_TOP_OFFSET,
         });
       })
-      // Update Product
       .addCase(updateProduct.pending, (state) => {
         state.isLoading = true;
         state.errorMessage = null;
@@ -300,6 +322,9 @@ export const selectProductModal = createSelector(
     price: productModal.price,
     media: productModal.media,
     category: productModal.category,
+    stock: productModal.stock, // Added stock
+    brand: productModal.brand, // Added brand
+    offer: productModal.offer, // Added offer
     userId: productModal.userId,
     isLoading: productModal.isLoading,
     errorMessage: productModal.errorMessage,
@@ -317,6 +342,9 @@ export const {
   removeMedia,
   setUserId,
   setDropdownVisible,
+  setStock, // Added
+  setBrand, // Added
+  setOffer, // Added
   resetForm,
   setProductData,
   clearError,

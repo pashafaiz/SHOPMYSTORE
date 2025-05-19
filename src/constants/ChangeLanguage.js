@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useContext } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,17 +13,29 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ThemeContext } from '../constants/ThemeContext';
 import Header from '../Components/Header';
 
 const { width, height } = Dimensions.get('window');
-const scaleFactor = width / 375;
-const scale = size => size * scaleFactor;
-const scaleFont = size => Math.round(size * (Math.min(width, height) / 375));
+const scaleFactor = Math.min(width, 375) / 375;
+const scale = (size) => Math.round(size * scaleFactor);
+const scaleFont = (size) => {
+  const fontScale = Math.min(width, height) / 375;
+  const scaledSize = size * fontScale * (Platform.OS === 'ios' ? 0.9 : 0.85);
+  return Math.round(scaledSize);
+};
+
+// Theme constants
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
 
 const ChangeLanguage = () => {
   const navigation = useNavigation();
-  const { theme } = useContext(ThemeContext);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideUpAnim = useRef(new Animated.Value(50)).current;
   const [selectedLanguage, setSelectedLanguage] = useState('en');
@@ -65,7 +77,7 @@ const ChangeLanguage = () => {
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [fadeAnim, slideUpAnim]);
 
   const handleLanguageSelect = async (languageCode, languageName) => {
     setSelectedLanguage(languageCode);
@@ -98,7 +110,7 @@ const ChangeLanguage = () => {
     };
 
     return (
-      <Animated.View style={[styles.languageItem(theme), { transform: [{ scale: scaleAnim }] }]}>
+      <Animated.View style={[styles.languageItem, { transform: [{ scale: scaleAnim }] }]}>
         <TouchableOpacity
           style={styles.languageItemContent}
           onPressIn={onPressIn}
@@ -108,26 +120,31 @@ const ChangeLanguage = () => {
           <LinearGradient
             colors={
               isSelected
-                ? ['#7B61FF', '#AD4DFF']
-                : ['rgba(123, 97, 255, 0.2)', 'rgba(173, 77, 255, 0.2)']
+                ? ['#5b9cff', '#8ec5fc']
+                : [CATEGORY_BG_COLOR, CATEGORY_BG_COLOR]
             }
             style={styles.languageItemGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
             <View style={styles.languageItemLeft}>
-              <Icon name="language" size={scale(20)} color={isSelected ? '#FFFFFF' : theme.textTertiary} style={styles.languageIcon} />
+              <Icon
+                name="language"
+                size={scale(20)}
+                color={isSelected ? TEXT_THEME_COLOR : SUBTEXT_THEME_COLOR}
+                style={styles.languageIcon}
+              />
               <Text
                 style={[
                   styles.languageText,
-                  { color: isSelected ? '#FFFFFF' : theme.textPrimary },
+                  { color: isSelected ? TEXT_THEME_COLOR : TEXT_THEME_COLOR },
                 ]}
               >
                 {language.name}
               </Text>
             </View>
             {isSelected && (
-              <Icon name="check" size={scale(20)} color="#FFFFFF" />
+              <Icon name="check" size={scale(20)} color={TEXT_THEME_COLOR} />
             )}
           </LinearGradient>
         </TouchableOpacity>
@@ -136,12 +153,12 @@ const ChangeLanguage = () => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.containerBg }]}>
+    <View style={styles.container}>
       <LinearGradient
-        colors={theme.background}
+        colors={BACKGROUND_GRADIENT}
         style={styles.backgroundGradient}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        end={{ x: 0, y: 1 }}
       />
       <Animated.View
         style={[styles.mainContainer, { opacity: fadeAnim, transform: [{ translateY: slideUpAnim }] }]}
@@ -151,31 +168,32 @@ const ChangeLanguage = () => {
           leftIcon="arrow-back"
           onLeftPress={() => navigation.goBack()}
           title="Change Language"
-          textStyle={{ color: theme.textPrimary }}
+          textStyle={styles.headerText}
+          containerStyle={styles.headerContainer}
         />
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.headerSection(theme)}>
+          <View style={styles.headerSection}>
             <LinearGradient
-              colors={['#7B61FF', '#AD4DFF']}
+              colors={['#5b9cff', '#8ec5fc']}
               style={styles.headerIconContainer}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Icon name="language" size={scale(36)} color="#FFFFFF" />
+              <Icon name="language" size={scale(36)} color={TEXT_THEME_COLOR} />
             </LinearGradient>
-            <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
+            <Text style={styles.headerTitle}>
               Change Language
             </Text>
-            <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
+            <Text style={styles.headerSubtitle}>
               Select Your Language
             </Text>
           </View>
 
-          <View style={styles.languageSection(theme)}>
-            <Text style={[styles.sectionTitle, { color: theme.textTertiary }]}>Languages</Text>
+          <View style={styles.languageSection}>
+            <Text style={styles.sectionTitle}>Languages</Text>
             {languages.map((language) => (
               <React.Fragment key={language.code}>
                 {renderLanguageItem(language)}
@@ -191,6 +209,7 @@ const ChangeLanguage = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: PRODUCT_BG_COLOR,
   },
   backgroundGradient: {
     position: 'absolute',
@@ -204,73 +223,90 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     paddingHorizontal: scale(20),
-    paddingBottom: scale(30),
+    paddingBottom: scale(40),
     flexGrow: 1,
-    marginTop: scale(30),
+    marginTop: scale(20),
   },
-  headerSection: theme => ({
+  headerSection: {
     alignItems: 'center',
     marginBottom: scale(30),
-    padding: scale(16),
-    backgroundColor: theme.glassBg,
-    borderRadius: scale(16),
-    borderWidth: 1,
-    borderColor: theme.glassBorder,
-  }),
+    padding: scale(20),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+  },
   headerIconContainer: {
-    width: scale(80),
-    height: scale(80),
-    borderRadius: scale(40),
+    width: scale(90),
+    height: scale(90),
+    borderRadius: scale(45),
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: scale(16),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   headerTitle: {
-    fontSize: scaleFont(24),
+    fontSize: scaleFont(22),
     fontWeight: '800',
+    color: TEXT_THEME_COLOR,
     marginBottom: scale(8),
     textAlign: 'center',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   headerSubtitle: {
     fontSize: scaleFont(14),
+    color: SUBTEXT_THEME_COLOR,
     textAlign: 'center',
     paddingHorizontal: scale(20),
     lineHeight: scale(20),
-    opacity: 0.9,
+    fontWeight: '500',
   },
-  languageSection: theme => ({
+  languageSection: {
     marginBottom: scale(30),
-    padding: scale(12),
-    backgroundColor: theme.glassBg,
-    borderRadius: scale(16),
-    borderWidth: 1,
-    borderColor: theme.glassBorder,
-  }),
+    padding: scale(20),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+  },
   sectionTitle: {
-    fontSize: scaleFont(20),
+    fontSize: scaleFont(18),
     fontWeight: '700',
+    color: TEXT_THEME_COLOR,
     marginBottom: scale(16),
     letterSpacing: 0.5,
   },
-  languageItem: theme => ({
-    marginBottom: scale(8),
-    borderRadius: scale(12),
+  languageItem: {
+    marginBottom: scale(12),
+    borderRadius: scale(16),
     overflow: 'hidden',
-    backgroundColor: theme.glassBg,
-    borderWidth: 1,
-    borderColor: theme.glassBorder,
-  }),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale(6),
+  },
   languageItemContent: {
-    borderRadius: scale(12),
-    minHeight: scale(48),
+    borderRadius: scale(16),
+    minHeight: scale(56),
   },
   languageItemGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: scale(12),
+    padding: scale(14),
     justifyContent: 'space-between',
-    minHeight: scale(48),
+    minHeight: scale(56),
   },
   languageItemLeft: {
     flexDirection: 'row',
@@ -281,10 +317,11 @@ const styles = StyleSheet.create({
     marginRight: scale(12),
   },
   languageText: {
-    fontSize: scaleFont(14),
-    fontWeight: '700',
+    fontSize: scaleFont(16),
+    fontWeight: '600',
     flex: 1,
-    lineHeight: scale(20),
+    lineHeight: scale(22),
+    color: TEXT_THEME_COLOR,
   },
 });
 

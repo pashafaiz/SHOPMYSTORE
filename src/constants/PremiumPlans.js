@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useContext } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,17 +13,29 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
-import { ThemeContext } from '../constants/ThemeContext';
 import Header from '../Components/Header';
 
 const { width, height } = Dimensions.get('window');
-const scaleFactor = width / 375;
-const scale = size => size * scaleFactor;
-const scaleFont = size => Math.round(size * (Math.min(width, height) / 375));
+const scaleFactor = Math.min(width, 375) / 375;
+const scale = (size) => Math.round(size * scaleFactor);
+const scaleFont = (size) => {
+  const fontScale = Math.min(width, height) / 375;
+  const scaledSize = size * fontScale * (Platform.OS === 'ios' ? 0.9 : 0.85);
+  return Math.round(scaledSize);
+};
+
+// Theme constants
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
 
 const PremiumPlans = () => {
   const navigation = useNavigation();
-  const { theme } = useContext(ThemeContext);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideUpAnim = useRef(new Animated.Value(50)).current;
 
@@ -133,7 +145,7 @@ const PremiumPlans = () => {
 
     return (
       <Animated.View
-        style={[styles.planItem(theme), { transform: [{ scale: pressAnim }] }]}
+        style={[styles.planItem, { transform: [{ scale: pressAnim }] }]}
       >
         <TouchableOpacity
           style={styles.planItemContent}
@@ -142,7 +154,7 @@ const PremiumPlans = () => {
           onPress={() => handleSubscribe(item.name)}
         >
           <LinearGradient
-            colors={['rgba(123, 97, 255, 0.2)', 'rgba(173, 77, 255, 0.2)']}
+            colors={[CATEGORY_BG_COLOR, CATEGORY_BG_COLOR]}
             style={styles.planItemGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -163,28 +175,23 @@ const PremiumPlans = () => {
               ]}
             />
             {isElitePlan && (
-              <LinearGradient
-                colors={['#FFD700', '#FFA500']}
-                style={styles.eliteBadge}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
+              <View style={styles.eliteBadge}>
                 <Text style={styles.badgeText}>Elite</Text>
-              </LinearGradient>
+              </View>
             )}
-            <Text style={[styles.planTagline, { color: theme.textSecondary }]}>
+            <Text style={styles.planTagline}>
               {item.tagline}
             </Text>
             <View style={styles.planItemLeft}>
-              <Icon name="diamond" size={scale(20)} color="#FFD700" style={styles.planIcon} />
+              <Icon name="diamond" size={scale(20)} color={PRIMARY_THEME_COLOR} style={styles.planIcon} />
               <View style={styles.planTextContainer}>
-                <Text style={[styles.planName, { color: theme.textPrimary }]}>
+                <Text style={styles.planName}>
                   {item.name} Plan - {item.price}/{item.duration}
                 </Text>
                 {item.features.map((feature, featureIndex) => (
                   <View key={featureIndex} style={styles.featureRow}>
-                    <Icon name="diamond" size={scale(12)} color="#FFD700" style={styles.featureIcon} />
-                    <Text style={[styles.featureText, { color: theme.textSecondary }]}>
+                    <Icon name="diamond" size={scale(12)} color={PRIMARY_THEME_COLOR} style={styles.featureIcon} />
+                    <Text style={styles.featureText}>
                       {feature}
                     </Text>
                   </View>
@@ -192,7 +199,7 @@ const PremiumPlans = () => {
               </View>
             </View>
             <LinearGradient
-              colors={['#FFD700', '#FFA500']}
+              colors={['#5b9cff', '#8ec5fc']}
               style={styles.subscribeButton}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
@@ -201,18 +208,18 @@ const PremiumPlans = () => {
             </LinearGradient>
           </LinearGradient>
         </TouchableOpacity>
-        <View style={styles.divider(theme)} />
+        <View style={styles.divider} />
       </Animated.View>
     );
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.containerBg }]}>
+    <View style={styles.container}>
       <LinearGradient
-        colors={theme.background}
+        colors={BACKGROUND_GRADIENT}
         style={styles.backgroundGradient}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        end={{ x: 0, y: 1 }}
       />
       <Animated.View
         style={[styles.mainContainer, { opacity: fadeAnim, transform: [{ translateY: slideUpAnim }] }]}
@@ -222,21 +229,22 @@ const PremiumPlans = () => {
           leftIcon="arrow-back"
           onLeftPress={() => navigation.goBack()}
           title="Premium Plans"
-          textStyle={{ color: theme.textPrimary }}
+          textStyle={styles.headerText}
+          containerStyle={styles.headerContainer}
         />
-        <View style={styles.headerSection(theme)}>
+        <View style={styles.headerSection}>
           <LinearGradient
-            colors={['#7B61FF', '#AD4DFF']}
+            colors={['#5b9cff', '#8ec5fc']}
             style={styles.headerIconContainer}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            <Icon name="star" size={scale(36)} color="#FFFFFF" />
+            <Icon name="star" size={scale(36)} color={TEXT_THEME_COLOR} />
           </LinearGradient>
-          <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
+          <Text style={styles.headerTitle}>
             Upgrade to Premium
           </Text>
-          <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
+          <Text style={styles.headerSubtitle}>
             Unlock exclusive features with our premium plans.
           </Text>
         </View>
@@ -256,6 +264,7 @@ const PremiumPlans = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: PRODUCT_BG_COLOR,
   },
   backgroundGradient: {
     position: 'absolute',
@@ -267,90 +276,122 @@ const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
   },
-  headerSection: theme => ({
+  headerContainer: {
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(20),
+    padding: scale(15),
+    margin: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    elevation: 5,
+  },
+  headerText: {
+    fontSize: scaleFont(20),
+    fontWeight: '700',
+    color: TEXT_THEME_COLOR,
+    textAlign: 'center',
+  },
+  headerSection: {
     alignItems: 'center',
-    marginTop: scale(30),
+    marginTop: scale(20),
     marginBottom: scale(30),
-    padding: scale(16),
-    backgroundColor: theme.glassBg,
-    borderRadius: scale(16),
-    borderWidth: 1,
-    borderColor: theme.glassBorder,
+    padding: scale(20),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(20),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
     marginHorizontal: scale(20),
-  }),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(3) },
+    shadowOpacity: 0.15,
+    shadowRadius: scale(8),
+    elevation: 5,
+  },
   headerIconContainer: {
-    width: scale(80),
-    height: scale(80),
-    borderRadius: scale(40),
+    width: scale(90),
+    height: scale(90),
+    borderRadius: scale(45),
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: scale(16),
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
   },
   headerTitle: {
-    fontSize: scaleFont(24),
+    fontSize: scaleFont(22),
     fontWeight: '800',
+    color: TEXT_THEME_COLOR,
     marginBottom: scale(8),
     textAlign: 'center',
-    letterSpacing: 1.5,
-    textShadowColor: 'rgba(123, 97, 255, 0.3)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: scale(5),
+    letterSpacing: 0.8,
   },
   headerSubtitle: {
     fontSize: scaleFont(14),
+    color: SUBTEXT_THEME_COLOR,
     textAlign: 'center',
     paddingHorizontal: scale(20),
     lineHeight: scale(20),
-    opacity: 0.9,
+    fontWeight: '500',
   },
   listContainer: {
     paddingHorizontal: scale(20),
-    paddingBottom: scale(30),
+    paddingBottom: scale(40),
   },
-  planItem: theme => ({
-    marginBottom: scale(8),
-    borderRadius: scale(12),
+  planItem: {
+    marginBottom: scale(12),
+    borderRadius: scale(16),
     overflow: 'hidden',
-    backgroundColor: theme.glassBg,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 215, 0, 0.3)', // Gold gradient border effect
-  }),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale(6),
+    elevation: 3,
+  },
   planItemContent: {
-    borderRadius: scale(12),
-    minHeight: scale(48),
+    borderRadius: scale(16),
+    minHeight: scale(56),
   },
   planItemGradient: {
-    padding: scale(12),
+    padding: scale(14),
     justifyContent: 'space-between',
-    minHeight: scale(48),
+    minHeight: scale(56),
   },
   shimmerOverlay: {
     position: 'absolute',
     top: 0,
     bottom: 0,
     width: scale(50),
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    opacity: 0.5,
+    backgroundColor: CATEGORY_BG_COLOR,
+    opacity: 0.3,
   },
   eliteBadge: {
     position: 'absolute',
-    top: scale(8),
-    right: scale(8),
-    paddingHorizontal: scale(8),
-    paddingVertical: scale(4),
-    borderRadius: scale(8),
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    top: scale(10),
+    right: scale(10),
+    paddingHorizontal: scale(6),
+    paddingVertical: scale(6),
+    borderRadius: scale(10),
+    backgroundColor: SECONDARY_THEME_COLOR,
+    borderWidth: scale(1),
+    borderColor: BORDER_THEME_COLOR,
   },
   badgeText: {
-    fontSize: scaleFont(10),
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 1,
+    fontSize: scaleFont(12),
+    fontWeight: '700',
+    color: TEXT_THEME_COLOR,
+    letterSpacing: 0.8,
   },
   planTagline: {
-    fontSize: scaleFont(12),
+    fontSize: scaleFont(14),
     fontWeight: '600',
+    color: SUBTEXT_THEME_COLOR,
     marginBottom: scale(8),
     textAlign: 'left',
     opacity: 0.9,
@@ -366,56 +407,53 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   planName: {
-    fontSize: scaleFont(16),
+    fontSize: scaleFont(18),
     fontWeight: '700',
+    color: TEXT_THEME_COLOR,
     marginBottom: scale(8),
-    lineHeight: scale(20),
-    letterSpacing: 1,
-    textShadowColor: 'rgba(123, 97, 255, 0.3)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: scale(3),
+    lineHeight: scale(24),
+    letterSpacing: 0.8,
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: scale(4),
+    marginBottom: scale(6),
   },
   featureIcon: {
     marginRight: scale(6),
   },
   featureText: {
-    fontSize: scaleFont(12),
+    fontSize: scaleFont(14),
     fontWeight: '500',
-    lineHeight: scale(16),
+    color: SUBTEXT_THEME_COLOR,
+    lineHeight: scale(18),
     opacity: 0.9,
   },
   subscribeButton: {
-    paddingVertical: scale(8),
+    paddingVertical: scale(10),
     paddingHorizontal: scale(16),
-    borderRadius: scale(10),
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: scale(12),
+    borderWidth: scale(1),
+    borderColor: BORDER_THEME_COLOR,
     alignItems: 'center',
-    shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: scale(5),
+    shadowColor: PRIMARY_THEME_COLOR,
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.3,
+    shadowRadius: scale(6),
+    elevation: 3,
   },
   subscribeButtonText: {
     fontSize: scaleFont(14),
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 1,
-    textShadowColor: 'rgba(255, 255, 255, 0.3)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: scale(3),
+    fontWeight: '700',
+    color: TEXT_THEME_COLOR,
+    letterSpacing: 0.8,
   },
-  divider: theme => ({
+  divider: {
     height: scale(1),
-    backgroundColor: theme.glassBorder,
+    backgroundColor: BORDER_THEME_COLOR,
     marginTop: scale(8),
     opacity: 0.5,
-  }),
+  },
 });
 
 export default PremiumPlans;

@@ -55,11 +55,25 @@ import {
   HTTP_METHODS,
 } from '../constants/GlobalConstants';
 import { ThemeContext } from '../constants/ThemeContext';
+import Trace from '../utils/Trace';
+
+// Define theme colors
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)';
+const SELECTED_CATEGORY_BG_COLOR = '#5b9cff';
+const PREMIUM_BADGE_COLOR = '#fef08a';
+const PREMIUM_TEXT_COLOR = '#1a2b4a';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
 
 const { width, height } = Dimensions.get('window');
 const scaleFactor = width / 375;
 const scale = (size) => size * scaleFactor;
-const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375));
+const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375) * 0.85);
 
 const ProductDetail = ({ route, navigation }) => {
   const { productId } = route.params || {};
@@ -75,13 +89,13 @@ const ProductDetail = ({ route, navigation }) => {
     token,
     loading,
     refreshing,
-    isActionLoading,
     currentMediaIndex,
     isLiked,
     isInCart,
     videoProgress,
     videoDuration,
     error,
+    currentProductId,
   } = useSelector((state) => state.productDetail);
 
   const scrollY = new Animated.Value(0);
@@ -95,17 +109,33 @@ const ProductDetail = ({ route, navigation }) => {
   const [reviewComment, setReviewComment] = useState('');
   const [expandedReviews, setExpandedReviews] = useState({});
   const [showAllReviews, setShowAllReviews] = useState(false);
-  const [isReviewSubmitting, setIsReviewSubmitting] = useState(false);
   const [isVideoPaused, setIsVideoPaused] = useState(true);
   const videoRef = useRef(null);
   const scrollViewRef = useRef();
   const flatListRef = useRef();
-
   const [currentMediaType, setCurrentMediaType] = useState('image');
 
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideUpAnim = useRef(new Animated.Value(50)).current;
+  const spinValue = useRef(new Animated.Value(0)).current;
+
+  // Spin animation for loader
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(spinValue, {
+        toValue: 1,
+        duration: 1000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, [spinValue]);
+
+  const spin = spinValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
   // Fetch reviews
   const [reviews, setReviews] = useState([]);
@@ -125,6 +155,7 @@ const ProductDetail = ({ route, navigation }) => {
         const data = await response.json();
         if (response.ok) {
           setReviews(data.reviews || []);
+          console.log('Reviews fetched:', data.reviews); // Debug log
         } else {
           Toast.show({
             type: 'error',
@@ -134,6 +165,7 @@ const ProductDetail = ({ route, navigation }) => {
           });
         }
       } catch (error) {
+        console.log('Error fetching reviews:', error);
         Toast.show({
           type: 'error',
           text1: 'Network error fetching reviews',
@@ -148,21 +180,8 @@ const ProductDetail = ({ route, navigation }) => {
     }
   }, [productId, token]);
 
+  // Handle productId change to fetch product details
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 1000,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideUpAnim, {
-        toValue: 0,
-        duration: 1000,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start();
-
     if (productId) {
       dispatch(fetchProductDetails({ productId }));
       if (userId) {
@@ -172,14 +191,31 @@ const ProductDetail = ({ route, navigation }) => {
   }, [productId, userId, dispatch]);
 
   useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideUpAnim, {
+        toValue: 0,
+        duration: 800,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  useEffect(() => {
     if (product && !loading && userId) {
       dispatch(saveRecentlyViewed({ productId, product, userId }));
+      console.log('Saving recently viewed:', { productId, product }); // Debug log
     }
   }, [product, productId, loading, userId, dispatch]);
 
   // Handle app state changes to pause/resume video
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', nextAppState => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
         if (currentMediaType === 'video') {
           setIsVideoPaused(false);
@@ -215,13 +251,24 @@ const ProductDetail = ({ route, navigation }) => {
 
   const onRefresh = async () => {
     dispatch(setRefreshing(true));
-    if (productId) {
-      await dispatch(fetchProductDetails({ productId }));
-      if (userId) {
-        await dispatch(loadRecentlyViewed({ userId }));
+    try {
+      if (productId) {
+        await dispatch(fetchProductDetails({ productId }));
+        if (userId) {
+          await dispatch(loadRecentlyViewed({ userId }));
+        }
       }
+    } catch (error) {
+      console.log('Refresh error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to refresh product details',
+        position: TOAST_POSITION,
+        topOffset: scale(20),
+      });
+    } finally {
+      dispatch(setRefreshing(false));
     }
-    dispatch(setRefreshing(false));
   };
 
   const handleAddToCart = async () => {
@@ -292,6 +339,7 @@ const ProductDetail = ({ route, navigation }) => {
         title: product?.name || 'Product',
       });
     } catch (error) {
+      console.log('Share error:', error);
       Toast.show({
         type: 'error',
         text1: 'Error sharing product',
@@ -338,7 +386,6 @@ const ProductDetail = ({ route, navigation }) => {
     }
 
     const submitReview = async () => {
-      setIsReviewSubmitting(true);
       try {
         const response = await fetch(`${BASE_URL}${PRODUCTS_ENDPOINT}/reviews`, {
           method: HTTP_METHODS.POST,
@@ -379,14 +426,13 @@ const ProductDetail = ({ route, navigation }) => {
           });
         }
       } catch (error) {
+        console.log('Review submission error:', error);
         Toast.show({
           type: 'error',
           text1: 'Network error submitting review',
           position: TOAST_POSITION,
           topOffset: scale(20),
         });
-      } finally {
-        setIsReviewSubmitting(false);
       }
     };
 
@@ -408,8 +454,8 @@ const ProductDetail = ({ route, navigation }) => {
     const contentOffset = event.nativeEvent.contentOffset.x;
     const index = Math.round(contentOffset / width);
     dispatch(setCurrentMediaIndex(index));
-    
-    const media = product?.media?.[index];
+
+    const media = product?.media_streams?.[index];
     if (media?.mediaType === 'video') {
       setCurrentMediaType('video');
       setIsVideoPaused(false);
@@ -420,9 +466,12 @@ const ProductDetail = ({ route, navigation }) => {
   };
 
   const renderMediaItem = ({ item, index }) => {
+    Trace("----item---->", item);
     try {
       const mediaUrl = typeof item?.url === 'string' && item.url ? item.url : DEFAULT_IMAGE_URL;
       const mediaType = item?.mediaType || 'image';
+
+      console.log(`Rendering media item ${index}:`, { mediaUrl, mediaType }); // Debug log
 
       return (
         <View style={styles.mediaItem}>
@@ -448,8 +497,8 @@ const ProductDetail = ({ route, navigation }) => {
                   >
                     <Icon
                       name={isVideoPaused ? 'play-arrow' : 'pause'}
-                      size={scale(24)}
-                      color="#FFFFFF"
+                      size={scale(20)}
+                      color={TEXT_THEME_COLOR}
                     />
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -461,11 +510,11 @@ const ProductDetail = ({ route, navigation }) => {
                     }}
                   >
                     <LinearGradient
-                      colors={['#7B61FF', '#AD4DFF']}
+                      colors={[PRIMARY_THEME_COLOR, '#8ec5fc']}
                       style={styles.progressBackground}
                     >
                       <LinearGradient
-                        colors={['#AD4DFF', '#7B61FF']}
+                        colors={['#8ec5fc', PRIMARY_THEME_COLOR]}
                         style={[styles.progressFill, { width: `${videoProgress * 100}%` }]}
                       />
                     </LinearGradient>
@@ -479,7 +528,7 @@ const ProductDetail = ({ route, navigation }) => {
               style={styles.media}
               resizeMode="contain"
               defaultSource={{ uri: DEFAULT_IMAGE_URL }}
-              onError={(e) => console.log('Image error:', e.nativeEvent.error)}
+              onError={(e) => console.log('Image error:', e.nativeEvent.error, 'URL:', mediaUrl)}
             />
           )}
         </View>
@@ -488,7 +537,7 @@ const ProductDetail = ({ route, navigation }) => {
       console.log('Error rendering media item:', error);
       return (
         <View style={styles.mediaItem}>
-          <Text style={[styles.errorText, { color: theme.textSecondary }]}>Failed to load media</Text>
+          <Text style={[styles.errorText, { color: SUBTEXT_THEME_COLOR }]}>Failed to load media</Text>
         </View>
       );
     }
@@ -517,19 +566,20 @@ const ProductDetail = ({ route, navigation }) => {
         }).start();
       };
 
+      // Handle media URL for related products and recently viewed
       const mediaUrl =
         typeof item?.media === 'string' && item.media
           ? item.media
           : Array.isArray(item?.media) && item.media.length > 0
-          ? typeof item.media[0] === 'string'
-            ? item.media[0]
-            : item.media[0]?.url || DEFAULT_IMAGE_URL
+          ? item.media[0]?.url || DEFAULT_IMAGE_URL
           : DEFAULT_IMAGE_URL;
+
+      console.log(`Rendering related/recently viewed product ${item.id || item._id}:`, { mediaUrl }); // Debug log
 
       const isVideo = item?.mediaType === 'video' || /\.(mp4|mov|avi)$/i.test(mediaUrl);
 
       return (
-        <Animated.View style={[styles.relatedProductCard(theme), { transform: [{ scale: scaleAnim }] }]}>
+        <Animated.View style={[styles.relatedProductCard, { transform: [{ scale: scaleAnim }] }]}>
           <TouchableOpacity
             onPressIn={onPressIn}
             onPressOut={onPressOut}
@@ -547,10 +597,9 @@ const ProductDetail = ({ route, navigation }) => {
               navigation.replace('ProductDetail', { productId: id });
             }}
             activeOpacity={0.95}
-            disabled={isActionLoading}
           >
             <LinearGradient
-              colors={['rgba(123, 97, 255, 0.2)', 'rgba(173, 77, 255, 0.2)']}
+              colors={[CATEGORY_BG_COLOR, 'rgba(142, 197, 252, 0.2)']}
               style={styles.relatedProductGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
@@ -570,13 +619,8 @@ const ProductDetail = ({ route, navigation }) => {
                     style={styles.relatedProductImage}
                     resizeMode="contain"
                     defaultSource={{ uri: DEFAULT_IMAGE_URL }}
-                    onError={(e) => console.log('Related product image error:', e.nativeEvent.error)}
+                    onError={(e) => console.log('Related product image error:', e.nativeEvent.error, 'URL:', mediaUrl)}
                   />
-                )}
-                {item.isNew && (
-                  <View style={styles.newBadge}>
-                    <Text style={styles.newBadgeText}>NEW</Text>
-                  </View>
                 )}
                 {item.discount && (
                   <View style={styles.discountBadge}>
@@ -585,20 +629,28 @@ const ProductDetail = ({ route, navigation }) => {
                 )}
               </View>
               <View style={styles.relatedProductInfo}>
-                <Text style={[styles.relatedProductBrand, { color: theme.textSecondary }]}>{item.brand || 'Unknown Brand'}</Text>
-                <Text style={[styles.relatedProductName, { color: theme.textPrimary }]} numberOfLines={1}>
+                <Text style={[styles.relatedProductBrand, { color: SUBTEXT_THEME_COLOR }]}>{item.brand || 'Unknown Brand'}</Text>
+                <Text style={[styles.relatedProductName, { color: TEXT_THEME_COLOR }]} numberOfLines={1}>
                   {item.name || 'Unknown Product'}
                 </Text>
                 <View style={styles.relatedProductRating}>
-                  <Rating rating={item.rating || 0} size={12} />
-                  <Text style={[styles.relatedProductReviewCount, { color: theme.textTertiary }]}>({item.reviewCount || 0})</Text>
+                  <Rating rating={item.rating || 0} size={10} />
+                  <Text style={[styles.relatedProductReviewCount, { color: SUBTEXT_THEME_COLOR }]}>({item.reviewCount || 0})</Text>
                 </View>
                 <View style={styles.relatedProductPriceContainer}>
-                  <Text style={[styles.relatedProductPrice, { color: theme.textPrimary }]}>₹{item.price || 'N/A'}</Text>
+                  <Text style={[styles.relatedProductPrice, { color: TEXT_THEME_COLOR }]}>₹{item.price || 'N/A'}</Text>
                   {item.originalPrice && (
-                    <Text style={[styles.relatedProductOriginalPrice, { color: theme.textTertiary }]}>₹{item.originalPrice}</Text>
+                    <Text style={[styles.relatedProductOriginalPrice, { color: SUBTEXT_THEME_COLOR }]}>₹{item.originalPrice}</Text>
                   )}
                 </View>
+                {item.offer && (
+                  <Text style={[styles.relatedProductOffer, { color: SECONDARY_THEME_COLOR }]} numberOfLines={1}>
+                    {item.offer}
+                  </Text>
+                )}
+                <Text style={[styles.relatedProductStock, { color: item.stock > 0 ? SUBTEXT_THEME_COLOR : SECONDARY_THEME_COLOR }]}>
+                  {item.stock > 0 ? `In Stock: ${item.stock}` : 'Out of Stock'}
+                </Text>
               </View>
             </LinearGradient>
           </TouchableOpacity>
@@ -607,8 +659,8 @@ const ProductDetail = ({ route, navigation }) => {
     } catch (error) {
       console.log('Error rendering related product:', error);
       return (
-        <View style={styles.relatedProductCard(theme)}>
-          <Text style={[styles.errorText, { color: theme.textSecondary }]}>Failed to load product</Text>
+        <View style={styles.relatedProductCard}>
+          <Text style={[styles.errorText, { color: SUBTEXT_THEME_COLOR }]}>Failed to load product</Text>
         </View>
       );
     }
@@ -619,14 +671,14 @@ const ProductDetail = ({ route, navigation }) => {
     const lineClamp = isExpanded ? undefined : 3;
 
     return (
-      <View style={styles.reviewItem(theme)}>
+      <View style={styles.reviewItem}>
         <View style={styles.reviewHeader}>
-          <Text style={[styles.reviewUser, { color: theme.textPrimary }]}>{item.user}</Text>
-          <Rating rating={item.rating} size={14} />
+          <Text style={[styles.reviewUser, { color: TEXT_THEME_COLOR }]}>{item.user}</Text>
+          <Rating rating={item.rating} size={12} />
         </View>
-        <Text style={[styles.reviewDate, { color: theme.textTertiary }]}>{item.date}</Text>
+        <Text style={[styles.reviewDate, { color: SUBTEXT_THEME_COLOR }]}>{item.date}</Text>
         <Text
-          style={[styles.reviewComment, { color: theme.textPrimary }]}
+          style={[styles.reviewComment, { color: TEXT_THEME_COLOR }]}
           numberOfLines={lineClamp}
           ellipsizeMode="tail"
         >
@@ -634,7 +686,7 @@ const ProductDetail = ({ route, navigation }) => {
         </Text>
         {item.comment.length > 100 && (
           <TouchableOpacity onPress={() => toggleReviewExpansion(item.id)}>
-            <Text style={[styles.seeMoreText, { color: theme.textSecondary }]}>
+            <Text style={[styles.seeMoreText, { color: PRIMARY_THEME_COLOR }]}>
               {isExpanded ? 'See Less' : 'See More'}
             </Text>
           </TouchableOpacity>
@@ -649,14 +701,14 @@ const ProductDetail = ({ route, navigation }) => {
     return (
       <View style={styles.reviewsContainer}>
         <View style={styles.reviewsHeader}>
-          <Text style={[styles.reviewsTitle, { color: theme.textPrimary }]}>Customer Reviews</Text>
+          <Text style={[styles.reviewsTitle, { color: TEXT_THEME_COLOR }]}>Customer Reviews</Text>
           <TouchableOpacity onPress={onWriteReview}>
-            <Text style={[styles.writeReviewText, { color: theme.textSecondary }]}>Write a Review</Text>
+            <Text style={[styles.writeReviewText, { color: PRIMARY_THEME_COLOR }]}>Write a Review</Text>
           </TouchableOpacity>
         </View>
 
         {reviews.length === 0 ? (
-          <Text style={[styles.noReviewsText, { color: theme.textSecondary }]}>No reviews yet</Text>
+          <Text style={[styles.noReviewsText, { color: SUBTEXT_THEME_COLOR }]}>No reviews yet</Text>
         ) : (
           <FlatList
             data={displayedReviews}
@@ -671,13 +723,13 @@ const ProductDetail = ({ route, navigation }) => {
             style={styles.seeAllReviewsButton}
             onPress={toggleShowAllReviews}
           >
-            <Text style={[styles.seeAllReviewsText, { color: theme.textSecondary }]}>
+            <Text style={[styles.seeAllReviewsText, { color: PRIMARY_THEME_COLOR }]}>
               {showAllReviews ? 'Show Less Reviews' : `See All Reviews (${reviews.length})`}
             </Text>
             <Icon
               name={showAllReviews ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-              size={20}
-              color={theme.textSecondary}
+              size={18}
+              color={PRIMARY_THEME_COLOR}
             />
           </TouchableOpacity>
         )}
@@ -685,10 +737,10 @@ const ProductDetail = ({ route, navigation }) => {
     );
   };
 
-  const renderActionLoader = () => {
+  const renderLoader = () => {
     return (
       <View style={styles.loaderOverlay}>
-        <ActivityIndicator size="large" color="#7B61FF" />
+        <ActivityIndicator size="large" color={PRIMARY_THEME_COLOR} />
       </View>
     );
   };
@@ -705,11 +757,14 @@ const ProductDetail = ({ route, navigation }) => {
       : DEFAULT_IMAGE_URL;
 
   const filteredRecentlyViewed = recentlyViewed.filter(
-    (item) => (item.id !== productId && item._id !== productId)
+    (item) => item.id !== productId && item._id !== productId
   );
 
+  Trace("-----product---->", product);
   return (
-    <LinearGradient colors={theme.background} style={styles.container}>
+    <LinearGradient colors={BACKGROUND_GRADIENT} style={styles.container}>
+      {(loading || refreshing) && renderLoader()}
+
       <Header
         showLeftIcon={true}
         leftIcon="arrow-back"
@@ -720,7 +775,7 @@ const ProductDetail = ({ route, navigation }) => {
         rightIcon1="share"
         onRightPress1={handleShare}
         showRightIcon2={false}
-        textStyle={{ color: theme.textPrimary }}
+        textStyle={{ color: TEXT_THEME_COLOR }}
       />
 
       <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideUpAnim }] }}>
@@ -731,249 +786,254 @@ const ProductDetail = ({ route, navigation }) => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              colors={['#7B61FF']}
-              tintColor="#7B61FF"
+              colors={[PRIMARY_THEME_COLOR]}
+              tintColor={PRIMARY_THEME_COLOR}
+              progressViewOffset={scale(20)}
             />
           }
-          scrollEnabled={!isActionLoading}
           contentContainerStyle={styles.scrollContainer}
         >
-          <LinearGradient colors={theme.background} style={styles.mediaContainer}>
-            <FlatList
-              ref={flatListRef}
-              data={
-                product?.media && Array.isArray(product.media)
-                  ? product.media
-                  : [{ url: DEFAULT_IMAGE_URL, mediaType: 'image' }]
-              }
-              renderItem={renderMediaItem}
-              keyExtractor={(_, index) => index.toString()}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onScroll={handleMediaScroll}
-              scrollEventThrottle={16}
-            />
+          {product && (
+            <>
+              <View style={styles.mediaContainer}>
+                <FlatList
+                  ref={flatListRef}
+                  data={
+                    product?.media_streams && Array.isArray(product.media_streams)
+                      ? product.media_streams
+                      : [{ url: DEFAULT_IMAGE_URL, mediaType: 'image' }]
+                  }
+                  renderItem={renderMediaItem}
+                  keyExtractor={(_, index) => index.toString()}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  onScroll={handleMediaScroll}
+                  scrollEventThrottle={16}
+                />
 
-            {product?.media && Array.isArray(product.media) && product.media.length > 1 && (
-              <View style={styles.mediaIndicator}>
-                <Text style={styles.mediaIndicatorText}>
-                  {currentMediaIndex + 1}/{product.media.length}
-                </Text>
-              </View>
-            )}
-
-            <TouchableOpacity style={styles.likeButtonFloating} onPress={handleToggleLike}>
-              <Icon
-                name={isLiked ? 'favorite' : 'favorite-border'}
-                size={scale(24)}
-                color={isLiked ? '#FF3E6D' : '#FFFFFF'}
-              />
-            </TouchableOpacity>
-          </LinearGradient>
-
-          <LinearGradient colors={theme.background} style={styles.detailsContainer(theme)}>
-            <View style={styles.brandRatingContainer}>
-              <Text style={[styles.brandText, { color: theme.textSecondary }]}>{product?.brand || 'Unknown Brand'}</Text>
-              <Rating rating={product?.rating || 0} size={16} />
-              <Text style={[styles.reviewCountText, { color: theme.textTertiary }]}>({product?.reviewCount || 0} reviews)</Text>
-            </View>
-
-            <Text style={[styles.name, { color: theme.textPrimary }]}>{product?.name || 'Product'}</Text>
-
-            <View style={styles.priceContainer}>
-              <Text style={[styles.price, { color: theme.textPrimary }]}>₹{product?.price || 'N/A'}</Text>
-              {product?.originalPrice && (
-                <Text style={[styles.originalPrice, { color: theme.textTertiary }]}>₹{product.originalPrice}</Text>
-              )}
-              {product?.discount && (
-                <View style={styles.discountBadge}>
-                  <Text style={styles.discountBadgeText}>{product.discount}% OFF</Text>
-                </View>
-              )}
-            </View>
-
-            {product?.category && (
-              <View style={styles.categoryContainer}>
-                <Text style={[styles.categoryText, { color: theme.textSecondary }]}>{product.category}</Text>
-              </View>
-            )}
-
-            <View style={styles.divider} />
-
-            <SizeSelector
-              sizes={product?.sizes || []}
-              selectedSize={selectedSize}
-              onSelect={setSelectedSize}
-            />
-
-            <ColorSelector
-              colors={product?.colors || []}
-              selectedColor={selectedColor}
-              onSelect={setSelectedColor}
-            />
-
-            <QuantitySelector
-              quantity={quantity}
-              onIncrement={() => setQuantity((prev) => Math.min(prev + 1, 10))}
-              onDecrement={() => setQuantity((prev) => Math.max(prev - 1, 1))}
-            />
-
-            <View style={styles.divider} />
-
-            <TouchableOpacity
-              style={styles.userInfo}
-              onPress={navigateToUserProfile}
-              activeOpacity={0.7}
-              disabled={isActionLoading}
-            >
-              <Image
-                source={{ uri: userProfileImage }}
-                style={styles.userImage}
-                defaultSource={{ uri: DEFAULT_IMAGE_URL }}
-                onError={(e) => console.log('User image error:', e.nativeEvent.error)}
-              />
-              <View style={styles.userInfoText}>
-                <Text style={[styles.sellerText, { color: theme.textSecondary }]}>Seller</Text>
-                <Text style={[styles.userName, { color: theme.textPrimary }]}>@{user?.userName || 'unknown'}</Text>
-              </View>
-              <TouchableOpacity style={styles.callButton} onPress={handleCallSeller}>
-                <Ionicons name="call" size={scale(18)} color="#FFFFFF" />
-                <Text style={styles.callButtonText}>Call</Text>
-              </TouchableOpacity>
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            <ProductHighlights highlights={product?.highlights || []} />
-
-            <View style={styles.divider} />
-          </LinearGradient>
-
-          <LinearGradient colors={theme.background} style={styles.tabsContainer(theme)}>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'description' && styles.activeTab]}
-              onPress={() => setActiveTab('description')}
-            >
-              <Text style={[styles.tabText, activeTab === 'description' ? { color: theme.textPrimary } : { color: theme.textSecondary }]}>
-                Description
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'specifications' && styles.activeTab]}
-              onPress={() => setActiveTab('specifications')}
-            >
-              <Text style={[styles.tabText, activeTab === 'specifications' ? { color: theme.textPrimary } : { color: theme.textSecondary }]}>
-                Specifications
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'reviews' && styles.activeTab]}
-              onPress={() => setActiveTab('reviews')}
-            >
-              <Text style={[styles.tabText, activeTab === 'reviews' ? { color: theme.textPrimary } : { color: theme.textSecondary }]}>
-                Reviews
-              </Text>
-            </TouchableOpacity>
-          </LinearGradient>
-
-          <LinearGradient colors={theme.background} style={styles.tabContent(theme)}>
-            {activeTab === 'description' && (
-              <View style={styles.descriptionContainer}>
-                <Text style={[styles.descriptionTitle, { color: theme.textPrimary }]}>Product Description</Text>
-                <Text style={[styles.description, { color: theme.textPrimary }]}>
-                  {product?.description || 'No description available'}
-                </Text>
-
-                {product?.tags && Array.isArray(product.tags) && product.tags.length > 0 && (
-                  <View style={styles.tagsContainer}>
-                    <Text style={[styles.tagsTitle, { color: theme.textPrimary }]}>Tags:</Text>
-                    <View style={styles.tagsList}>
-                      {product.tags.map((tag, index) => (
-                        <View key={index} style={styles.tag}>
-                          <Text style={[styles.tagText, { color: theme.textSecondary }]}>{tag}</Text>
-                        </View>
-                      ))}
-                    </View>
+                {product?.media_streams && Array.isArray(product.media_streams) && product.media_streams.length > 1 && (
+                  <View style={styles.mediaIndicator}>
+                    <Text style={styles.mediaIndicatorText}>
+                      {currentMediaIndex + 1}/{product.media_streams.length}
+                    </Text>
                   </View>
                 )}
-              </View>
-            )}
 
-            {activeTab === 'specifications' && (
-              <ProductSpecifications specifications={product?.specifications || []} />
-            )}
-
-            {activeTab === 'reviews' && (
-              <ReviewsSection
-                reviews={reviews}
-                onWriteReview={() => setReviewModalVisible(true)}
-              />
-            )}
-          </LinearGradient>
-
-          {relatedProducts && Array.isArray(relatedProducts) && relatedProducts.length > 0 && (
-            <LinearGradient colors={theme.background} style={styles.relatedProductsContainer(theme)}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Similar Products</Text>
-                <TouchableOpacity>
-                  <Text style={[styles.seeAllText, { color: theme.textSecondary }]}>See All</Text>
+                <TouchableOpacity style={styles.likeButtonFloating} onPress={handleToggleLike}>
+                  <Icon
+                    name={isLiked ? 'favorite' : 'favorite-border'}
+                    size={scale(20)}
+                    color={isLiked ? SECONDARY_THEME_COLOR : TEXT_THEME_COLOR}
+                  />
                 </TouchableOpacity>
               </View>
-              <FlatList
-                data={relatedProducts.filter((item) => item && (item._id || item.id))}
-                renderItem={renderRelatedProduct}
-                keyExtractor={(item) => (item._id || item.id || Math.random().toString())}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.relatedProductsList}
-              />
-            </LinearGradient>
-          )}
 
-          {filteredRecentlyViewed && Array.isArray(filteredRecentlyViewed) && filteredRecentlyViewed.length > 0 && (
-            <LinearGradient colors={theme.background} style={styles.recentlyViewedContainer(theme)}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Recently Viewed</Text>
-                <TouchableOpacity>
-                  <Text style={[styles.seeAllText, { color: theme.textSecondary }]}>See All</Text>
+              <View style={styles.detailsContainer}>
+                <View style={styles.brandRatingContainer}>
+                  <Text style={[styles.brandText, { color: SUBTEXT_THEME_COLOR }]}>{product?.brand || 'Unknown Brand'}</Text>
+                  <Rating rating={product?.rating || 0} size={14} />
+                  <Text style={[styles.reviewCountText, { color: SUBTEXT_THEME_COLOR }]}>({product?.reviewCount || 0} reviews)</Text>
+                </View>
+
+                <Text style={[styles.name, { color: TEXT_THEME_COLOR }]}>{product?.name || 'Product'}</Text>
+
+                <View style={styles.priceContainer}>
+                  <Text style={[styles.price, { color: TEXT_THEME_COLOR }]}>₹{product?.price || 'N/A'}</Text>
+                  {product?.originalPrice && (
+                    <Text style={[styles.originalPrice, { color: SUBTEXT_THEME_COLOR }]}>₹{product.originalPrice}</Text>
+                  )}
+                  {product?.discount && (
+                    <View style={styles.discountBadge}>
+                      <Text style={styles.discountBadgeText}>{product.discount}% OFF</Text>
+                    </View>
+                  )}
+                </View>
+
+                {product?.category && (
+                  <View style={styles.categoryContainer}>
+                    <Text style={[styles.categoryText, { color: SUBTEXT_THEME_COLOR }]}>{product.category}</Text>
+                  </View>
+                )}
+
+                {product?.offer && (
+                  <Text style={[styles.offerText, { color: SECONDARY_THEME_COLOR }]}>{product.offer}</Text>
+                )}
+
+                <Text style={[styles.stockText, { color: product?.stock > 0 ? SUBTEXT_THEME_COLOR : SECONDARY_THEME_COLOR }]}>
+                  {product?.stock > 0 ? `In Stock: ${product.stock}` : 'Out of Stock'}
+                </Text>
+
+                <View style={styles.divider} />
+
+                <SizeSelector
+                  sizes={product?.sizes || []}
+                  selectedSize={selectedSize}
+                  onSelect={setSelectedSize}
+                />
+
+                <ColorSelector
+                  colors={product?.colors || []}
+                  selectedColor={selectedColor}
+                  onSelect={setSelectedColor}
+                />
+
+                <QuantitySelector
+                  quantity={quantity}
+                  onIncrement={() => setQuantity((prev) => Math.min(prev + 1, 10))}
+                  onDecrement={() => setQuantity((prev) => Math.max(prev - 1, 1))}
+                />
+
+                <View style={styles.divider} />
+
+                <TouchableOpacity
+                  style={styles.userInfo}
+                  onPress={navigateToUserProfile}
+                  activeOpacity={0.7}
+                >
+                  <Image
+                    source={{ uri: userProfileImage }}
+                    style={styles.userImage}
+                    defaultSource={{ uri: DEFAULT_IMAGE_URL }}
+                    onError={(e) => console.log('User image error:', e.nativeEvent.error)}
+                  />
+                  <View style={styles.userInfoText}>
+                    <Text style={[styles.sellerText, { color: SUBTEXT_THEME_COLOR }]}>Seller</Text>
+                    <Text style={[styles.userName, { color: TEXT_THEME_COLOR }]}>@{user?.userName || 'unknown'}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.callButton} onPress={handleCallSeller}>
+                    <Ionicons name="call" size={scale(16)} color={TEXT_THEME_COLOR} />
+                    <Text style={styles.callButtonText}>Call</Text>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+
+                <View style={styles.divider} />
+              </View>
+
+              <View style={styles.tabsContainer}>
+                <TouchableOpacity
+                  style={[styles.tab, activeTab === 'description' && styles.activeTab]}
+                  onPress={() => setActiveTab('description')}
+                >
+                  <Text style={[styles.tabText, activeTab === 'description' ? { color: TEXT_THEME_COLOR } : { color: SUBTEXT_THEME_COLOR }]}>
+                    Description
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.tab, activeTab === 'specifications' && styles.activeTab]}
+                  onPress={() => setActiveTab('specifications')}
+                >
+                  <Text style={[styles.tabText, activeTab === 'specifications' ? { color: TEXT_THEME_COLOR } : { color: SUBTEXT_THEME_COLOR }]}>
+                    Specifications
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.tab, activeTab === 'reviews' && styles.activeTab]}
+                  onPress={() => setActiveTab('reviews')}
+                >
+                  <Text style={[styles.tabText, activeTab === 'reviews' ? { color: TEXT_THEME_COLOR } : { color: SUBTEXT_THEME_COLOR }]}>
+                    Reviews
+                  </Text>
                 </TouchableOpacity>
               </View>
-              <FlatList
-                data={filteredRecentlyViewed}
-                renderItem={renderRelatedProduct}
-                keyExtractor={(item) => (item.id || item._id || Math.random().toString())}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.relatedProductsList}
-              />
-            </LinearGradient>
+
+              <View style={styles.tabContent}>
+                {activeTab === 'description' && (
+                  <View style={styles.descriptionContainer}>
+                    <Text style={[styles.descriptionTitle, { color: TEXT_THEME_COLOR }]}>Product Description</Text>
+                    <Text style={[styles.description, { color: TEXT_THEME_COLOR }]}>
+                      {product?.description || 'No description available'}
+                    </Text>
+
+                    {product?.tags && Array.isArray(product.tags) && product.tags.length > 0 && (
+                      <View style={styles.tagsContainer}>
+                        <Text style={[styles.tagsTitle, { color: TEXT_THEME_COLOR }]}>Tags:</Text>
+                        <View style={styles.tagsList}>
+                          {product.tags.map((tag, index) => (
+                            <View key={index} style={styles.tag}>
+                              <Text style={[styles.tagText, { color: SUBTEXT_THEME_COLOR }]}>{tag}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                {activeTab === 'specifications' && (
+                  <ProductSpecifications specifications={product?.specifications || []} />
+                )}
+
+                {activeTab === 'reviews' && (
+                  <ReviewsSection
+                    reviews={reviews}
+                    onWriteReview={() => setReviewModalVisible(true)}
+                  />
+                )}
+              </View>
+
+              {relatedProducts && Array.isArray(relatedProducts) && relatedProducts.length > 0 && (
+                <View style={styles.relatedProductsContainer}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={[styles.sectionTitle, { color: TEXT_THEME_COLOR }]}>Similar Products</Text>
+                    <TouchableOpacity>
+                      <Text style={[styles.seeAllText, { color: PRIMARY_THEME_COLOR }]}>See All</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <FlatList
+                    data={relatedProducts.filter((item) => item && (item._id || item.id))}
+                    renderItem={renderRelatedProduct}
+                    keyExtractor={(item) => (item._id || item.id || Math.random().toString())}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.relatedProductsList}
+                  />
+                </View>
+              )}
+
+              {filteredRecentlyViewed && Array.isArray(filteredRecentlyViewed) && filteredRecentlyViewed.length > 0 && (
+                <View style={styles.recentlyViewedContainer}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={[styles.sectionTitle, { color: TEXT_THEME_COLOR }]}>Recently Viewed</Text>
+                    <TouchableOpacity>
+                      <Text style={[styles.seeAllText, { color: PRIMARY_THEME_COLOR }]}>See All</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <FlatList
+                    data={filteredRecentlyViewed}
+                    renderItem={renderRelatedProduct}
+                    keyExtractor={(item) => (item.id || item._id || Math.random().toString())}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.relatedProductsList}
+                  />
+                </View>
+              )}
+            </>
           )}
         </ScrollView>
       </Animated.View>
 
-      <LinearGradient colors={theme.background} style={styles.actionBar}>
+      <LinearGradient colors={BACKGROUND_GRADIENT} style={styles.actionBar}>
         <TouchableOpacity
           style={styles.wishlistButton}
           onPress={handleToggleLike}
-          disabled={isActionLoading}
         >
           <Icon
             name={isLiked ? 'favorite' : 'favorite-border'}
-            size={scale(24)}
-            color={isLiked ? '#FF3E6D' : theme.textSecondary}
+            size={scale(20)}
+            color={isLiked ? SECONDARY_THEME_COLOR : SUBTEXT_THEME_COLOR}
           />
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.cartButton}
           onPress={handleAddToCart}
-          disabled={isActionLoading}
         >
           <LinearGradient
-            colors={['#7B61FF', '#AD4DFF']}
+            colors={[PRIMARY_THEME_COLOR, '#8ec5fc']}
             style={styles.buttonGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -986,7 +1046,6 @@ const ProductDetail = ({ route, navigation }) => {
 
         <TouchableOpacity
           style={styles.buyButton}
-          disabled={isActionLoading}
           onPress={() =>
             navigation.navigate('Checkout', {
               productId,
@@ -997,7 +1056,7 @@ const ProductDetail = ({ route, navigation }) => {
           }
         >
           <LinearGradient
-            colors={['#7B61FF', '#AD4DFF']}
+            colors={[PRIMARY_THEME_COLOR, '#8ec5fc']}
             style={styles.buttonGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -1014,17 +1073,17 @@ const ProductDetail = ({ route, navigation }) => {
         onRequestClose={() => setReviewModalVisible(false)}
       >
         <View style={styles.modalContainer}>
-          <LinearGradient colors={theme.background} style={styles.modalContent(theme)}>
-            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Write a Review</Text>
+          <View style={styles.modalContent}>
+            <Text style={[styles.modalTitle, { color: TEXT_THEME_COLOR }]}>Write a Review</Text>
 
             <View style={styles.ratingContainer}>
-              <Text style={[styles.ratingLabel, { color: theme.textPrimary }]}>Your Rating:</Text>
+              <Text style={[styles.ratingLabel, { color: TEXT_THEME_COLOR }]}>Your Rating:</Text>
               <View style={styles.starsContainer}>
                 {[1, 2, 3, 4, 5].map((star) => (
                   <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
                     <Icon
                       name={star <= reviewRating ? 'star' : 'star-border'}
-                      size={scale(30)}
+                      size={scale(26)}
                       color="#FFD700"
                     />
                   </TouchableOpacity>
@@ -1032,15 +1091,15 @@ const ProductDetail = ({ route, navigation }) => {
               </View>
             </View>
 
-            <Text style={[styles.commentLabel, { color: theme.textPrimary }]}>Your Comment:</Text>
+            <Text style={[styles.commentLabel, { color: TEXT_THEME_COLOR }]}>Your Comment:</Text>
             <TextInput
-              style={[styles.commentInput, { color: theme.textPrimary, borderColor: theme.glassBorder }]}
+              style={[styles.commentInput, { color: TEXT_THEME_COLOR, borderColor: BORDER_THEME_COLOR }]}
               multiline
               numberOfLines={4}
               value={reviewComment}
               onChangeText={setReviewComment}
               placeholder="Write your review here..."
-              placeholderTextColor={theme.textTertiary}
+              placeholderTextColor={SUBTEXT_THEME_COLOR}
             />
 
             <View style={styles.modalButtons}>
@@ -1049,7 +1108,7 @@ const ProductDetail = ({ route, navigation }) => {
                 onPress={() => setReviewModalVisible(false)}
               >
                 <LinearGradient
-                  colors={['#7B61FF', '#AD4DFF']}
+                  colors={[PRIMARY_THEME_COLOR, '#8ec5fc']}
                   style={styles.buttonGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
@@ -1059,7 +1118,7 @@ const ProductDetail = ({ route, navigation }) => {
               </TouchableOpacity>
               <TouchableOpacity style={styles.submitButton} onPress={handleSubmitReview}>
                 <LinearGradient
-                  colors={['#7B61FF', '#AD4DFF']}
+                  colors={[PRIMARY_THEME_COLOR, '#8ec5fc']}
                   style={styles.buttonGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
@@ -1068,11 +1127,9 @@ const ProductDetail = ({ route, navigation }) => {
                 </LinearGradient>
               </TouchableOpacity>
             </View>
-          </LinearGradient>
+          </View>
         </View>
       </Modal>
-
-      {(loading || isActionLoading || isReviewSubmitting) && renderActionLoader()}
     </LinearGradient>
   );
 };
@@ -1087,7 +1144,7 @@ const styles = StyleSheet.create({
   mediaContainer: {
     height: width * 0.9,
     position: 'relative',
-    marginBottom: scale(16),
+    marginBottom: scale(14),
   },
   mediaItem: {
     width: width,
@@ -1101,29 +1158,29 @@ const styles = StyleSheet.create({
   },
   videoControls: {
     position: 'absolute',
-    bottom: scale(15),
-    left: scale(15),
-    right: scale(15),
+    bottom: scale(12),
+    left: scale(12),
+    right: scale(12),
     flexDirection: 'row',
     alignItems: 'center',
   },
   playPauseButton: {
     backgroundColor: 'rgba(0,0,0,0.4)',
-    width: scale(40),
-    height: scale(40),
-    borderRadius: scale(20),
+    width: scale(35),
+    height: scale(35),
+    borderRadius: scale(17.5),
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: scale(10),
+    marginRight: scale(8),
   },
   progressBarContainer: {
     flex: 1,
-    height: scale(4),
-    borderRadius: scale(2),
+    height: scale(3),
+    borderRadius: scale(1.5),
   },
   progressBackground: {
     flex: 1,
-    borderRadius: scale(2),
+    borderRadius: scale(1.5),
     overflow: 'hidden',
   },
   progressFill: {
@@ -1131,404 +1188,408 @@ const styles = StyleSheet.create({
   },
   mediaIndicator: {
     position: 'absolute',
-    bottom: scale(15),
-    right: scale(15),
+    bottom: scale(12),
+    right: scale(12),
     backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: scale(10),
-    paddingVertical: scale(5),
-    borderRadius: scale(10),
+    paddingHorizontal: scale(8),
+    paddingVertical: scale(4),
+    borderRadius: scale(8),
   },
   mediaIndicatorText: {
     color: '#FFFFFF',
-    fontSize: scaleFont(12),
-    fontWeight: '700',
+    fontSize: scaleFont(10),
+    fontWeight: '600',
   },
   likeButtonFloating: {
     position: 'absolute',
-    top: scale(15),
-    right: scale(15),
+    top: scale(12),
+    right: scale(12),
     backgroundColor: 'rgba(0,0,0,0.4)',
-    width: scale(40),
-    height: scale(40),
-    borderRadius: scale(20),
+    width: scale(35),
+    height: scale(35),
+    borderRadius: scale(17.5),
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 2,
   },
-  detailsContainer: theme => ({
-    padding: scale(16),
-    borderRadius: scale(12),
-    marginHorizontal: scale(16),
-    marginBottom: scale(16),
-    backgroundColor: theme.glassBg,
+  detailsContainer: {
+    padding: scale(14),
+    borderRadius: scale(10),
+    marginHorizontal: scale(14),
+    marginBottom: scale(14),
+    backgroundColor: PRODUCT_BG_COLOR,
     borderWidth: 1,
-    borderColor: theme.glassBorder,
-  }),
+    borderColor: BORDER_THEME_COLOR,
+  },
   brandRatingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: scale(12),
+    marginBottom: scale(10),
   },
   brandText: {
-    fontSize: scaleFont(14),
-    fontWeight: '700',
-    marginRight: scale(10),
+    fontSize: scaleFont(12),
+    fontWeight: '600',
+    marginRight: scale(8),
   },
   reviewCountText: {
-    fontSize: scaleFont(12),
-    marginLeft: scale(5),
+    fontSize: scaleFont(10),
+    marginLeft: scale(4),
   },
   name: {
-    fontSize: scaleFont(24),
-    fontWeight: '800',
-    marginBottom: scale(12),
+    fontSize: scaleFont(20),
+    fontWeight: '700',
+    marginBottom: scale(10),
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: scale(12),
+    marginBottom: scale(10),
   },
   price: {
-    fontSize: scaleFont(22),
-    fontWeight: '800',
-    marginRight: scale(10),
+    fontSize: scaleFont(18),
+    fontWeight: '700',
+    marginRight: scale(8),
   },
   originalPrice: {
-    fontSize: scaleFont(16),
+    fontSize: scaleFont(14),
     textDecorationLine: 'line-through',
-    marginRight: scale(10),
+    marginRight: scale(8),
   },
   discountBadge: {
-    backgroundColor: '#FF3E6D',
-    paddingHorizontal: scale(8),
-    paddingVertical: scale(4),
-    borderRadius: scale(4),
+    backgroundColor: SECONDARY_THEME_COLOR,
+    paddingHorizontal: scale(6),
+    paddingVertical: scale(3),
+    borderRadius: scale(3),
   },
   discountBadgeText: {
-    fontSize: scaleFont(12),
-    color: '#FFFFFF',
-    fontWeight: '700',
+    fontSize: scaleFont(10),
+    color: TEXT_THEME_COLOR,
+    fontWeight: '600',
   },
   categoryContainer: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(123, 97, 255, 0.2)',
-    paddingHorizontal: scale(10),
-    paddingVertical: scale(5),
-    borderRadius: scale(15),
-    marginBottom: scale(12),
+    backgroundColor: CATEGORY_BG_COLOR,
+    paddingHorizontal: scale(8),
+    paddingVertical: scale(4),
+    borderRadius: scale(12),
+    marginBottom: scale(10),
   },
   categoryText: {
+    fontSize: scaleFont(10),
+    fontWeight: '600',
+  },
+  offerText: {
     fontSize: scaleFont(12),
-    fontWeight: '700',
+    fontWeight: '500',
+    marginBottom: scale(10),
+  },
+  stockText: {
+    fontSize: scaleFont(12),
+    fontWeight: '500',
+    marginBottom: scale(10),
   },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    marginVertical: scale(12),
+    backgroundColor: BORDER_THEME_COLOR,
+    marginVertical: scale(10),
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: scale(10),
+    paddingVertical: scale(8),
   },
   userImage: {
-    width: scale(50),
-    height: scale(50),
-    borderRadius: scale(25),
-    marginRight: scale(10),
-    backgroundColor: '#F0F0F0',
+    width: scale(45),
+    height: scale(45),
+    borderRadius: scale(22.5),
+    marginRight: scale(8),
+    backgroundColor: SUBTEXT_THEME_COLOR,
   },
   userInfoText: {
     flex: 1,
   },
   sellerText: {
-    fontSize: scaleFont(12),
+    fontSize: scaleFont(10),
   },
   userName: {
-    fontSize: scaleFont(16),
-    fontWeight: '700',
+    fontSize: scaleFont(14),
+    fontWeight: '600',
   },
   callButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#7B61FF',
-    paddingHorizontal: scale(12),
-    paddingVertical: scale(6),
-    borderRadius: scale(20),
+    backgroundColor: PRIMARY_THEME_COLOR,
+    paddingHorizontal: scale(10),
+    paddingVertical: scale(5),
+    borderRadius: scale(15),
   },
   callButtonText: {
-    fontSize: scaleFont(14),
-    color: '#FFFFFF',
-    fontWeight: '700',
-    marginLeft: scale(5),
+    fontSize: scaleFont(12),
+    color: TEXT_THEME_COLOR,
+    fontWeight: '600',
+    marginLeft: scale(4),
   },
-  tabsContainer: theme => ({
+  tabsContainer: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.2)',
-    marginHorizontal: scale(16),
-    marginBottom: scale(16),
-    backgroundColor: theme.glassBg,
-    borderRadius: scale(12),
+    borderBottomColor: BORDER_THEME_COLOR,
+    marginHorizontal: scale(14),
+    marginBottom: scale(14),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(10),
     borderWidth: 1,
-    borderColor: theme.glassBorder,
-    padding: scale(8),
-  }),
+    borderColor: BORDER_THEME_COLOR,
+    padding: scale(6),
+  },
   tab: {
     flex: 1,
-    paddingVertical: scale(12),
+    paddingVertical: scale(10),
     alignItems: 'center',
   },
   activeTab: {
     borderBottomWidth: 2,
-    borderBottomColor: '#7B61FF',
+    borderBottomColor: PRIMARY_THEME_COLOR,
   },
   tabText: {
-    fontSize: scaleFont(14),
-    fontWeight: '700',
+    fontSize: scaleFont(12),
+    fontWeight: '600',
   },
-  tabContent: theme => ({
-    padding: scale(16),
-    marginHorizontal: scale(16),
-    borderRadius: scale(12),
-    marginBottom: scale(16),
-    backgroundColor: theme.glassBg,
+  tabContent: {
+    padding: scale(14),
+    marginHorizontal: scale(14),
+    borderRadius: scale(10),
+    marginBottom: scale(14),
+    backgroundColor: PRODUCT_BG_COLOR,
     borderWidth: 1,
-    borderColor: theme.glassBorder,
-  }),
+    borderColor: BORDER_THEME_COLOR,
+  },
   descriptionContainer: {
-    marginBottom: scale(12),
+    marginBottom: scale(10),
   },
   descriptionTitle: {
-    fontSize: scaleFont(16),
-    fontWeight: '700',
-    marginBottom: scale(8),
+    fontSize: scaleFont(14),
+    fontWeight: '600',
+    marginBottom: scale(6),
   },
   description: {
-    fontSize: scaleFont(14),
-    lineHeight: scaleFont(22),
+    fontSize: scaleFont(12),
+    lineHeight: scaleFont(18),
   },
   tagsContainer: {
-    marginTop: scale(12),
+    marginTop: scale(10),
   },
   tagsTitle: {
-    fontSize: scaleFont(14),
-    fontWeight: '700',
-    marginBottom: scale(8),
+    fontSize: scaleFont(12),
+    fontWeight: '600',
+    marginBottom: scale(6),
   },
   tagsList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
   tag: {
-    backgroundColor: 'rgba(123, 97, 255, 0.2)',
-    paddingHorizontal: scale(12),
-    paddingVertical: scale(6),
-    borderRadius: scale(15),
-    marginRight: scale(8),
-    marginBottom: scale(8),
+    backgroundColor: CATEGORY_BG_COLOR,
+    paddingHorizontal: scale(10),
+    paddingVertical: scale(5),
+    borderRadius: scale(12),
+    marginRight: scale(6),
+    marginBottom: scale(6),
   },
   tagText: {
-    fontSize: scaleFont(12),
+    fontSize: scaleFont(10),
   },
   reviewsContainer: {
-    marginBottom: scale(12),
+    marginBottom: scale(10),
   },
   reviewsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: scale(12),
+    marginBottom: scale(10),
   },
   reviewsTitle: {
-    fontSize: scaleFont(16),
-    fontWeight: '700',
+    fontSize: scaleFont(14),
+    fontWeight: '600',
   },
   writeReviewText: {
-    fontSize: scaleFont(14),
-    fontWeight: '700',
+    fontSize: scaleFont(12),
+    fontWeight: '600',
   },
   noReviewsText: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(12),
     textAlign: 'center',
-    marginVertical: scale(10),
+    marginVertical: scale(8),
   },
-  reviewItem: theme => ({
-    borderRadius: scale(8),
-    padding: scale(12),
-    marginBottom: scale(12),
-    backgroundColor: theme.glassBg,
+  reviewItem: {
+    borderRadius: scale(6),
+    padding: scale(10),
+    marginBottom: scale(10),
+    backgroundColor: PRODUCT_BG_COLOR,
     borderWidth: 1,
-    borderColor: theme.glassBorder,
-  }),
+    borderColor: BORDER_THEME_COLOR,
+  },
   reviewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: scale(5),
+    marginBottom: scale(4),
   },
   reviewUser: {
-    fontSize: scaleFont(14),
-    fontWeight: '700',
+    fontSize: scaleFont(12),
+    fontWeight: '600',
   },
   reviewDate: {
-    fontSize: scaleFont(12),
-    marginBottom: scale(8),
+    fontSize: scaleFont(10),
+    marginBottom: scale(6),
   },
   reviewComment: {
-    fontSize: scaleFont(14),
-    lineHeight: scaleFont(20),
-    marginBottom: scale(5),
+    fontSize: scaleFont(12),
+    lineHeight: scaleFont(18),
+    marginBottom: scale(4),
   },
   seeMoreText: {
-    fontSize: scaleFont(12),
-    fontWeight: '700',
+    fontSize: scaleFont(10),
+    fontWeight: '600',
     textAlign: 'right',
   },
   seeAllReviewsButton: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: scale(10),
-    borderRadius: scale(8),
-    marginTop: scale(12),
+    padding: scale(8),
+    borderRadius: scale(6),
+    marginTop: scale(10),
   },
   seeAllReviewsText: {
-    fontSize: scaleFont(14),
-    fontWeight: '700',
-    marginRight: scale(5),
+    fontSize: scaleFont(12),
+    fontWeight: '600',
+    marginRight: scale(4),
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: scale(16),
-    marginBottom: scale(12),
+    paddingHorizontal: scale(14),
+    marginBottom: scale(10),
   },
   sectionTitle: {
-    fontSize: scaleFont(24),
-    fontWeight: '800',
-  },
-  seeAllText: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(15),
     fontWeight: '700',
   },
-  relatedProductsContainer: theme => ({
-    paddingVertical: scale(16),
-    marginBottom: scale(16),
-    backgroundColor: theme.glassBg,
-    borderRadius: scale(12),
-    borderWidth: 1,
-    borderColor: theme.glassBorder,
-    marginHorizontal: scale(16),
-  }),
-  recentlyViewedContainer: theme => ({
-    paddingVertical: scale(16),
-    marginBottom: scale(80),
-    backgroundColor: theme.glassBg,
-    borderRadius: scale(12),
-    borderWidth: 1,
-    borderColor: theme.glassBorder,
-    marginHorizontal: scale(16),
-  }),
-  relatedProductsList: {
-    paddingHorizontal: scale(16),
+  seeAllText: {
+    fontSize: scaleFont(12),
+    fontWeight: '600',
   },
-  relatedProductCard: theme => ({
-    width: scale(160),
-    marginRight: scale(12),
-    borderRadius: scale(12),
-    overflow: 'hidden',
-    backgroundColor: theme.glassBg,
+  relatedProductsContainer: {
+    paddingVertical: scale(14),
+    marginBottom: scale(14),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(10),
     borderWidth: 1,
-    borderColor: theme.glassBorder,
-  }),
+    borderColor: BORDER_THEME_COLOR,
+    marginHorizontal: scale(14),
+  },
+  recentlyViewedContainer: {
+    paddingVertical: scale(14),
+    marginBottom: scale(80),
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderRadius: scale(10),
+    borderWidth: 1,
+    borderColor: BORDER_THEME_COLOR,
+    marginHorizontal: scale(14),
+  },
+  relatedProductsList: {
+    paddingHorizontal: scale(14),
+  },
+  relatedProductCard: {
+    width: scale(140),
+    marginRight: scale(10),
+    borderRadius: scale(10),
+    overflow: 'hidden',
+    backgroundColor: PRODUCT_BG_COLOR,
+    borderWidth: 1,
+    borderColor: BORDER_THEME_COLOR,
+  },
   relatedProductGradient: {
-    borderRadius: scale(12),
+    borderRadius: scale(10),
   },
   relatedProductImageContainer: {
     position: 'relative',
   },
   relatedProductImage: {
     width: '100%',
-    height: scale(150),
-    backgroundColor: '#F0F0F0',
-  },
-  newBadge: {
-    position: 'absolute',
-    top: scale(10),
-    left: scale(10),
-    backgroundColor: '#FF3E6D',
-    paddingHorizontal: scale(8),
-    paddingVertical: scale(3),
-    borderRadius: scale(12),
-  },
-  newBadgeText: {
-    fontSize: scaleFont(10),
-    color: '#FFFFFF',
-    fontWeight: 'bold',
+    height: scale(130),
+    backgroundColor: SUBTEXT_THEME_COLOR,
   },
   discountBadge: {
     position: 'absolute',
-    top: scale(10),
-    right: scale(10),
-    backgroundColor: '#FF3E6D',
-    paddingHorizontal: scale(8),
-    paddingVertical: scale(4),
-    borderRadius: scale(4),
+    top: scale(8),
+    right: scale(8),
+    backgroundColor: SECONDARY_THEME_COLOR,
+    paddingHorizontal: scale(6),
+    paddingVertical: scale(3),
+    borderRadius: scale(3),
   },
   discountBadgeText: {
-    fontSize: scaleFont(10),
-    color: '#FFFFFF',
-    fontWeight: '700',
+    fontSize: scaleFont(9),
+    color: TEXT_THEME_COLOR,
+    fontWeight: '600',
   },
   relatedProductInfo: {
-    padding: scale(10),
+    padding: scale(8),
   },
   relatedProductBrand: {
-    fontSize: scaleFont(12),
-    fontWeight: '700',
+    fontSize: scaleFont(10),
+    fontWeight: '600',
   },
   relatedProductName: {
-    fontSize: scaleFont(14),
-    fontWeight: '700',
-    marginVertical: scale(5),
+    fontSize: scaleFont(12),
+    fontWeight: '600',
+    marginVertical: scale(4),
   },
   relatedProductRating: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: scale(5),
+    marginBottom: scale(4),
   },
   relatedProductReviewCount: {
-    fontSize: scaleFont(12),
-    marginLeft: scale(5),
+    fontSize: scaleFont(10),
+    marginLeft: scale(4),
   },
   relatedProductPriceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: scale(4),
   },
   relatedProductPrice: {
-    fontSize: scaleFont(14),
-    fontWeight: '700',
-    marginRight: scale(5),
+    fontSize: scaleFont(12),
+    fontWeight: '600',
+    marginRight: scale(4),
   },
   relatedProductOriginalPrice: {
-    fontSize: scaleFont(12),
+    fontSize: scaleFont(10),
     textDecorationLine: 'line-through',
+  },
+  relatedProductOffer: {
+    fontSize: scaleFont(10),
+    marginBottom: scale(4),
+  },
+  relatedProductStock: {
+    fontSize: scaleFont(10),
   },
   actionBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: scale(10),
+    padding: scale(8),
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.2)',
+    borderTopColor: BORDER_THEME_COLOR,
     position: 'absolute',
-    bottom: 0,
+    bottom: -1,
     left: 0,
     right: 0,
   },
   wishlistButton: {
-    padding: scale(10),
-    borderRadius: scale(8),
+    padding: scale(8),
+    borderRadius: scale(6),
     marginRight: scale(12),
   },
   cartButton: {
@@ -1542,8 +1603,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cartButtonText: {
-    fontSize: scaleFont(14),
-    color: '#FFFFFF',
+    fontSize: scaleFont(12),
+    color: TEXT_THEME_COLOR,
     fontWeight: '700',
   },
   buyButton: {
@@ -1551,8 +1612,8 @@ const styles = StyleSheet.create({
     borderRadius: scale(8),
   },
   buyButtonText: {
-    fontSize: scaleFont(14),
-    color: '#FFFFFF',
+    fontSize: scaleFont(12),
+    color: TEXT_THEME_COLOR,
     fontWeight: '700',
   },
   modalContainer: {
@@ -1561,34 +1622,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  modalContent: theme => ({
+  modalContent: {
     width: width * 0.9,
     padding: scale(16),
     borderRadius: scale(12),
-    backgroundColor: theme.glassBg,
-    borderWidth: 1,
-    borderColor: theme.glassBorder,
-  }),
+    backgroundColor: PRODUCT_BG_COLOR,
+  },
   modalTitle: {
-    fontSize: scaleFont(24),
-    fontWeight: '800',
-    marginBottom: scale(12),
-    textAlign: 'center',
+    fontSize: scaleFont(16),
+    fontWeight: '700',
+    marginBottom: scale(16),
   },
   ratingContainer: {
-    marginBottom: scale(12),
+    marginBottom: scale(16),
   },
   ratingLabel: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(12),
     fontWeight: '700',
     marginBottom: scale(8),
   },
   starsContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
   },
   commentLabel: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(12),
     fontWeight: '700',
     marginBottom: scale(8),
   },
@@ -1596,8 +1653,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: scale(8),
     padding: scale(10),
-    fontSize: scaleFont(14),
-    marginBottom: scale(12),
+    marginBottom: scale(16),
+    height: scale(100),
     textAlignVertical: 'top',
   },
   modalButtons: {
@@ -1606,22 +1663,22 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    borderRadius: scale(8),
-    marginRight: scale(12),
-  },
-  cancelButtonText: {
-    fontSize: scaleFont(14),
-    color: '#FFFFFF',
-    fontWeight: '700',
+    marginRight: scale(10),
   },
   submitButton: {
     flex: 1,
-    borderRadius: scale(8),
+  },
+  cancelButtonText: {
+    fontSize: scaleFont(12),
+    color: TEXT_THEME_COLOR,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   submitButtonText: {
-    fontSize: scaleFont(14),
-    color: '#FFFFFF',
+    fontSize: scaleFont(12),
+    color: TEXT_THEME_COLOR,
     fontWeight: '700',
+    textAlign: 'center',
   },
   loaderOverlay: {
     position: 'absolute',
@@ -1629,18 +1686,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
     zIndex: 1000,
   },
-  loaderText: {
-    fontSize: scaleFont(16),
-    fontWeight: '700',
-    marginTop: scale(10),
-  },
   errorText: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(12),
     textAlign: 'center',
   },
 });

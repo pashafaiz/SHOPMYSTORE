@@ -28,7 +28,6 @@ export const fetchUser = createAsyncThunk(
         Trace('User Data Fetched', { user: parsedUser });
         return parsedUser;
       } else {
-        // Trace('No User Data Found');
         return rejectWithValue('No user data found');
       }
     } catch (err) {
@@ -53,25 +52,23 @@ export const fetchUserProducts = createAsyncThunk(
       if (ok && Array.isArray(data.products)) {
         const userProducts = data.products
           .filter((product) => {
-            // Handle cases where createdBy might be a string or object
             const createdById = typeof product.createdBy === 'object' && product.createdBy?._id
               ? product.createdBy._id
               : product.createdBy;
             return createdById === userId;
           })
           .map((product) => ({
-            // Normalize product structure
             id: product._id || product.id || '',
             _id: product._id || product.id || '',
             name: product.name || 'Unknown Product',
             price: product.price || 0,
             originalPrice: product.originalPrice || null,
             discount: product.discount || null,
-            brand: product.brand || 'Unknown Brand',
+            brand: product.brand || 'Unknown Brand', // Added brand
             rating: product.rating || 0,
             reviewCount: product.reviewCount || 0,
             media: Array.isArray(product.media) && product.media.length > 0
-              ? product.media
+              ? product.media.map(item => typeof item === 'string' ? item : item.url || DEFAULT_IMAGE_URL).slice(0, 10) // Support up to 10 media
               : [DEFAULT_IMAGE_URL],
             mediaType: product.mediaType || (/\.(mp4|mov|avi)$/i.test(product.media?.[0]) ? 'video' : 'image'),
             isNew: product.isNew || false,
@@ -82,6 +79,8 @@ export const fetchUserProducts = createAsyncThunk(
             highlights: product.highlights || [],
             specifications: product.specifications || [],
             tags: product.tags || [],
+            stock: product.stock || 0, // Added stock
+            offer: product.offer || '', // Added offer
           }));
 
         Trace('Filtered and Normalized User Products', { count: userProducts.length });
@@ -222,11 +221,37 @@ export const submitProduct = createAsyncThunk(
       }
 
       const response = currentProduct
-        ? await updateProductApi(token, currentProduct.id, productData)
-        : await createProductApi(token, productData);
+        ? await updateProductApi(token, currentProduct.id, {
+            ...productData,
+            stock: productData.stock || 0, // Ensure stock
+            brand: productData.brand || 'Unknown Brand', // Ensure brand
+            offer: productData.offer || '', // Ensure offer
+            media: productData.media.slice(0, 10), // Limit to 10 media
+          })
+        : await createProductApi(token, {
+            ...productData,
+            stock: productData.stock || 0, // Ensure stock
+            brand: productData.brand || 'Unknown Brand', // Ensure brand
+            offer: productData.offer || '', // Ensure offer
+            media: productData.media.slice(0, 10), // Limit to 10 media
+          });
 
       if (response.ok) {
+        const normalizedProduct = {
+          id: response.data.product._id || response.data.product.id,
+          _id: response.data.product._id || response.data.product.id,
+          name: response.data.product.name || 'Unknown Product',
+          price: response.data.product.price || 0,
+          brand: response.data.product.brand || 'Unknown Brand',
+          stock: response.data.product.stock || 0,
+          offer: response.data.product.offer || '',
+          category: response.data.product.category || 'Unknown',
+          media: Array.isArray(response.data.product.media) && response.data.product.media.length > 0
+            ? response.data.product.media.map(item => typeof item === 'string' ? item : item.url || DEFAULT_IMAGE_URL).slice(0, 10)
+            : [DEFAULT_IMAGE_URL],
+        };
         return {
+          product: normalizedProduct,
           message: response.data?.msg || 
             (currentProduct ? 'Product updated successfully' : 'Product added successfully')
         };
@@ -350,7 +375,6 @@ const profileSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Fetch User
       .addCase(fetchUser.pending, (state) => {
         state.loadingProducts = true;
       })
@@ -371,7 +395,6 @@ const profileSlice = createSlice({
           visibilityTime: 3000,
         });
       })
-      // Fetch User Products
       .addCase(fetchUserProducts.pending, (state) => {
         state.loadingProducts = true;
         state.errorMessage = '';
@@ -393,7 +416,6 @@ const profileSlice = createSlice({
           visibilityTime: 3000,
         });
       })
-      // Fetch User Reels
       .addCase(fetchUserReels.pending, (state) => {
         state.loadingProducts = true;
       })
@@ -413,7 +435,6 @@ const profileSlice = createSlice({
           visibilityTime: 3000,
         });
       })
-      // Fetch Cart
       .addCase(fetchCart.pending, (state) => {
         state.loadingProducts = true;
       })
@@ -434,7 +455,6 @@ const profileSlice = createSlice({
           visibilityTime: 3000,
         });
       })
-      // Fetch Wishlist
       .addCase(fetchWishlist.pending, (state) => {
         state.loadingProducts = true;
       })
@@ -455,7 +475,6 @@ const profileSlice = createSlice({
           visibilityTime: 3000,
         });
       })
-      // Update Profile
       .addCase(updateProfile.pending, (state) => {
         state.loadingProducts = true;
         state.successMessage = '';
@@ -486,7 +505,6 @@ const profileSlice = createSlice({
           visibilityTime: 3000,
         });
       })
-      // Submit Product
       .addCase(submitProduct.pending, (state) => {
         state.loadingProducts = true;
         state.successMessage = '';
@@ -495,6 +513,14 @@ const profileSlice = createSlice({
       .addCase(submitProduct.fulfilled, (state, action) => {
         state.loadingProducts = false;
         state.successMessage = action.payload.message;
+        if (action.payload.product) {
+          const existingIndex = state.products.findIndex(p => p.id === action.payload.product.id);
+          if (existingIndex >= 0) {
+            state.products[existingIndex] = action.payload.product;
+          } else {
+            state.products.push(action.payload.product);
+          }
+        }
         Toast.show({
           type: 'success',
           text1: 'Success',
@@ -516,7 +542,6 @@ const profileSlice = createSlice({
           visibilityTime: 3000,
         });
       })
-      // Delete Product
       .addCase(deleteProduct.pending, (state) => {
         state.loadingProducts = true;
         state.successMessage = '';
@@ -525,9 +550,7 @@ const profileSlice = createSlice({
       .addCase(deleteProduct.fulfilled, (state, action) => {
         state.loadingProducts = false;
         state.successMessage = action.payload.message;
-        state.products = state.products.filter(
-          (product) => product.id !== action.payload.productId
-        );
+        state.products = state.products.filter(p => p.id !== action.payload.productId);
         Toast.show({
           type: 'success',
           text1: 'Success',
@@ -549,7 +572,6 @@ const profileSlice = createSlice({
           visibilityTime: 3000,
         });
       })
-      // Remove from Cart
       .addCase(removeFromCart.pending, (state) => {
         state.loadingProducts = true;
         state.successMessage = '';
@@ -580,7 +602,6 @@ const profileSlice = createSlice({
           visibilityTime: 3000,
         });
       })
-      // Remove from Wishlist
       .addCase(removeFromWishlist.pending, (state) => {
         state.loadingProducts = true;
         state.successMessage = '';
@@ -611,9 +632,10 @@ const profileSlice = createSlice({
           visibilityTime: 3000,
         });
       })
-      // Logout
       .addCase(logout.pending, (state) => {
         state.loadingProducts = true;
+        state.successMessage = '';
+        state.errorMessage = '';
       })
       .addCase(logout.fulfilled, (state, action) => {
         state.loadingProducts = false;
@@ -649,4 +671,5 @@ const profileSlice = createSlice({
 });
 
 export const { setRefreshing, clearMessages } = profileSlice.actions;
+
 export default profileSlice.reducer;

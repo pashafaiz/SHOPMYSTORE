@@ -8,17 +8,30 @@ import {
   Dimensions,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import Colors from '../constants/Colors';
 
 const { width } = Dimensions.get('window');
-const scaleFactor = width / 375;
-const scale = (size) => size * scaleFactor;
-const scaleFont = (size) => Math.round(size * (Math.min(width, 375) / 375));
+const scaleFactor = Math.min(width, 375) / 375;
+const scale = (size) => Math.round(size * scaleFactor);
+const scaleFont = (size) => {
+  const fontScale = Math.min(width, 375) / 375;
+  const scaledSize = size * fontScale * (Platform.OS === 'ios' ? 0.9 : 0.85);
+  return Math.round(scaledSize);
+};
+
+// Theme constants
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
 
 const Header = ({
   isSearch = false,
   searchValue = '',
   onSearchChange = () => {},
+  onSearchPress = () => {}, // New prop for search bar click
   showLeftIcon = false,
   leftIcon = 'menu',
   onLeftPress = () => {},
@@ -38,11 +51,11 @@ const Header = ({
         <View style={styles.headerRow}>
           {showLeftIcon ? (
             <TouchableOpacity onPress={onLeftPress} style={styles.iconButton}>
-              <Ionicons name={leftIcon} size={scale(20)} color={Colors.lightPurple} />
+              <Ionicons name={leftIcon} size={scale(24)} color={SUBTEXT_THEME_COLOR} />
             </TouchableOpacity>
           ) : title ? (
             <TouchableOpacity onPress={onBackPress} style={styles.iconButton}>
-              <Ionicons name="arrow-back" size={scale(28)} color="#FFFFFF" />
+              <Ionicons name="arrow-back" size={scale(24)} color={SUBTEXT_THEME_COLOR} />
             </TouchableOpacity>
           ) : (
             <View style={styles.placeholder} />
@@ -50,39 +63,41 @@ const Header = ({
           {title ? (
             <Text style={styles.title}>{title}</Text>
           ) : (
-            <View style={styles.searchContainer}>
+            <TouchableOpacity
+              style={styles.searchContainer}
+              onPress={onSearchPress} // Navigate to Search screen
+              activeOpacity={0.7}
+            >
               {isSearch && (
                 <>
                   <Ionicons
                     name="search"
                     size={scale(20)}
-                    color={Colors.White}
+                    color={SUBTEXT_THEME_COLOR}
                     style={styles.searchIcon}
                   />
                   <TextInput
                     style={styles.searchInput}
-                    placeholder="Search"
-                    placeholderTextColor="#A0A0A0"
+                    placeholder="Search products"
+                    placeholderTextColor={SUBTEXT_THEME_COLOR}
                     value={searchValue}
                     onChangeText={onSearchChange}
+                    editable={false} 
                   />
                 </>
               )}
-            </View>
+            </TouchableOpacity>
           )}
           {showRightIcon1 || showRightIcon2 ? (
             <View style={styles.rightIcons}>
               {showRightIcon1 && (
                 <TouchableOpacity onPress={onRightPress1} style={styles.iconButton}>
-                  <Ionicons name={rightIcon1} size={scale(20)} color={Colors.lightPurple} />
+                  <Ionicons name={rightIcon1} size={scale(24)} color={SUBTEXT_THEME_COLOR} />
                 </TouchableOpacity>
               )}
               {showRightIcon2 && (
-                <TouchableOpacity
-                  onPress={onRightIcon2Press}
-                  style={styles.iconButton}
-                >
-                  <Ionicons name={rightIcon2} size={scale(20)} color={Colors.lightPurple} />
+                <TouchableOpacity onPress={onRightIcon2Press} style={styles.iconButton}>
+                  <Ionicons name={rightIcon2} size={scale(24)} color={SUBTEXT_THEME_COLOR} />
                 </TouchableOpacity>
               )}
             </View>
@@ -97,9 +112,16 @@ const Header = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor:'#1A0B3B',
+    backgroundColor: "#8ec5fc",
     paddingHorizontal: scale(15),
-    paddingVertical: scale(7),
+    paddingVertical: scale(10),
+    borderBottomWidth: scale(1),
+    borderBottomColor: BORDER_THEME_COLOR,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale(4),
+    elevation: 2,
   },
   absoluteContainer: {
     position: 'absolute',
@@ -114,42 +136,45 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   iconButton: {
-    padding: scale(5),
+    padding: scale(8),
     borderRadius: scale(20),
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginHorizontal:2
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderWidth: scale(1),
+    borderColor: BORDER_THEME_COLOR,
   },
   searchContainer: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: scale(10),
-    paddingHorizontal: scale(10),
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderRadius: scale(12),
+    paddingHorizontal: scale(12),
     marginHorizontal: scale(10),
+    borderWidth: scale(1),
+    borderColor: BORDER_THEME_COLOR,
   },
   searchIcon: {
     marginRight: scale(8),
   },
   searchInput: {
     flex: 1,
-    color: Colors.White,
+    color: TEXT_THEME_COLOR,
     fontSize: scaleFont(16),
-    paddingVertical: scale(8),
   },
   rightIcons: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap:10
   },
   title: {
     flex: 1,
-    fontSize: scaleFont(15),
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontSize: scaleFont(18),
+    fontWeight: '700',
+    color: TEXT_THEME_COLOR,
     textAlign: 'center',
   },
   placeholder: {
-    width: scale(44), // Matches iconButton size
+    width: scale(40),
   },
 });
 

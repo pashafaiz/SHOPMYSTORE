@@ -6,9 +6,27 @@ import {
   Image,
   Text,
   TouchableOpacity,
-  Platform,
+  Dimensions,
 } from 'react-native';
 import img from '../assets/Images/img';
+
+const { width, height } = Dimensions.get('window');
+const scaleFactor = Math.min(width, 375) / 375;
+const scale = (size) => Math.round(size * scaleFactor);
+const scaleFont = (size) => {
+  const fontScale = Math.min(width, height) / 375;
+  const scaledSize = size * fontScale * (Platform.OS === 'ios' ? 0.9 : 0.85);
+  return Math.round(scaledSize);
+};
+
+// Theme constants
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
 
 const InputBox = ({
   placeholder,
@@ -17,32 +35,36 @@ const InputBox = ({
   value,
   secureTextEntry,
   error,
+  iconColor = PRIMARY_THEME_COLOR,
+  placeholderTextColor = SUBTEXT_THEME_COLOR,
+  containerStyle,
 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = secureTextEntry;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: PRODUCT_BG_COLOR }]}>
       <View
         style={[
           styles.inputContainer,
-          error && { borderColor: '#FF4D4D' },
+          containerStyle,
+          error && { borderColor: SECONDARY_THEME_COLOR },
         ]}
       >
         {icon && (
           <View style={styles.iconWrapper}>
-            <Image source={icon} style={styles.icon} />
+            <Image source={icon} style={[styles.icon, { tintColor: iconColor }]} />
           </View>
         )}
 
         <TextInput
           style={styles.textInput}
           placeholder={placeholder}
-          placeholderTextColor="#A0A4B0"
+          placeholderTextColor={placeholderTextColor}
           value={value}
           onChangeText={onChangeText}
           secureTextEntry={isPassword && !showPassword}
-          selectionColor="#7B61FF"
+          selectionColor={PRIMARY_THEME_COLOR}
           autoCapitalize="none"
           keyboardType={isPassword ? 'default' : 'email-address'}
           returnKeyType="done"
@@ -58,7 +80,7 @@ const InputBox = ({
           >
             <Image
               source={showPassword ? img.open : img.hide}
-              style={styles.eyeIcon}
+              style={[styles.eyeIcon, { tintColor: iconColor }]}
             />
           </TouchableOpacity>
         )}
@@ -74,51 +96,55 @@ export default InputBox;
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    marginBottom: 16,
+    marginBottom: scale(16),
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(123, 97, 255, 0.3)',
-    borderRadius: 12,
-    paddingHorizontal: 8,
+    height: scale(56),
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
+    borderRadius: scale(16),
+    paddingHorizontal: scale(12),
+    shadowColor: PRIMARY_THEME_COLOR,
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale(4),
+    // elevation: 3,
   },
   iconWrapper: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: 'rgba(123, 97, 255, 0.1)',
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(10),
+    backgroundColor: CATEGORY_BG_COLOR,
+    borderWidth: scale(2),
+    borderColor: BORDER_THEME_COLOR,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
-
+    marginRight: scale(12),
   },
   icon: {
-    width: 20,
-    height: 20,
-    tintColor: '#7B61FF',
+    width: scale(22),
+    height: scale(22),
+    tintColor: PRIMARY_THEME_COLOR,
   },
   textInput: {
     flex: 1,
-    fontSize: 13,
-    color: '#FFFFFF',
-    fontFamily: Platform.OS === 'ios' ? 'Avenir Next' : 'Roboto',
+    fontSize: scaleFont(16),
+    color: TEXT_THEME_COLOR,
     paddingVertical: 0,
     height: '100%',
   },
   eyeIcon: {
-    width: 20,
-    height: 20,
-    tintColor: '#7B61FF',
+    width: scale(22),
+    height: scale(22),
+    tintColor: PRIMARY_THEME_COLOR,
   },
   errorText: {
-    color: '#FF4D4D',
-    fontSize: 10,
-    marginTop: 4,
+    color: SECONDARY_THEME_COLOR,
+    fontSize: scaleFont(11),
+    marginTop: scale(-10),
     marginLeft: 0,
-    fontFamily: Platform.OS === 'ios' ? 'Avenir Next' : 'Roboto',
   },
 });

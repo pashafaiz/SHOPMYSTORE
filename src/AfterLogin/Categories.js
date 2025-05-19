@@ -30,65 +30,61 @@ import Animated, {
   FadeIn,
 } from 'react-native-reanimated';
 
-// Default constants
-const DEFAULT_CONSTANTS = {
-  CATEGORIES: [],
-  NUM_COLUMNS: 2,
-  ITEM_SPACING: 10,
-  HEADER_TITLE: 'Categories',
-  EMPTY_TEXT: 'No products found',
-  PRIMARY_COLOR: '#7B61FF',
-  TEXT_COLOR: '#FFFFFF',
-  SECONDARY_TEXT_COLOR: '#A0A0A0',
-  BACKGROUND_COLORS: ['#0A0A1E', '#1E1E3F'],
-  CATEGORY_BG_COLOR: 'rgba(123, 97, 255, 0.1)',
-  SELECTED_CATEGORY_BG_COLOR: '#7B61FF',
-  PRODUCT_BG_COLOR: 'rgba(255, 255, 255, 0.05)',
-  BORDER_COLOR: 'rgba(255, 255, 255, 0.1)',
-  IMAGE_BG_COLOR: 'rgba(255, 255, 255, 0.1)',
-  ANIMATION_DELAY: 100,
-  BASE_WIDTH: 375,
-  BASE_HEIGHT: 667,
-  DEFAULT_IMAGE_URL: 'https://via.placeholder.com/150',
-  DISCOUNT_COLOR: '#FF3E6D',
-  PREMIUM_COLOR: '#FFD700',
-};
+// Import constants from GlobalConstants.js
+import {
+  CATEGORIES,
+  NUM_COLUMNS,
+  ITEM_SPACING,
+  HEADER_TITLE,
+  EMPTY_TEXT,
+  DEFAULT_IMAGE_URL,
+  FONT_SIZE_SMALL,
+  FONT_SIZE_MEDIUM,
+  FONT_SIZE_LARGE,
+  FONT_SIZE_XLARGE,
+  SCREEN_PADDING,
+  CARD_BORDER_RADIUS,
+  ICON_SIZE,
+  ANIMATION_DURATION,
+  ANIMATION_SCALE,
+  ANIMATION_OPACITY,
+  // Add these to GlobalConstants.js for consistency
+  // PRODUCT_BG_COLOR,
+  // CATEGORY_BG_COLOR,
+  // SELECTED_CATEGORY_BG_COLOR,
+  // PREMIUM_BADGE_COLOR,
+  // PREMIUM_TEXT_COLOR,
+  // PRIMARY_THEME_COLOR,
+  // SECONDARY_THEME_COLOR,
+  // TEXT_THEME_COLOR,
+  // SUBTEXT_THEME_COLOR,
+  // BORDER_THEME_COLOR,
+  // BACKGROUND_GRADIENT,
+} from '../constants/GlobalConstants';
 
-// Safely get constants
-const {
-  CATEGORIES = DEFAULT_CONSTANTS.CATEGORIES,
-  NUM_COLUMNS = DEFAULT_CONSTANTS.NUM_COLUMNS,
-  ITEM_SPACING = DEFAULT_CONSTANTS.ITEM_SPACING,
-  HEADER_TITLE = DEFAULT_CONSTANTS.HEADER_TITLE,
-  EMPTY_TEXT = DEFAULT_CONSTANTS.EMPTY_TEXT,
-  PRIMARY_COLOR = DEFAULT_CONSTANTS.PRIMARY_COLOR,
-  TEXT_COLOR = DEFAULT_CONSTANTS.TEXT_COLOR,
-  SECONDARY_TEXT_COLOR = DEFAULT_CONSTANTS.SECONDARY_TEXT_COLOR,
-  BACKGROUND_COLORS = DEFAULT_CONSTANTS.BACKGROUND_COLORS,
-  CATEGORY_BG_COLOR = DEFAULT_CONSTANTS.CATEGORY_BG_COLOR,
-  SELECTED_CATEGORY_BG_COLOR = DEFAULT_CONSTANTS.SELECTED_CATEGORY_BG_COLOR,
-  PRODUCT_BG_COLOR = DEFAULT_CONSTANTS.PRODUCT_BG_COLOR,
-  BORDER_COLOR = DEFAULT_CONSTANTS.BORDER_COLOR,
-  IMAGE_BG_COLOR = DEFAULT_CONSTANTS.IMAGE_BG_COLOR,
-  ANIMATION_DELAY = DEFAULT_CONSTANTS.ANIMATION_DELAY,
-  BASE_WIDTH = DEFAULT_CONSTANTS.BASE_WIDTH,
-  BASE_HEIGHT = DEFAULT_CONSTANTS.BASE_HEIGHT,
-  DEFAULT_IMAGE_URL = DEFAULT_CONSTANTS.DEFAULT_IMAGE_URL,
-  DISCOUNT_COLOR = DEFAULT_CONSTANTS.DISCOUNT_COLOR,
-  PREMIUM_COLOR = DEFAULT_CONSTANTS.PREMIUM_COLOR,
-} = require('../constants/GlobalConstants') || DEFAULT_CONSTANTS;
+// Define theme colors (move to GlobalConstants.js if possible)
+const PRODUCT_BG_COLOR = '#f5f9ff';
+const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)';
+const SELECTED_CATEGORY_BG_COLOR = '#5b9cff';
+const PREMIUM_BADGE_COLOR = '#fef08a';
+const PREMIUM_TEXT_COLOR = '#1a2b4a';
+const PRIMARY_THEME_COLOR = '#5b9cff';
+const SECONDARY_THEME_COLOR = '#ff6b8a';
+const TEXT_THEME_COLOR = '#1a2b4a';
+const SUBTEXT_THEME_COLOR = '#5a6b8a';
+const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)';
+const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
 
 const { width, height } = Dimensions.get('window');
 
-// Enhanced scaling functions
-const scaleSize = (size) => Math.round(size * (width / BASE_WIDTH));
-const scaleFont = (size) => Math.round(size * (Math.min(width, height) / BASE_HEIGHT));
+const scaleSize = (size) => Math.round(size * (width / 375));
+const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 667) * 0.85);
 
 const itemWidth = (width - (ITEM_SPACING * (NUM_COLUMNS + 1))) / NUM_COLUMNS;
 
 const AnimatedItem = ({ children, onPress, onPressIn, onPressOut, index, isCategory = false }) => {
-  const scaleValue = useSharedValue(0.95);
-  const opacityValue = useSharedValue(0);
+  const scaleValue = useSharedValue(ANIMATION_SCALE);
+  const opacityValue = useSharedValue(ANIMATION_OPACITY);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: withSpring(scaleValue.value) }],
@@ -102,14 +98,14 @@ const AnimatedItem = ({ children, onPress, onPressIn, onPressOut, index, isCateg
 
   return (
     <Animated.View
-      entering={FadeIn.delay(index * ANIMATION_DELAY)}
+      // entering={FadeIn.delay(index * ANIMATION_DURATION)}
       style={animatedStyle}
     >
       <TouchableOpacity
         activeOpacity={0.9}
         onPress={onPress}
         onPressIn={() => {
-          scaleValue.value = isCategory ? 1.1 : 0.95;
+          scaleValue.value = isCategory ? 1.1 : ANIMATION_SCALE;
           if (onPressIn) onPressIn();
         }}
         onPressOut={() => {
@@ -134,10 +130,6 @@ const Categories = ({ onScroll }) => {
     const fromDrawer = route.params?.fromDrawer || false;
     console.log('Categories screen - fromDrawer:', fromDrawer);
   }, [route.params]);
-
-  const safeBackgroundColors = Array.isArray(BACKGROUND_COLORS) && BACKGROUND_COLORS.length >= 2 
-    ? BACKGROUND_COLORS 
-    : DEFAULT_CONSTANTS.BACKGROUND_COLORS;
 
   const fetchProducts = () => {
     if (selectedCategory === 'all') {
@@ -172,7 +164,7 @@ const Categories = ({ onScroll }) => {
             repeat={false}
           />
           <View style={styles.videoIcon}>
-            <Icon name="play-circle-filled" size={scaleSize(24)} color="rgba(255,255,255,0.8)" />
+            <Icon name="play-circle-filled" size={scaleSize(ICON_SIZE)} color={PRIMARY_THEME_COLOR} />
           </View>
         </View>
       );
@@ -265,8 +257,8 @@ const Categories = ({ onScroll }) => {
           >
             <Icon
               name={iconName}
-              size={scaleSize(20)}
-              color={isSelected ? TEXT_COLOR : PRIMARY_COLOR}
+              size={scaleSize(ICON_SIZE)}
+              color={isSelected ? TEXT_THEME_COLOR : PRIMARY_THEME_COLOR}
             />
           </View>
           <Text
@@ -285,7 +277,7 @@ const Categories = ({ onScroll }) => {
 
   return (
     <LinearGradient
-      colors={['#1A0B3B', '#2E1A5C', '#4A2A8D']}
+      colors={BACKGROUND_GRADIENT}
       style={styles.container}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
@@ -315,9 +307,9 @@ const Categories = ({ onScroll }) => {
           <RefreshControl
             refreshing={loading || refreshing}
             onRefresh={onRefresh}
-            colors={[PRIMARY_COLOR]}
-            tintColor={PRIMARY_COLOR}
-            progressBackgroundColor={safeBackgroundColors[1] || PRIMARY_COLOR}
+            colors={[PRIMARY_THEME_COLOR]}
+            tintColor={PRIMARY_THEME_COLOR}
+            progressBackgroundColor={PRODUCT_BG_COLOR}
             progressViewOffset={50}
           />
         }
@@ -336,16 +328,16 @@ const Categories = ({ onScroll }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: scaleSize(20),
+    paddingTop: scaleSize(SCREEN_PADDING),
   },
   header: {
-    paddingHorizontal: scaleSize(20),
+    paddingHorizontal: scaleSize(SCREEN_PADDING),
     marginBottom: scaleSize(10),
   },
   headerTitle: {
-    fontSize: scaleFont(22),
+    fontSize: scaleFont(FONT_SIZE_XLARGE + 4),
     fontWeight: '700',
-    color: TEXT_COLOR,
+    color: TEXT_THEME_COLOR,
     letterSpacing: 0.5,
   },
   categoriesContainer: {
@@ -353,7 +345,7 @@ const styles = StyleSheet.create({
     marginBottom: scaleSize(15),
   },
   categoriesList: {
-    paddingHorizontal: scaleSize(15),
+    paddingHorizontal: scaleSize(SCREEN_PADDING),
   },
   categoryItem: {
     alignItems: 'center',
@@ -362,7 +354,7 @@ const styles = StyleSheet.create({
   },
   selectedCategoryItem: {
     borderBottomWidth: 2,
-    borderBottomColor: PRIMARY_COLOR,
+    borderBottomColor: PRIMARY_THEME_COLOR,
   },
   categoryIconContainer: {
     backgroundColor: CATEGORY_BG_COLOR,
@@ -377,13 +369,13 @@ const styles = StyleSheet.create({
     backgroundColor: SELECTED_CATEGORY_BG_COLOR,
   },
   categoryName: {
-    fontSize: scaleFont(14),
-    color: SECONDARY_TEXT_COLOR,
+    fontSize: scaleFont(FONT_SIZE_MEDIUM + 2),
+    color: SUBTEXT_THEME_COLOR,
     textAlign: 'center',
     fontWeight: '500',
   },
   selectedCategoryName: {
-    color: PRIMARY_COLOR,
+    color: PRIMARY_THEME_COLOR,
     fontWeight: '600',
   },
   productList: {
@@ -393,13 +385,13 @@ const styles = StyleSheet.create({
   productItem: {
     width: itemWidth * 0.98,
     backgroundColor: PRODUCT_BG_COLOR,
-    borderRadius: scaleSize(10),
+    borderRadius: scaleSize(CARD_BORDER_RADIUS),
     margin: ITEM_SPACING / 2,
     padding: scaleSize(10),
     alignItems: 'center',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: BORDER_COLOR,
+    borderColor: BORDER_THEME_COLOR,
   },
   mediaContainer: {
     position: 'relative',
@@ -412,15 +404,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: scaleSize(4),
-    backgroundColor: IMAGE_BG_COLOR,
-    borderRadius: scaleSize(8),
+    backgroundColor: SUBTEXT_THEME_COLOR,
+    borderRadius: scaleSize(CARD_BORDER_RADIUS),
     overflow: 'hidden',
     position: 'relative',
   },
   productImage: {
     width: '100%',
     height: '100%',
-    borderRadius: scaleSize(8),
+    borderRadius: scaleSize(CARD_BORDER_RADIUS),
   },
   videoIcon: {
     position: 'absolute',
@@ -434,8 +426,8 @@ const styles = StyleSheet.create({
     paddingTop: scaleSize(4),
   },
   productName: {
-    fontSize: scaleFont(17),
-    color: TEXT_COLOR,
+    fontSize: scaleFont(FONT_SIZE_LARGE + 2),
+    color: TEXT_THEME_COLOR,
     textAlign: 'center',
     fontWeight: '500',
     marginBottom: scaleSize(2),
@@ -449,20 +441,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   productPrice: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(FONT_SIZE_MEDIUM + 2),
     fontWeight: '700',
-    color: PRIMARY_COLOR,
+    color: PRIMARY_THEME_COLOR,
   },
   discountedPrice: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(FONT_SIZE_MEDIUM + 2),
     fontWeight: '700',
-    color: PRIMARY_COLOR,
+    color: PRIMARY_THEME_COLOR,
     marginRight: scaleSize(4),
   },
   originalPrice: {
-    fontSize: scaleFont(12),
+    fontSize: scaleFont(FONT_SIZE_SMALL + 2),
     fontWeight: '500',
-    color: SECONDARY_TEXT_COLOR,
+    color: SUBTEXT_THEME_COLOR,
     textDecorationLine: 'line-through',
     marginRight: scaleSize(4),
   },
@@ -470,30 +462,30 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: scaleSize(8),
     right: scaleSize(8),
-    backgroundColor: DISCOUNT_COLOR,
+    backgroundColor: SECONDARY_THEME_COLOR,
     borderRadius: scaleSize(4),
     paddingHorizontal: scaleSize(6),
     paddingVertical: scaleSize(2),
     zIndex: 1,
   },
   discountText: {
-    fontSize: scaleFont(10),
-    color: '#FFFFFF',
+    fontSize: scaleFont(FONT_SIZE_SMALL),
+    color: TEXT_THEME_COLOR,
     fontWeight: 'bold',
   },
   premiumBadge: {
     position: 'absolute',
     top: scaleSize(8),
     left: scaleSize(8),
-    backgroundColor: PREMIUM_COLOR,
+    backgroundColor: PREMIUM_BADGE_COLOR,
     paddingHorizontal: scaleSize(8),
     paddingVertical: scaleSize(3),
     borderRadius: scaleSize(12),
     zIndex: 1,
   },
   premiumBadgeText: {
-    fontSize: scaleFont(10),
-    color: '#000000',
+    fontSize: scaleFont(FONT_SIZE_SMALL),
+    color: PREMIUM_TEXT_COLOR,
     fontWeight: 'bold',
   },
   emptyContainer: {
@@ -501,11 +493,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     height: height * 0.4,
-    paddingHorizontal: scaleSize(20),
+    paddingHorizontal: scaleSize(SCREEN_PADDING),
   },
   emptyText: {
-    fontSize: scaleFont(18),
-    color: SECONDARY_TEXT_COLOR,
+    fontSize: scaleFont(FONT_SIZE_XLARGE + 2),
+    color: SUBTEXT_THEME_COLOR,
     textAlign: 'center',
   },
 });

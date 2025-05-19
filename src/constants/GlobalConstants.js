@@ -1,6 +1,6 @@
+//GlobalConstants
 export const BASE_URL = 'https://shopmystore-backend-1.onrender.com';
 
-// API Endpoints
 export const PRODUCTS_ENDPOINT = '/api/products';
 export const PRODUCTS_BY_CATEGORY_ENDPOINT = '/api/products/category';
 export const REELS_ENDPOINT = '/api/reels/reels';
@@ -34,6 +34,8 @@ export const AUTH_FORGOT_PASSWORD_ENDPOINT = '/api/auth/forgot-password';
 export const AUTH_VERIFY_PASSWORD_RESET_OTP_ENDPOINT = '/api/auth/verify-password-reset-otp';
 export const AUTH_RESET_PASSWORD_ENDPOINT = '/api/auth/reset-password';
 
+export const RAZORPAY_KEY_ID = 'rzp_test_9r6fi8ChH5mImP'; // Add your Razorpay key here
+
 // HTTP Methods
 export const HTTP_METHODS = {
   GET: 'GET',
@@ -44,7 +46,7 @@ export const HTTP_METHODS = {
 };
 
 // Default Values
-export const DEFAULT_IMAGE_URL = 'https://via.placeholder.com/150';
+export const DEFAULT_IMAGE_URL = 'https://picsum.photos/200/300';
 export const FALLBACK_IMAGE_URL = 'https://via.placeholder.com/150/CCCCCC/FFFFFF?text=Image+Unavailable';
 export const DEFAULT_CATEGORY = 'all';
 export const DEFAULT_PRICE = 0;
@@ -54,21 +56,36 @@ export const FILTER_LIMIT = 10;
 export const DEFAULT_PAGE = 1;
 export const DEFAULT_PER_PAGE = 20;
 export const DEFAULT_QUANTITY = 1;
+export const MAX_MEDIA_FILES = 10; // Maximum media files
 
 // Price Ranges
 export const PRICE_RANGES = {
-  UNDER_500: 'Under ₹500',
-  RANGE_500_1000: '₹500 - ₹1000',
-  RANGE_1000_2000: '₹1000 - ₹2000',
-  OVER_2000: 'Over ₹2000',
+  UNDER_500: 'under_500',
+  RANGE_500_1000: '500_1000',
+  RANGE_1000_2000: '1000_2000',
+  OVER_2000: 'over_2000',
 };
 
 // Sort Options
 export const SORT_OPTIONS = {
-  NEWEST: 'Newest',
-  PRICE_LOW_HIGH: 'Price: Low to High',
-  PRICE_HIGH_LOW: 'Price: High to Low',
-  POPULAR: 'Most Popular',
+  NEWEST: 'newest',
+  PRICE_LOW_HIGH: 'price_low_high',
+  PRICE_HIGH_LOW: 'price_high_low',
+  POPULAR: 'popular',
+};
+
+// Rating Options
+export const RATING_OPTIONS = {
+  FOUR_PLUS: '4',
+  THREE_PLUS: '3',
+  TWO_PLUS: '2',
+};
+
+// Discount Options
+export const DISCOUNT_OPTIONS = {
+  TEN_PLUS: '10',
+  TWENTY_PLUS: '20',
+  THIRTY_PLUS: '30',
 };
 
 // Error Messages
@@ -118,17 +135,6 @@ export const CLEAR_NOTIFICATIONS_ERROR = 'Failed to clear notifications';
 export const SAVE_FCM_TOKEN_ERROR = 'Failed to save FCM token';
 export const FETCH_CHAT_LIST_ERROR = 'Failed to fetch chat list';
 
-// Categories
-export const CATEGORIES = [
-  { id: 'all', name: 'All', icon: 'apps' },
-  { id: 'Accessories', name: 'Accessories', icon: 'devices' },
-  { id: 'Grocery', name: 'Grocery', icon: 'shopping-basket' },
-  { id: 'Toys', name: 'Toys', icon: 'toys' },
-  { id: 'Clothes', name: 'Clothes', icon: 'checkroom' },
-  { id: 'Shoes', name: 'Shoes', icon: 'shoe-sneaker' },
-  { id: 'Trending', name: 'Trending', icon: 'trending-up' },
-];
-
 // Layout Constants
 export const NUM_COLUMNS = 3;
 export const ITEM_SPACING = 8;
@@ -162,18 +168,27 @@ export const RECENTLY_VIEWED_KEY = 'recentlyViewed';
 export const USER_DATA_KEY = 'user';
 
 // Colors
-export const PRIMARY_COLOR = '#7B61FF';
-export const SECONDARY_COLOR = '#FF3E6D';
-export const BACKGROUND_COLOR = '#0A0A1E';
-export const TEXT_COLOR = '#FFFFFF';
-export const SUBTEXT_COLOR = '#E5E7EB';
-export const BORDER_COLOR = 'rgba(255,255,255,0.2)';
-export const REELS_LOADER_COLOR = '#FFFFFF';
-export const REELS_REFRESH_TINT_COLOR = '#FFFFFF';
-export const REELS_MODAL_BG_COLOR = '#1A1A1A';
-export const REELS_MODAL_TEXT_COLOR = '#FFFFFF';
-export const REELS_BUTTON_COLOR = '#7B61FF';
-export const EMPTY_REELS_TEXT = 'No reels available';
+export const PRIMARY_THEME_COLOR = '#5b9cff'; // Primary theme color used in buttons, highlights
+export const SECONDARY_THEME_COLOR = '#ff6b8a'; // Secondary theme for badges, liked icons
+export const TEXT_THEME_COLOR = '#1a2b4a'; // Primary text color
+export const SUBTEXT_THEME_COLOR = '#5a6b8a'; // Subtext and secondary text color
+export const BORDER_THEME_COLOR = 'rgba(91, 156, 255, 0.3)'; // Border color for cards and inputs
+export const PRODUCT_BG_COLOR = '#f5f9ff'; // Background for product cards and sections
+export const CATEGORY_BG_COLOR = 'rgba(91, 156, 255, 0.2)'; // Background for category tags
+export const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff']; // Gradient for screens and action bars
+export const SELECTED_CATEGORY_BG_COLOR = '#5b9cff';
+export const REELS_LOADER_COLOR = '#5b9cff';
+export const REELS_REFRESH_TINT_COLOR = '#5b9cff';
+export const REELS_MODAL_BG_COLOR = '#f5f9ff';
+export const REELS_MODAL_TEXT_COLOR = '#1a2b4a';
+export const REELS_BUTTON_COLOR = '#5b9cff';
+
+// Previously defined colors for consistency
+export const PRIMARY_COLOR = '#5b9cff';
+export const SECONDARY_COLOR = '#ff6b8a';
+export const TEXT_COLOR = '#1a2b4a';
+export const SUBTEXT_COLOR = '#5a6b8a';
+export const BORDER_COLOR = 'rgba(91, 156, 255, 0.3)';
 
 // Miscellaneous
 export const MAX_QUANTITY = 10;
@@ -185,3 +200,6 @@ export const RELATED_PRODUCTS_LIMIT = 10;
 export const MAX_TICKET_SUBJECT_LENGTH = 100;
 export const MAX_TICKET_DESCRIPTION_LENGTH = 500;
 export const MAX_CHAT_MESSAGE_LENGTH = 500;
+export const EMPTY_REELS_TEXT = 'No reels available';
+
+
