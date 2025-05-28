@@ -15,6 +15,7 @@ import ordersReducer from './slices/ordersSlice';
 import notificationsReducer from './slices/notificationsSlice'
 import notificationScreenReducer from './slices/notificationScreenSlice'
 import chatReducer from './slices/chatSlice';
+import sellerReducer from './slices/sellerSlice'
 
 
 
@@ -35,7 +36,8 @@ export const store = configureStore({
     orders: ordersReducer,
     notifications: notificationsReducer,
     NotificationsScreen: notificationScreenReducer,
-    chat: chatReducer
+    chat: chatReducer,
+    seller: sellerReducer,
   },
 });
 

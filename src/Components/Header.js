@@ -53,11 +53,13 @@ const Header = ({
             <TouchableOpacity onPress={onLeftPress} style={styles.iconButton}>
               <Ionicons name={leftIcon} size={scale(24)} color={SUBTEXT_THEME_COLOR} />
             </TouchableOpacity>
-          ) : title ? (
-            <TouchableOpacity onPress={onBackPress} style={styles.iconButton}>
-              <Ionicons name="arrow-back" size={scale(24)} color={SUBTEXT_THEME_COLOR} />
-            </TouchableOpacity>
-          ) : (
+          ) 
+          // : title ? (
+          //   <TouchableOpacity onPress={onBackPress} style={styles.iconButton}>
+          //     <Ionicons name="arrow-back" size={scale(24)} color={SUBTEXT_THEME_COLOR} />
+          //   </TouchableOpacity>
+          // )
+           : (
             <View style={styles.placeholder} />
           )}
           {title ? (

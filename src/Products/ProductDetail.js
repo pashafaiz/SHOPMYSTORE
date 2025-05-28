@@ -1016,55 +1016,68 @@ const ProductDetail = ({ route, navigation }) => {
         </ScrollView>
       </Animated.View>
 
-      <LinearGradient colors={BACKGROUND_GRADIENT} style={styles.actionBar}>
-        <TouchableOpacity
-          style={styles.wishlistButton}
-          onPress={handleToggleLike}
-        >
-          <Icon
-            name={isLiked ? 'favorite' : 'favorite-border'}
-            size={scale(20)}
-            color={isLiked ? SECONDARY_THEME_COLOR : SUBTEXT_THEME_COLOR}
-          />
-        </TouchableOpacity>
+     <LinearGradient 
+  colors={['rgba(143, 183, 248, 0.3)', '#fff']} 
+  style={styles.actionBar}
+>
+  {product?.stock <= 0 ? (
+    <View style={styles.outOfStockContainer}>
+      <View style={styles.outOfStockBadge}>
+        <Text style={styles.outOfStockText}>Out of Stock</Text>
+      </View>
+    </View>
+  ) : (
+    <>
+      <TouchableOpacity
+        style={styles.wishlistButton}
+        onPress={handleToggleLike}
+      >
+        <Icon
+          name={isLiked ? 'favorite' : 'favorite-border'}
+          size={scale(20)}
+          color={isLiked ? SECONDARY_THEME_COLOR : SUBTEXT_THEME_COLOR}
+        />
+      </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.cartButton}
-          onPress={handleAddToCart}
+      <TouchableOpacity
+        style={styles.cartButton}
+        onPress={handleAddToCart}
+      >
+        <LinearGradient
+          colors={[PRIMARY_THEME_COLOR, '#8ec5fc']}
+          style={styles.buttonGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
         >
-          <LinearGradient
-            colors={[PRIMARY_THEME_COLOR, '#8ec5fc']}
-            style={styles.buttonGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Text style={styles.cartButtonText}>
-              {isInCart ? 'Go to Cart' : 'Add to Cart'}
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
+          <Text style={styles.cartButtonText}>
+            {isInCart ? 'Go to Cart' : 'Add to Cart'}
+          </Text>
+        </LinearGradient>
+      </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.buyButton}
-          onPress={() =>
-            navigation.navigate('Checkout', {
-              productId,
-              quantity,
-              size: selectedSize,
-              color: selectedColor,
-            })
-          }
+      <TouchableOpacity
+        style={styles.buyButton}
+        onPress={() =>
+          navigation.navigate('Checkout', {
+            productId,
+            quantity,
+            size: selectedSize,
+            color: selectedColor,
+          })
+        }
+      >
+        <LinearGradient
+          colors={[PRIMARY_THEME_COLOR, '#8ec5fc']}
+          style={styles.buttonGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
         >
-          <LinearGradient
-            colors={[PRIMARY_THEME_COLOR, '#8ec5fc']}
-            style={styles.buttonGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Text style={styles.buyButtonText}>Buy Now</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </LinearGradient>
+          <Text style={styles.buyButtonText}>Buy Now</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </>
+  )}
+</LinearGradient>
 
       <Modal
         visible={isReviewModalVisible}
@@ -1576,46 +1589,82 @@ const styles = StyleSheet.create({
   relatedProductStock: {
     fontSize: scaleFont(10),
   },
-  actionBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: scale(8),
-    borderTopWidth: 1,
-    borderTopColor: BORDER_THEME_COLOR,
-    position: 'absolute',
-    bottom: -1,
-    left: 0,
-    right: 0,
-  },
-  wishlistButton: {
-    padding: scale(8),
-    borderRadius: scale(6),
-    marginRight: scale(12),
-  },
-  cartButton: {
-    flex: 1,
-    borderRadius: scale(8),
-    marginRight: scale(12),
-  },
-  buttonGradient: {
-    paddingVertical: scale(12),
-    borderRadius: scale(8),
-    alignItems: 'center',
-  },
-  cartButtonText: {
-    fontSize: scaleFont(12),
-    color: TEXT_THEME_COLOR,
-    fontWeight: '700',
-  },
-  buyButton: {
-    flex: 1,
-    borderRadius: scale(8),
-  },
-  buyButtonText: {
-    fontSize: scaleFont(12),
-    color: TEXT_THEME_COLOR,
-    fontWeight: '700',
-  },
+actionBar: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  padding: scale(12),
+  borderTopWidth: 1,
+  borderTopColor: BORDER_THEME_COLOR,
+  position: 'absolute',
+  bottom: -1,
+  left: 0,
+  right: 0,
+  height: scale(70),
+},
+outOfStockContainer: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+outOfStockBadge: {
+  backgroundColor: 'rgba(255, 59, 48, 0.1)',
+  paddingVertical: scale(10),
+  paddingHorizontal: scale(20),
+  borderRadius: scale(20),
+  borderWidth: 1,
+  borderColor: 'rgba(255, 59, 48, 0.3)',
+},
+outOfStockText: {
+  textAlign: 'center',
+  color: 'red',
+  fontSize: scaleFont(14),
+  fontWeight: '600',
+  letterSpacing: 0.5,
+},
+wishlistButton: {
+  padding: scale(10),
+  borderRadius: scale(8),
+  marginRight: scale(12),
+  backgroundColor: 'rgba(255,255,255,0.2)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  width: scale(40),
+},
+cartButton: {
+  flex: 1.5,
+  borderRadius: scale(8),
+  marginRight: scale(12),
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+},
+buttonGradient: {
+  paddingVertical: scale(12),
+  borderRadius: scale(8),
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+cartButtonText: {
+  fontSize: scaleFont(14),
+  color: TEXT_THEME_COLOR,
+  fontWeight: '700',
+  letterSpacing: 0.5,
+},
+buyButton: {
+  flex: 1,
+  borderRadius: scale(8),
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+},
+buyButtonText: {
+  fontSize: scaleFont(14),
+  color: TEXT_THEME_COLOR,
+  fontWeight: '700',
+  letterSpacing: 0.5,
+},
   modalContainer: {
     flex: 1,
     justifyContent: 'center',

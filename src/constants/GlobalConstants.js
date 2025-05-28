@@ -1,6 +1,8 @@
-//GlobalConstants
+import Colors from "./Colors";
+
 export const BASE_URL = 'https://shopmystore-backend-1.onrender.com';
 
+// Existing endpoints
 export const PRODUCTS_ENDPOINT = '/api/products';
 export const PRODUCTS_BY_CATEGORY_ENDPOINT = '/api/products/category';
 export const REELS_ENDPOINT = '/api/reels/reels';
@@ -34,7 +36,20 @@ export const AUTH_FORGOT_PASSWORD_ENDPOINT = '/api/auth/forgot-password';
 export const AUTH_VERIFY_PASSWORD_RESET_OTP_ENDPOINT = '/api/auth/verify-password-reset-otp';
 export const AUTH_RESET_PASSWORD_ENDPOINT = '/api/auth/reset-password';
 
-export const RAZORPAY_KEY_ID = 'rzp_test_9r6fi8ChH5mImP'; // Add your Razorpay key here
+export const SELLER_PROFILE_ENDPOINT = 'seller/profile';
+export const SELLER_PUBLIC_PROFILE_ENDPOINT = 'seller/profile/';
+export const SELLER_PRODUCTS_ENDPOINT = 'seller/products';
+export const SELLER_PRODUCT_ANALYTICS_ENDPOINT = 'seller/products/analytics';
+export const SELLER_SALES_ANALYTICS_ENDPOINT = 'seller/analytics/sales';
+export const SELLER_DASHBOARD_SUMMARY_ENDPOINT = 'seller/analytics/dashboard';
+export const SELLER_ORDERS_ENDPOINT = 'seller/orders';
+export const SELLER_ORDER_DETAILS_ENDPOINT = 'seller/orders/';
+export const SELLER_UPDATE_ORDER_STATUS_ENDPOINT = 'seller/orders/';
+export const SELLER_CHATS_ENDPOINT = 'seller/chats';
+export const SELLER_CHAT_MESSAGES_ENDPOINT = 'seller/chats/';
+export const SELLER_SEND_MESSAGE_ENDPOINT = 'seller/chats/';
+
+export const RAZORPAY_KEY_ID = 'rzp_test_9r6fi8ChH5mImP';
 
 // HTTP Methods
 export const HTTP_METHODS = {
@@ -127,15 +142,18 @@ export const ADD_ADDRESS_ERROR = 'Failed to add address';
 export const DELETE_ADDRESS_ERROR = 'Failed to delete address';
 export const INVALID_PROMO_CODE_ERROR = 'Invalid promo code';
 export const PLACE_ORDER_ERROR = 'Failed to place order';
-export const FETCH_NOTIFICATIONS_ERROR = 'Failed to fetch notifications';
-export const CREATE_NOTIFICATION_ERROR = 'Failed to create notification';
-export const MARK_NOTIFICATION_READ_ERROR = 'Failed to mark notification as read';
-export const DELETE_NOTIFICATION_ERROR = 'Failed to delete notification';
-export const CLEAR_NOTIFICATIONS_ERROR = 'Failed to clear notifications';
-export const SAVE_FCM_TOKEN_ERROR = 'Failed to save FCM token';
-export const FETCH_CHAT_LIST_ERROR = 'Failed to fetch chat list';
+export const FETCH_SELLER_PROFILE_ERROR = 'Failed to fetch seller profile';
+export const UPDATE_SELLER_PROFILE_ERROR = 'Failed to update seller profile';
+export const FETCH_SELLER_PRODUCTS_ERROR = 'Failed to fetch seller products';
+export const FETCH_PRODUCT_ANALYTICS_ERROR = 'Failed to fetch product analytics';
+export const FETCH_SALES_ANALYTICS_ERROR = 'Failed to fetch sales analytics';
+export const FETCH_DASHBOARD_SUMMARY_ERROR = 'Failed to fetch dashboard summary';
+export const FETCH_SELLER_ORDERS_ERROR = 'Failed to fetch seller orders';
+export const FETCH_ORDER_DETAILS_ERROR = 'Failed to fetch order details';
+export const FETCH_SELLER_CHATS_ERROR = 'Failed to fetch seller chats';
+export const SEND_MESSAGE_ERROR = 'Failed to send message';
 
-// Layout Constants
+export const ANIMATION_DELAY = 100;
 export const NUM_COLUMNS = 3;
 export const ITEM_SPACING = 8;
 export const HEADER_TITLE = 'Shop by Category';
@@ -182,6 +200,14 @@ export const REELS_REFRESH_TINT_COLOR = '#5b9cff';
 export const REELS_MODAL_BG_COLOR = '#f5f9ff';
 export const REELS_MODAL_TEXT_COLOR = '#1a2b4a';
 export const REELS_BUTTON_COLOR = '#5b9cff';
+export const FETCH_DASHBOARD_ERROR = 'Failed to fetch dashboard data';
+export const FETCH_ORDERS_ERROR = 'Failed to fetch orders';
+export const FETCH_ANALYTICS_ERROR = 'Failed to fetch analytics';
+export const FETCH_PROFILE_ERROR = 'Failed to fetch profile';
+export const UPDATE_PROFILE_ERROR = 'Failed to update profile';
+export const ADD_PRODUCT_ERROR = 'Failed to add product';
+export const UPDATE_PRODUCT_ERROR = 'Failed to update product';
+export const UPDATE_ORDER_STATUS_ERROR = 'Failed to update order status';
 
 // Previously defined colors for consistency
 export const PRIMARY_COLOR = '#5b9cff';
@@ -189,6 +215,43 @@ export const SECONDARY_COLOR = '#ff6b8a';
 export const TEXT_COLOR = '#1a2b4a';
 export const SUBTEXT_COLOR = '#5a6b8a';
 export const BORDER_COLOR = 'rgba(91, 156, 255, 0.3)';
+
+export const COLORS = {
+  primary: '#4B5EAA', // Deep indigo for primary elements
+  secondary: '#FF6B6B', // Coral for secondary elements
+  accent: '#FFD700', // Gold for highlights
+  textPrimary: '#2A2D34', // Dark charcoal for primary text
+  textSecondary: '#6B7280', // Gray for secondary text
+  background: '#F5F5F7', // Light background for cards
+  gradient: ['#4B5EAA', '#E8ECEF'], // Gradient for backgrounds
+  white: '#FFFFFF',
+  black: '#000000',
+  gray: '#6C757D',
+  lightGray: '#E9ECEF',
+  darkGray: '#495057',
+  success: '#34C759',
+  danger: '#FF3B30',
+  warning: '#FF9500',
+  info: '#007AFF',
+};
+
+export const FONTS = {
+  regular: 'Poppins-Regular',
+  medium: 'Poppins-Medium',
+  semiBold: 'Poppins-SemiBold',
+  bold: 'Poppins-Bold',
+};
+
+export const DIMENSIONS = {
+  padding: 16,
+  margin: 16,
+  borderRadius: 12,
+  buttonHeight: 50,
+  inputHeight: 50,
+  iconSize: 24,
+};
+
+
 
 // Miscellaneous
 export const MAX_QUANTITY = 10;

@@ -203,7 +203,7 @@ export const deleteAddress = createAsyncThunk(
 // Validate promo code
 export const validatePromoCode = createAsyncThunk(
   'checkout/validatePromoCode',
-  async ({ code }, { rejectWithValue }) => {
+  async ({ code, productId }, { rejectWithValue }) => {
     try {
       const token = await AsyncStorage.getItem('userToken');
       if (!token) {
@@ -218,7 +218,7 @@ export const validatePromoCode = createAsyncThunk(
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ code }),
+          body: JSON.stringify({ code, productId }),
         },
         API_TIMEOUT_SHORT
       );
@@ -247,6 +247,10 @@ export const placeOrder = createAsyncThunk(
         throw new Error('Authentication token is missing');
       }
 
+      if (!orderData.productId || !orderData.quantity || !orderData.address) {
+        throw new Error('Missing required order details');
+      }
+
       const response = await fetchWithTimeout(
         `${BASE_URL}${ORDER_ENDPOINT}`,
         {
@@ -262,6 +266,7 @@ export const placeOrder = createAsyncThunk(
 
       const data = await response.json();
       console.log('placeOrder response:', data);
+
       if (!response.ok) {
         throw new Error(data.msg || 'Failed to place order');
       }
@@ -277,7 +282,7 @@ export const placeOrder = createAsyncThunk(
 // Fetch order details
 export const fetchOrderDetails = createAsyncThunk(
   'checkout/fetchOrderDetails',
-  async ({ orderId }, {組みwithValue }) => {
+  async ({ orderId }, { rejectWithValue }) => {
     try {
       if (!orderId || typeof orderId !== 'string') {
         throw new Error('Invalid order ID');
@@ -394,7 +399,7 @@ const checkoutSlice = createSlice({
         state.loading = false;
         state.addresses = action.payload;
         const defaultAddress = action.payload.find((addr) => addr.isDefault);
-        state.selectedAddressId = defaultAddress ? defaultAddress._id : null
+        state.selectedAddressId = defaultAddress ? defaultAddress._id : null;
       })
       .addCase(fetchAddresses.rejected, (state, action) => {
         state.loading = false;
@@ -495,6 +500,7 @@ const checkoutSlice = createSlice({
         state.order = action.payload;
         state.discount = 0;
         state.promoCode = '';
+        state.selectedAddressId = null;
         Toast.show({
           type: 'success',
           text1: 'Order placed successfully',

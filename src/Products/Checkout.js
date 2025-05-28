@@ -40,7 +40,7 @@ import Header from '../Components/Header';
 const { width, height } = Dimensions.get('window');
 const scaleFactor = Math.min(width, 375) / 375;
 const scale = (size) => size * scaleFactor;
-const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375) * 0.85); // Increased multiplier from 0.75 to 0.85
+const scaleFont = (size) => Math.round(size * (Math.min(width, height) / 375) * 0.85);
 
 const Checkout = ({ route, navigation }) => {
   const { productId, quantity, size, color } = route.params || {};
@@ -183,11 +183,12 @@ const Checkout = ({ route, navigation }) => {
 
   const calculateTotal = () => {
     if (!product?.price) return 0;
-    const subtotal = product.price * quantity;
-    const shipping = 50; // Match backend shipping value
+    const subtotal = Number(product.price) * Number(quantity);
+    const shipping = subtotal > 500 ? 0 : 50; // Match backend logic
     const tax = subtotal * 0.05;
-    const discountAmount = subtotal * (discount / 100);
-    return (subtotal + shipping + tax - discountAmount).toFixed(2);
+    const discountAmount = subtotal * (Number(discount) / 100);
+    const total = subtotal + shipping + tax - discountAmount;
+    return Number(total.toFixed(2)); // Ensure total is in rupees, rounded to 2 decimals
   };
 
   const getEstimatedDelivery = () => {
@@ -238,12 +239,22 @@ const Checkout = ({ route, navigation }) => {
       return;
     }
 
+    if (!productId || !quantity || !product?._id) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid order details',
+        position: 'top',
+        topOffset: Platform.OS === 'ios' ? 50 : 30,
+      });
+      return;
+    }
+
     const total = calculateTotal();
     let orderData = {
-      productId,
-      quantity,
-      size,
-      color,
+      productId: product._id, // Ensure correct product ID
+      quantity: Number(quantity),
+      size: size || '',
+      color: color || '',
       address: {
         address: selectedAddress.address,
         city: selectedAddress.city,
@@ -253,22 +264,26 @@ const Checkout = ({ route, navigation }) => {
       },
       paymentMethod,
       promoCode: discount > 0 ? promoCode : null,
-      total,
+      total, // Total in rupees
     };
 
     try {
       setPaymentLoading(true);
+      console.log('Initiating order placement with data:', orderData);
 
       if (paymentMethod !== 'cod') {
-        // Send amount in rupees (backend will convert to paise)
         const razorpayOrderResponse = await dispatch(
-          createRazorpayOrder({ amount: parseFloat(total) })
+          createRazorpayOrder({ amount: total * 100 }) // Convert to paise
         ).unwrap();
         const { id: razorpayOrderId, amount: razorpayAmount, currency } = razorpayOrderResponse;
 
+        if (!razorpayOrderId || !razorpayAmount) {
+          throw new Error('Failed to create Razorpay order');
+        }
+
         const options = {
-          key: process.env.RAZORPAY_KEY_ID || 'rzp_test_9r6fi8ChH5mImP', // Use env variable or fallback
-          amount: razorpayAmount.toString(), // Amount in paise from backend
+          key: process.env.RAZORPAY_KEY_ID || 'rzp_test_9r6fi8ChH5mImP', // Use environment variable
+          amount: razorpayAmount.toString(), // Amount in paise
           currency,
           order_id: razorpayOrderId,
           name: 'Premium Store',
@@ -282,66 +297,52 @@ const Checkout = ({ route, navigation }) => {
 
         console.log('Razorpay options:', options);
 
-        RazorpayCheckout.open(options)
-          .then(async (response) => {
-            console.log('Razorpay payment response:', response);
-            const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = response;
+        const response = await RazorpayCheckout.open(options);
+        console.log('Razorpay payment response:', response);
 
-            orderData = {
-              ...orderData,
-              razorpayOrderId: razorpay_order_id,
-              razorpayPaymentId: razorpay_payment_id,
-              razorpaySignature: razorpay_signature,
-            };
+        if (!response.razorpay_order_id || !response.razorpay_payment_id || !response.razorpay_signature) {
+          throw new Error('Incomplete payment details received from Razorpay');
+        }
 
-            const placeOrderAction = await dispatch(placeOrder(orderData)).unwrap();
-            navigation.navigate('OrderConfirmation', {
-              orderId: placeOrderAction._id,
-              order: placeOrderAction,
-              product,
-              address: orderData.address,
-              paymentMethod: orderData.paymentMethod,
-            });
-
-            Toast.show({
-              type: 'success',
-              text1: 'Order placed successfully',
-              position: 'top',
-              topOffset: Platform.OS === 'ios' ? 50 : 30,
-            });
-          })
-          .catch((error) => {
-            console.error('Razorpay payment error:', error);
-            Toast.show({
-              type: 'error',
-              text1: error.description || 'Payment failed. Please try again.',
-              position: 'top',
-              topOffset: Platform.OS === 'ios' ? 50 : 30,
-            });
-            setPaymentLoading(false);
-          });
-      } else {
-        const placeOrderAction = await dispatch(placeOrder(orderData)).unwrap();
-        navigation.navigate('OrderConfirmation', {
-          orderId: placeOrderAction._id,
-          order: placeOrderAction,
-          product,
-          address: orderData.address,
-          paymentMethod: orderData.paymentMethod,
-        });
-
-        Toast.show({
-          type: 'success',
-          text1: 'Order placed successfully',
-          position: 'top',
-          topOffset: Platform.OS === 'ios' ? 50 : 30,
-        });
+        orderData = {
+          ...orderData,
+          razorpayOrderId: response.razorpay_order_id,
+          razorpayPaymentId: response.razorpay_payment_id,
+          razorpaySignature: response.razorpay_signature,
+        };
       }
+
+      console.log('Final order data sent to backend:', orderData);
+      const placeOrderAction = await dispatch(placeOrder(orderData)).unwrap();
+
+      dispatch(clearDiscount());
+      dispatch(setSelectedAddressId(null));
+
+      navigation.navigate('OrderConfirmation', {
+        orderId: placeOrderAction._id,
+        order: placeOrderAction,
+        product,
+        address: orderData.address,
+        paymentMethod: orderData.paymentMethod,
+      });
+
+      Toast.show({
+        type: 'success',
+        text1: 'Order placed successfully',
+        position: 'top',
+        topOffset: Platform.OS === 'ios' ? 50 : 30,
+      });
     } catch (error) {
       console.error('Confirm order error:', error);
+      let errorMessage = error.message || 'Failed to place order. Please try again.';
+      if (error.code === 'BAD_REQUEST_ERROR') {
+        errorMessage = error.description || 'Invalid payment request. Please try again.';
+      } else if (error.error) {
+        errorMessage = error.error.description || 'Payment failed. Please try again.';
+      }
       Toast.show({
         type: 'error',
-        text1: error.message || 'Failed to process payment. Please try again.',
+        text1: errorMessage,
         position: 'top',
         topOffset: Platform.OS === 'ios' ? 50 : 30,
       });
@@ -491,7 +492,6 @@ const Checkout = ({ route, navigation }) => {
         title="Checkout"
         textStyle={{ color: '#1a2b4a' }}
       />
-
       <Animated.View
         style={[styles.content, { opacity: fadeAnim, transform: [{ translateY: slideUpAnim }] }]}
       >
@@ -623,7 +623,7 @@ const Checkout = ({ route, navigation }) => {
                     disabled={isActionLoading}
                   >
                     <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-                      <LinearGradient  colors={['#5b9cff', '#5b9cff']}style={styles.applyButtonGradient}>
+                      <LinearGradient colors={['#5b9cff', '#3b82f6']} style={styles.applyButtonGradient}>
                         <Text style={styles.applyButtonText}>APPLY</Text>
                       </LinearGradient>
                     </Animated.View>
@@ -649,7 +649,9 @@ const Checkout = ({ route, navigation }) => {
                 </View>
                 <View style={styles.priceRow}>
                   <Text style={styles.priceLabel}>Delivery</Text>
-                  <Text style={styles.priceValue}>₹50.00</Text>
+                  <Text style={styles.priceValue}>
+                    ₹{(product?.price * quantity > 500 ? 0 : 50).toFixed(2)}
+                  </Text>
                 </View>
                 <View style={styles.priceRow}>
                   <Text style={styles.priceLabel}>Tax (5%)</Text>
@@ -687,7 +689,7 @@ const Checkout = ({ route, navigation }) => {
             disabled={isActionLoading || isPaymentLoading || !selectedAddressId}
           >
             <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-              <LinearGradient  colors={['#5b9cff', '#5b9cff']} style={styles.confirmButtonGradient}>
+              <LinearGradient colors={['#5b9cff', '#3b82f6']} style={styles.confirmButtonGradient}>
                 <Text style={styles.confirmButtonText}>
                   {isPaymentLoading ? (
                     <ActivityIndicator size="small" color="#fff" />
@@ -792,6 +794,7 @@ const Checkout = ({ route, navigation }) => {
   );
 };
 
+// Styles remain unchanged
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -816,7 +819,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#5b9cff',
   },
   tabText: {
-    fontSize: scaleFont(16), // Increased from 14
+    fontSize: scaleFont(16),
     fontWeight: '600',
     color: '#5a6b8a',
   },
@@ -836,7 +839,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(91, 156, 255, 0.3)',
   },
   sectionTitle: {
-    fontSize: scaleFont(20), // Increased from 16
+    fontSize: scaleFont(20),
     fontWeight: '700',
     color: '#1a2b4a',
     marginBottom: scale(16),
@@ -859,20 +862,20 @@ const styles = StyleSheet.create({
     marginBottom: scale(8),
   },
   addressType: {
-    fontSize: scaleFont(12), // Increased from 10
+    fontSize: scaleFont(12),
     fontWeight: '700',
     color: '#5b9cff',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   addressText: {
-    fontSize: scaleFont(15), // Increased from 13
+    fontSize: scaleFont(15),
     color: '#1a2b4a',
     marginBottom: scale(4),
     lineHeight: scale(20),
   },
   alternatePhone: {
-    fontSize: scaleFont(14), // Increased from 12
+    fontSize: scaleFont(14),
     color: '#5a6b8a',
     marginBottom: scale(12),
   },
@@ -882,7 +885,7 @@ const styles = StyleSheet.create({
     marginTop: scale(8),
   },
   deliveryText: {
-    fontSize: scaleFont(14), // Increased from 12
+    fontSize: scaleFont(14),
     color: '#5a6b8a',
     marginLeft: scale(6),
   },
@@ -890,7 +893,7 @@ const styles = StyleSheet.create({
     padding: scale(4),
   },
   noAddressText: {
-    fontSize: scaleFont(15), // Increased from 13
+    fontSize: scaleFont(15),
     color: '#5a6b8a',
     textAlign: 'center',
     marginVertical: scale(16),
@@ -905,7 +908,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addAddressButtonText: {
-    fontSize: scaleFont(16), // Increased from 14
+    fontSize: scaleFont(16),
     fontWeight: '600',
     color: '#ffffff',
   },
@@ -929,13 +932,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   productName: {
-    fontSize: scaleFont(16), // Increased from 14
+    fontSize: scaleFont(16),
     fontWeight: '600',
     color: '#1a2b4a',
     marginBottom: scale(6),
   },
   productPrice: {
-    fontSize: scaleFont(18), // Increased from 15
+    fontSize: scaleFont(18),
     fontWeight: '700',
     color: '#5b9cff',
     marginBottom: scale(8),
@@ -945,7 +948,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   productMetaText: {
-    fontSize: scaleFont(14), // Increased from 12
+    fontSize: scaleFont(14),
     color: '#5a6b8a',
     marginRight: scale(12),
     marginBottom: scale(4),
@@ -962,7 +965,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(91, 156, 255, 0.3)',
     borderRadius: scale(8),
     padding: scale(14),
-    fontSize: scaleFont(15), // Increased from 13
+    fontSize: scaleFont(15),
     color: '#1a2b4a',
     marginRight: scale(12),
   },
@@ -976,7 +979,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   applyButtonText: {
-    fontSize: scaleFont(15), // Increased from 13
+    fontSize: scaleFont(15),
     fontWeight: '700',
     color: '#ffffff',
   },
@@ -986,7 +989,7 @@ const styles = StyleSheet.create({
     marginTop: scale(8),
   },
   discountText: {
-    fontSize: scaleFont(15), // Increased from 13
+    fontSize: scaleFont(15),
     color: '#ff6b8a',
     marginLeft: scale(6),
   },
@@ -1013,7 +1016,7 @@ const styles = StyleSheet.create({
     marginRight: scale(12),
   },
   paymentOptionText: {
-    fontSize: scaleFont(16), // Increased from 14
+    fontSize: scaleFont(16),
     color: '#1a2b4a',
     flex: 1,
   },
@@ -1039,21 +1042,21 @@ const styles = StyleSheet.create({
     marginTop: scale(4),
   },
   priceLabel: {
-    fontSize: scaleFont(15), // Increased from 13
+    fontSize: scaleFont(15),
     color: '#5a6b8a',
   },
   priceValue: {
-    fontSize: scaleFont(15), // Increased from 13
+    fontSize: scaleFont(15),
     color: '#1a2b4a',
     fontWeight: '500',
   },
   totalLabel: {
-    fontSize: scaleFont(16), // Increased from 14
+    fontSize: scaleFont(16),
     color: '#1a2b4a',
     fontWeight: '600',
   },
   totalValue: {
-    fontSize: scaleFont(16), // Increased from 14
+    fontSize: scaleFont(16),
     color: '#5b9cff',
     fontWeight: '700',
   },
@@ -1076,7 +1079,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   totalPrice: {
-    fontSize: scaleFont(20), // Increased from 18
+    fontSize: scaleFont(20),
     fontWeight: '700',
     color: '#5b9cff',
     marginTop: scale(4),
@@ -1094,7 +1097,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   confirmButtonText: {
-    fontSize: scaleFont(16), // Increased from 14
+    fontSize: scaleFont(16),
     fontWeight: '700',
     color: '#fff',
     textTransform: 'uppercase',
@@ -1106,7 +1109,7 @@ const styles = StyleSheet.create({
     padding: scale(16),
   },
   errorText: {
-    fontSize: scaleFont(18), // Increased from 16
+    fontSize: scaleFont(18),
     color: '#1a2b4a',
     marginBottom: scale(20),
     marginTop: scale(16),
@@ -1121,7 +1124,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(40),
   },
   retryButtonText: {
-    fontSize: scaleFont(16), // Increased from 14
+    fontSize: scaleFont(16),
     fontWeight: '600',
     color: '#fff',
   },
@@ -1137,7 +1140,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(91, 156, 255, 0.3)',
     borderRadius: scale(8),
     padding: scale(14),
-    fontSize: scaleFont(15), // Increased from 13
+    fontSize: scaleFont(15),
     color: '#1a2b4a',
     marginBottom: scale(16),
   },
@@ -1155,7 +1158,7 @@ const styles = StyleSheet.create({
     marginBottom: scale(16),
   },
   defaultAddressText: {
-    fontSize: scaleFont(16), // Increased from 14
+    fontSize: scaleFont(16),
     color: '#1a2b4a',
   },
   modalFooter: {
@@ -1171,7 +1174,7 @@ const styles = StyleSheet.create({
     padding: scale(16),
   },
   saveButtonText: {
-    fontSize: scaleFont(16), // Increased from 14
+    fontSize: scaleFont(16),
     fontWeight: '700',
     color: '#fff',
     textTransform: 'uppercase',

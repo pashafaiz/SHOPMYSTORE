@@ -1,5 +1,6 @@
 import React, { useRef, createContext, useContext, useState, useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useNavigation } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { StyleSheet, TouchableOpacity, Animated, Dimensions, View, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'react-native-linear-gradient';
@@ -13,12 +14,14 @@ import SellerDashboard from '../SellerSenerio/SellerDashboard';
 import SellerProducts from '../SellerSenerio/SellerProducts';
 import SellerOrders from '../SellerSenerio/SellerOrders';
 import SellerProfile from '../SellerSenerio/SellerProfile';
+import SellerVerification from '../SellerSenerio/SellerVerification';
 import {
-  PRIMARY_THEME_COLOR, SUBTEXT_THEME_COLOR, BACKGROUND_GRADIENT,
+  PRIMARY_THEME_COLOR, 
+  SUBTEXT_THEME_COLOR,
 } from '../constants/GlobalConstants';
 import Management from '../SellerSenerio/Management';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 const Tab = createBottomTabNavigator();
 
 const ScrollContext = createContext();
@@ -60,32 +63,44 @@ export const ScrollProvider = ({ children }) => {
 };
 
 const BottomTabs = ({ tabOffsetValue }) => {
+  const navigation = useNavigation();
   const { user } = useSelector((state) => state.profile);
   const [isSeller, setIsSeller] = useState(null);
+  const [isVerified, setIsVerified] = useState(null);
 
   useEffect(() => {
     const determineUserType = async () => {
       try {
         if (user?.userType) {
           setIsSeller(user.userType === 'seller');
+          setIsVerified(user.isVerified || false);
         } else {
           const storedUser = await AsyncStorage.getItem('user');
           if (storedUser) {
             const parsedUser = JSON.parse(storedUser);
             setIsSeller(parsedUser.userType === 'seller');
+            setIsVerified(parsedUser.isVerified || false);
           } else {
             setIsSeller(false);
+            setIsVerified(false);
           }
         }
       } catch (error) {
         console.error('Error determining user type:', error);
         setIsSeller(false);
+        setIsVerified(false);
       }
     };
     determineUserType();
   }, [user]);
 
-  if (isSeller === null) {
+  useEffect(() => {
+    if (isSeller && !isVerified) {
+      navigation.replace('SellerVerification');
+    }
+  }, [isSeller, isVerified, navigation]);
+
+  if (isSeller === null || isVerified === null) {
     return (
       <View style={styles.loaderContainer}>
         <ActivityIndicator size="large" color={PRIMARY_THEME_COLOR} />
@@ -96,18 +111,18 @@ const BottomTabs = ({ tabOffsetValue }) => {
   return isSeller ? (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ color, size }) => {
+        tabBarIcon: ({ focused, color, size }) => {
           let iconName;
           if (route.name === 'SellerDashboard') {
-            iconName = 'stats-chart-outline';
+            iconName = focused ? 'stats-chart' : 'stats-chart-outline';
           } else if (route.name === 'Management') {
-            iconName = 'cube-outline';
+            iconName = focused ? 'cube' : 'cube-outline';
           } else if (route.name === 'SellerProducts') {
-            iconName = 'cart-outline';
+            iconName = focused ? 'cart' : 'cart-outline';
           } else if (route.name === 'SellerProfile') {
-            iconName = 'person-outline';
+            iconName = focused ? 'person' : 'person-outline';
           }
-          return <Ionicons name={iconName} size={20} color={color} />;
+          return <Ionicons name={iconName} size={24} color={color} />;
         },
         tabBarActiveTintColor: PRIMARY_THEME_COLOR,
         tabBarInactiveTintColor: SUBTEXT_THEME_COLOR,
@@ -115,7 +130,7 @@ const BottomTabs = ({ tabOffsetValue }) => {
         tabBarButton: (props) => <TouchableOpacity activeOpacity={0.7} {...props} />,
         tabBarStyle: {
           position: 'absolute',
-          height: 50,
+          height: 60,
           borderTopWidth: 0,
           backgroundColor: '#FFFFFF',
           borderTopLeftRadius: 24,
@@ -132,10 +147,12 @@ const BottomTabs = ({ tabOffsetValue }) => {
           />
         ),
         tabBarLabelStyle: {
-          fontSize: 10,
+          fontSize: 12,
           fontWeight: '600',
-          marginBottom: 0,
-          fontFamily: Platform.OS === 'ios' ? 'Avenir' : 'Roboto',
+          marginBottom: 4,
+        },
+        tabBarIconStyle: {
+          marginTop: 8,
         },
       })}
     >
@@ -146,7 +163,7 @@ const BottomTabs = ({ tabOffsetValue }) => {
       />
       <Tab.Screen
         name="Management"
-        options={{ tabBarLabel: 'Management' }}
+        options={{ tabBarLabel: 'Manage' }}
         component={Management}
       />
       <Tab.Screen
@@ -163,18 +180,18 @@ const BottomTabs = ({ tabOffsetValue }) => {
   ) : (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ color, size }) => {
+        tabBarIcon: ({ focused, color, size }) => {
           let iconName;
           if (route.name === 'DashBoard') {
-            iconName = 'home-outline';
+            iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Reels') {
-            iconName = 'play-circle-outline';
+            iconName = focused ? 'play-circle' : 'play-circle-outline';
           } else if (route.name === 'Categories') {
-            iconName = 'grid-outline';
+            iconName = focused ? 'grid' : 'grid-outline';
           } else if (route.name === 'Profile') {
-            iconName = 'person-outline';
+            iconName = focused ? 'person' : 'person-outline';
           }
-          return <Ionicons name={iconName} size={20} color={color} />;
+          return <Ionicons name={iconName} size={24} color={color} />;
         },
         tabBarActiveTintColor: PRIMARY_THEME_COLOR,
         tabBarInactiveTintColor: SUBTEXT_THEME_COLOR,
@@ -182,7 +199,7 @@ const BottomTabs = ({ tabOffsetValue }) => {
         tabBarButton: (props) => <TouchableOpacity activeOpacity={0.7} {...props} />,
         tabBarStyle: {
           position: 'absolute',
-          height: 50,
+          height: 60,
           borderTopWidth: 0,
           backgroundColor: '#FFFFFF',
           borderTopLeftRadius: 24,
@@ -199,10 +216,12 @@ const BottomTabs = ({ tabOffsetValue }) => {
           />
         ),
         tabBarLabelStyle: {
-          fontSize: 10,
+          fontSize: 12,
           fontWeight: '600',
-          marginBottom: 0,
-          fontFamily: Platform.OS === 'ios' ? 'Avenir' : 'Roboto',
+          marginBottom: 4,
+        },
+        tabBarIconStyle: {
+          marginTop: 8,
         },
       })}
     >

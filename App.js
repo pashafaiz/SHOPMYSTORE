@@ -73,7 +73,7 @@ const { width, height } = Dimensions.get('window');
 const scaleFactor = width / 375;
 const scale = size => Math.round(size * scaleFactor);
 
-const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
+const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 34;
 
 const navigationRef = React.createRef();
 LogBox.ignoreAllLogs(true);
@@ -589,7 +589,7 @@ const AppContent = () => {
   useEffect(() => {
     if (!showSplash) {
       dispatch(checkAuth()).then(() => {
-        setInitialRoute(isAuthenticated ? 'BottomTabs' : 'Login');
+        setInitialRoute(isAuthenticated ? 'BottomTabs' : 'Roleselection');
       });
     }
   }, [showSplash, isAuthenticated, dispatch]);
@@ -725,7 +725,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    top: 0,
+    top:0,
     bottom: 0,
   },
   animationContainer: {
