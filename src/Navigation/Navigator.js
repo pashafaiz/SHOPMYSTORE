@@ -197,9 +197,8 @@ import SellerSupport from '../SellerSenerio/SellerSupport';
 import {ChatScreen, SellerChats} from '../SellerSenerio/SellerChats';
 import AddProduct from '../SellerSenerio/AddProduct';
 import EditProduct from '../SellerSenerio/EditProduct';
-import SellerVerification from '../SellerSenerio/SellerVerification';
+// import SellerVerification from '../SellerSenerio/SellerVerification';
 import RoleSelection from '../BeforeLogin/RoleSelection';
-import SellerSignupNew from '../BeforeLogin/SellerSignupNew';
 
 const Stack = createNativeStackNavigator();
 const DrawerNav = createDrawerNavigator();
@@ -255,7 +254,7 @@ const HomeStack = () => {
       <Stack.Screen name="AddProduct" component={AddProduct} />
       <Stack.Screen name="EditProduct" component={EditProduct} />
       <Stack.Screen name="Management" component={Management} />
-      <Stack.Screen name="SellerVerification" component={SellerVerification} />
+      {/* <Stack.Screen name="SellerVerification" component={SellerVerification} /> */}
     </Stack.Navigator>
   );
 };
@@ -319,7 +318,6 @@ const Navigator = () => {
           <Stack.Screen name="OTP" component={OTP} />
           <Stack.Screen name="SellerSignup" component={SellerSignup} />
           <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
-          <Stack.Screen name="SellerSignupNew" component={SellerSignupNew}/>
         </>
       )}
     </Stack.Navigator>

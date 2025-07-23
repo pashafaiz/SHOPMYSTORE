@@ -16,7 +16,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import LinearGradient from 'react-native-linear-gradient';
 import InputBox from '../Components/InputBox';
 import img from '../assets/Images/img';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import Button from '../Components/Button';
 import { signup, clearErrors } from '../redux/slices/authSlice';
 import Loader from '../Components/Loader';
@@ -45,13 +45,14 @@ const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
 
 const SignUp = () => {
   const navigation = useNavigation();
+  const route = useRoute();
   const dispatch = useDispatch();
   const { loading, errors } = useSelector((state) => state.auth);
   const [isChecked, setChecked] = useState(false);
-  const [userType, setUserType] = useState(null);
+  const [userType, setUserType] = useState('customer'); // Always set to customer
   const [fullName, setFullName] = useState('');
   const [userName, setUserName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(route.params?.email || '');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -86,56 +87,7 @@ const SignUp = () => {
     };
   }, [dispatch]);
 
-  const validateForm = () => {
-    let tempErrors = {};
-    let isValid = true;
-
-    if (!userType) {
-      tempErrors.userType = 'Please select user type';
-      isValid = false;
-    }
-
-    if (!fullName.trim()) {
-      tempErrors.fullName = 'Full Name is required';
-      isValid = false;
-    }
-
-    if (!userName.trim()) {
-      tempErrors.userName = 'Username is required';
-      isValid = false;
-    }
-
-    if (!email.trim()) {
-      tempErrors.email = 'Email is required';
-      isValid = false;
-    }
-
-    if (!phoneNumber.trim()) {
-      tempErrors.phoneNumber = 'Phone Number is required';
-      isValid = false;
-    }
-
-    if (!password.trim()) {
-      tempErrors.password = 'Password is required';
-      isValid = false;
-    }
-
-    if (!confirmPassword.trim()) {
-      tempErrors.confirmPassword = 'Please confirm your password';
-      isValid = false;
-    }
-
-    if (!isChecked) {
-      tempErrors.terms = 'Please accept Terms & Conditions and Privacy Policy';
-      isValid = false;
-    }
-
-    dispatch({ type: 'auth/signup/rejected', payload: tempErrors });
-    return isValid;
-  };
-
   const handleSignup = () => {
-    navigation.navigate('OTP', { email });
     Animated.sequence([
       Animated.timing(buttonScale, {
         toValue: 0.95,
@@ -149,7 +101,18 @@ const SignUp = () => {
       }),
     ]).start();
 
-    if (!validateForm()) {
+    // Basic client-side validation for empty fields
+    const tempErrors = {};
+    if (!fullName.trim()) tempErrors.fullName = 'Full Name is required';
+    if (!userName.trim()) tempErrors.userName = 'Username is required';
+    if (!email.trim()) tempErrors.email = 'Email is required';
+    if (!phoneNumber.trim()) tempErrors.phoneNumber = 'Phone Number is required';
+    if (!password.trim()) tempErrors.password = 'Password is required';
+    if (!confirmPassword.trim()) tempErrors.confirmPassword = 'Confirm Password is required';
+    if (!isChecked) tempErrors.terms = 'Please accept Terms & Conditions and Privacy Policy';
+
+    if (Object.keys(tempErrors).length > 0) {
+      dispatch({ type: 'auth/signup/rejected', payload: tempErrors });
       return;
     }
 
@@ -165,7 +128,22 @@ const SignUp = () => {
 
     dispatch(signup(formData)).then((result) => {
       if (result.meta.requestStatus === 'fulfilled') {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'OTP sent to your email',
+          position: 'top',
+          visibilityTime: 3000,
+        });
         navigation.navigate('OTP', { email });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: result.payload?.msg || 'Signup failed',
+          position: 'top',
+          visibilityTime: 3000,
+        });
       }
     });
   };
@@ -191,16 +169,23 @@ const SignUp = () => {
 
       dispatch(signup(formData)).then((result) => {
         if (result.meta.requestStatus === 'fulfilled') {
+          Toast.show({
+            type: 'success',
+            text1: 'Success',
+            text2: 'Google Sign-In successful!',
+            position: 'top',
+            visibilityTime: 3000,
+          });
           navigation.navigate('BottomTabs');
+        } else {
+          Toast.show({
+            type: 'error',
+            text1: 'Error',
+            text2: result.payload?.msg || 'Google Sign-In failed',
+            position: 'top',
+            visibilityTime: 3000,
+          });
         }
-      });
-
-      Toast.show({
-        type: 'success',
-        text1: 'Success',
-        text2: 'Google Sign-In successful!',
-        position: 'top',
-        visibilityTime: 3000,
       });
     } catch (error) {
       let errorMessage = 'Google Sign-In failed';
@@ -234,8 +219,6 @@ const SignUp = () => {
       <LinearGradient
         colors={BACKGROUND_GRADIENT}
         style={styles.backgroundGradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
       />
       
       <Loader visible={loading} color={PRIMARY_THEME_COLOR} />
@@ -279,75 +262,23 @@ const SignUp = () => {
             <Text style={styles.welcomeText}>Create Account</Text>
             
             <View style={styles.userTypeContainer}>
-              <Text style={styles.userTypeLabel}>I want to register as:</Text>
+              <Text style={styles.userTypeLabel}>Registering as:</Text>
               <View style={styles.userTypeOptions}>
-                <TouchableOpacity
-                  style={[
-                    styles.userTypeButton,
-                    userType === 'seller' && styles.userTypeButtonSelected,
-                  ]}
-                  onPress={() => {
-                    setUserType('seller');
-                    clearError('userType');
-                  }}
-                  activeOpacity={0.7}
-                >
+                <View style={[
+                  styles.userTypeButton,
+                  styles.userTypeButtonSelected
+                ]}>
                   <LinearGradient
-                    colors={
-                      userType === 'seller'
-                        ? ['#5b9cff', '#8ec5fc']
-                        : ['transparent', 'transparent']
-                    }
-                    style={[
-                      styles.userTypeCheckbox,
-                      userType === 'seller' && styles.userTypeCheckboxSelected,
-                    ]}
+                    colors={['#5b9cff', '#8ec5fc']}
+                    style={styles.userTypeCheckboxSelected}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                   >
-                    {userType === 'seller' && (
-                      <Image source={img.check} style={styles.checkIcon} />
-                    )}
+                    <Image source={img.check} style={styles.checkIcon} />
                   </LinearGradient>
-                  <Text style={styles.userTypeText}>Seller</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.userTypeButton,
-                    userType === 'customer' && styles.userTypeButtonSelected,
-                  ]}
-                  onPress={() => {
-                    setUserType('customer');
-                    clearError('userType');
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <LinearGradient
-                    colors={
-                      userType === 'customer'
-                        ? ['#5b9cff', '#8ec5fc']
-                        : ['transparent', 'transparent']
-                    }
-                    style={[
-                      styles.userTypeCheckbox,
-                      userType === 'customer' && styles.userTypeCheckboxSelected,
-                    ]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  >
-                    {userType === 'customer' && (
-                      <Image source={img.check} style={styles.checkIcon} />
-                    )}
-                  </LinearGradient>
-                  <Text style={styles.userTypeText}>Customer</Text>
-                </TouchableOpacity>
+                  <Text style={[styles.userTypeText, styles.userTypeTextSelected]}>Customer</Text>
+                </View>
               </View>
-              {errors.userType && (
-                <Text style={[styles.errorText, { top: scale(0) }]}>
-                  {errors.userType}
-                </Text>
-              )}
             </View>
 
             <InputBox
@@ -481,14 +412,6 @@ const SignUp = () => {
               <Text style={styles.errorText}>{errors.terms}</Text>
             )}
 
-            {errors.message && (
-              <Text
-                style={[styles.errorText, { textAlign: 'center', marginBottom: scale(10) }]}
-              >
-                {errors.message}
-              </Text>
-            )}
-
             <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
               <Button
                 title="SIGN UP"
@@ -608,8 +531,7 @@ const styles = StyleSheet.create({
   },
   userTypeOptions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: scale(4),
+    justifyContent: 'flex-start',
   },
   userTypeButton: {
     flexDirection: 'row',
@@ -617,7 +539,7 @@ const styles = StyleSheet.create({
     padding: scale(12),
     borderRadius: scale(12),
     borderWidth: scale(2),
-    borderColor: BORDER_THEME_COLOR,
+    borderColor: PRIMARY_THEME_COLOR,
     backgroundColor: CATEGORY_BG_COLOR,
     width: '48%',
   },
@@ -625,23 +547,21 @@ const styles = StyleSheet.create({
     borderColor: PRIMARY_THEME_COLOR,
     backgroundColor: CATEGORY_BG_COLOR,
   },
-  userTypeCheckbox: {
+  userTypeCheckboxSelected: {
     width: scale(22),
     height: scale(22),
     borderRadius: scale(6),
-    borderWidth: scale(2),
-    borderColor: BORDER_THEME_COLOR,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: scale(8),
-  },
-  userTypeCheckboxSelected: {
-    borderColor: PRIMARY_THEME_COLOR,
   },
   userTypeText: {
     color: TEXT_THEME_COLOR,
     fontSize: scaleFont(14),
     fontWeight: '500',
+  },
+  userTypeTextSelected: {
+    color: TEXT_THEME_COLOR,
   },
   inputContainer: {
     backgroundColor: CATEGORY_BG_COLOR,
@@ -655,7 +575,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: scale(2) },
     shadowOpacity: 0.1,
     shadowRadius: scale(4),
-    // elevation: 3,
   },
   termsRow: {
     flexDirection: 'row',

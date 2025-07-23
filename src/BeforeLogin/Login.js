@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useRef } from 'react';
+import React, {useCallback, useState, useRef} from 'react';
 import {
   Image,
   ScrollView,
@@ -13,22 +13,29 @@ import {
   Easing,
   Dimensions,
 } from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
+import {useDispatch, useSelector} from 'react-redux';
 import img from '../assets/Images/img';
 import InputBox from '../Components/InputBox';
 import Button from '../Components/Button';
 import LinearGradient from 'react-native-linear-gradient';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { login, clearErrors } from '../redux/slices/authSlice';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import {login, clearErrors} from '../redux/slices/authSlice';
 import Loader from '../Components/Loader';
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
-import { getAuth, signInWithCredential, GoogleAuthProvider } from '@react-native-firebase/auth';
+import {
+  GoogleSignin,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
+import {
+  getAuth,
+  signInWithCredential,
+  GoogleAuthProvider,
+} from '@react-native-firebase/auth';
 import Toast from 'react-native-toast-message';
 
-const { width, height } = Dimensions.get('window');
+const {width, height} = Dimensions.get('window');
 const scaleFactor = Math.min(width, 375) / 375;
-const scaleSize = (size) => Math.round(size * scaleFactor);
-const scaleFont = (size) => {
+const scaleSize = size => Math.round(size * scaleFactor);
+const scaleFont = size => {
   const fontScale = Math.min(width, height) / 375;
   const scaledSize = size * fontScale * (Platform.OS === 'ios' ? 0.9 : 0.85);
   return Math.round(scaledSize);
@@ -47,7 +54,7 @@ const BACKGROUND_GRADIENT = ['#8ec5fc', '#fff'];
 const Login = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
-  const { loading, errors } = useSelector((state) => state.auth);
+  const {loading, errors} = useSelector(state => state.auth);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -65,7 +72,7 @@ const Login = () => {
 
       const backHandler = BackHandler.addEventListener(
         'hardwareBackPress',
-        backAction
+        backAction,
       );
 
       Animated.parallel([
@@ -94,7 +101,7 @@ const Login = () => {
         logoScale.setValue(0.9);
         dispatch(clearErrors());
       };
-    }, [dispatch])
+    }, [dispatch]),
   );
 
   const handleLogin = () => {
@@ -116,15 +123,15 @@ const Login = () => {
     if (!password) tempErrors.password = 'Password is required';
 
     if (Object.keys(tempErrors).length > 0) {
-      dispatch({ type: 'auth/login/rejected', payload: tempErrors });
+      dispatch({type: 'auth/login/rejected', payload: tempErrors});
       return;
     }
 
-    dispatch(login({ email, password })).then((result) => {
+    dispatch(login({email, password})).then(result => {
       if (result.meta.requestStatus === 'fulfilled') {
         navigation.reset({
           index: 0,
-          routes: [{ name: 'SignUp' }],
+          routes: [{name: 'SignUp'}],
         });
       }
     });
@@ -138,8 +145,11 @@ const Login = () => {
 
       console.log('Step 2: Attempting Google Sign-In...');
       const signInResult = await GoogleSignin.signIn();
-      console.log('Step 2: Google Sign-In Result:', JSON.stringify(signInResult, null, 2));
-      const { idToken } = signInResult;
+      console.log(
+        'Step 2: Google Sign-In Result:',
+        JSON.stringify(signInResult, null, 2),
+      );
+      const {idToken} = signInResult;
 
       console.log('Step 3: Creating Google Credential...');
       const googleCredential = GoogleAuthProvider.credential(idToken);
@@ -148,19 +158,24 @@ const Login = () => {
       console.log('Step 4: Signing in with Firebase...');
       const auth = getAuth();
       const userCredential = await signInWithCredential(auth, googleCredential);
-      console.log('Step 4: Firebase Sign-In successful:', JSON.stringify(userCredential, null, 2));
+      console.log(
+        'Step 4: Firebase Sign-In successful:',
+        JSON.stringify(userCredential, null, 2),
+      );
       const user = userCredential.user;
 
       console.log('Step 5: Dispatching login action...');
-      dispatch(login({
-        email: user.email,
-        fullName: user.displayName,
-        googleId: user.uid,
-      })).then((result) => {
+      dispatch(
+        login({
+          email: user.email,
+          fullName: user.displayName,
+          googleId: user.uid,
+        }),
+      ).then(result => {
         if (result.meta.requestStatus === 'fulfilled') {
           navigation.reset({
             index: 0,
-            routes: [{ name: 'BottomTabs' }],
+            routes: [{name: 'BottomTabs'}],
           });
         }
       });
@@ -174,8 +189,12 @@ const Login = () => {
       });
     } catch (error) {
       let errorMessage = 'Google Sign-In failed';
-      if (!error || (typeof error === 'object' && Object.keys(error).length === 0)) {
-        errorMessage = 'Google Sign-In failed: Unknown error (empty error object)';
+      if (
+        !error ||
+        (typeof error === 'object' && Object.keys(error).length === 0)
+      ) {
+        errorMessage =
+          'Google Sign-In failed: Unknown error (empty error object)';
       } else if (error && typeof error === 'object') {
         if (error.code) {
           if (error.code === statusCodes.SIGN_IN_CANCELLED) {
@@ -188,13 +207,18 @@ const Login = () => {
             errorMessage = `Error: ${error.message || 'Unknown error'}`;
           }
         } else {
-          errorMessage = `Error: ${error.message || 'Unexpected error occurred'}`;
+          errorMessage = `Error: ${
+            error.message || 'Unexpected error occurred'
+          }`;
         }
       } else {
         errorMessage = 'An unexpected error occurred';
       }
 
-      console.error('Google Sign-In Error:', JSON.stringify(error || {}, null, 2));
+      console.error(
+        'Google Sign-In Error:',
+        JSON.stringify(error || {}, null, 2),
+      );
       console.log('Error occurred at step:', errorMessage);
 
       Toast.show({
@@ -212,36 +236,27 @@ const Login = () => {
       <LinearGradient
         colors={BACKGROUND_GRADIENT}
         style={styles.backgroundGradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
       />
-      
+
       <Loader visible={loading} color={PRIMARY_THEME_COLOR} />
-      
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoid}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? scaleSize(60) : 0}
-      >
+        keyboardVerticalOffset={Platform.OS === 'ios' ? scaleSize(60) : 0}>
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+          keyboardShouldPersistTaps="handled">
           <Animated.View
             style={[
               styles.logoContainer,
               {
                 opacity: fadeAnim,
-                transform: [{ scale: logoScale }],
+                transform: [{scale: logoScale}],
               },
-            ]}
-          >
-            <Image 
-              style={styles.logo} 
-              source={img.App} 
-              resizeMode="contain"
-            />
+            ]}>
+            <Image style={styles.logo} source={img.App} resizeMode="contain" />
             <Text style={styles.tagline}>Your Premium Shopping Companion</Text>
           </Animated.View>
 
@@ -250,12 +265,11 @@ const Login = () => {
               styles.formContainer,
               {
                 opacity: fadeAnim,
-                transform: [{ translateY: slideUpAnim }],
+                transform: [{translateY: slideUpAnim}],
               },
-            ]}
-          >
+            ]}>
             <Text style={styles.welcomeText}>Welcome Back</Text>
-            
+
             <InputBox
               placeholder="Email Address"
               placeholderTextColor={SUBTEXT_THEME_COLOR}
@@ -280,14 +294,13 @@ const Login = () => {
               containerStyle={styles.inputContainer}
             />
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.forgotPass}
-              onPress={() => navigation.navigate('ForgotPassword')}
-            >
+              onPress={() => navigation.navigate('ForgotPassword')}>
               <Text style={styles.forgotPassText}>Forgot Password?</Text>
             </TouchableOpacity>
 
-            <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+            <Animated.View style={{transform: [{scale: buttonScale}]}}>
               <Button
                 title="LOGIN"
                 onPress={handleLogin}
@@ -304,34 +317,45 @@ const Login = () => {
             </View>
 
             <View style={styles.socialButtonsContainer}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.socialButton}
                 activeOpacity={0.8}
-                onPress={handleGoogleSignIn}
-              >
-                <Image 
-                  source={img.google} 
-                  style={styles.socialIcon} 
+                onPress={handleGoogleSignIn}>
+                <Image
+                  source={img.google}
+                  style={styles.socialIcon}
                   resizeMode="contain"
                 />
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={styles.socialButton}
-                activeOpacity={0.8}
-              >
-                <Image 
-                  source={img.facebook} 
-                  style={styles.socialIcon} 
+              <TouchableOpacity style={styles.socialButton} activeOpacity={0.8}>
+                <Image
+                  source={img.facebook}
+                  style={styles.socialIcon}
                   resizeMode="contain"
                 />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.signupContainer}>
+            {/* <View style={styles.signupContainer}>
               <Text style={styles.signupText}>Don't have an account? </Text>
               <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
                 <Text style={styles.signupLink}>Sign Up</Text>
+              </TouchableOpacity>
+            </View> */}
+
+            <View style={styles.bottomOptionsContainer}>
+              <View style={styles.signupContainer}>
+                <Text style={styles.signupText}>Don't have an account? </Text>
+                <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
+                  <Text style={styles.signupLink}>Sign Up</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={styles.roleButton}
+                onPress={() => navigation.navigate('RoleSelection')}>
+                <Text style={styles.roleButtonText}>Select Role</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -345,6 +369,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: PRODUCT_BG_COLOR,
+  },
+  bottomOptionsContainer: {
+    marginTop: scaleSize(8),
+  },
+  roleButton: {
+    alignSelf: 'center',
+    marginTop: scaleSize(8),
+  },
+  roleButtonText: {
+    color: SECONDARY_THEME_COLOR,
+    fontSize: scaleFont(12),
+    fontWeight: '500',
+    textDecorationLine: 'underline',
   },
   backgroundGradient: {
     position: 'absolute',
@@ -385,7 +422,7 @@ const styles = StyleSheet.create({
     borderWidth: scaleSize(2),
     borderColor: BORDER_THEME_COLOR,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: scaleSize(4) },
+    shadowOffset: {width: 0, height: scaleSize(4)},
     shadowOpacity: 0.15,
     shadowRadius: scaleSize(10),
     elevation: 8,
@@ -406,7 +443,7 @@ const styles = StyleSheet.create({
     marginBottom: scaleSize(16),
     height: scaleSize(56),
     shadowColor: PRIMARY_THEME_COLOR,
-    shadowOffset: { width: 0, height: scaleSize(2) },
+    shadowOffset: {width: 0, height: scaleSize(2)},
     shadowOpacity: 0.1,
     shadowRadius: scaleSize(4),
   },
@@ -424,7 +461,7 @@ const styles = StyleSheet.create({
     borderRadius: scaleSize(16),
     marginBottom: scaleSize(24),
     shadowColor: PRIMARY_THEME_COLOR,
-    shadowOffset: { width: 0, height: scaleSize(4) },
+    shadowOffset: {width: 0, height: scaleSize(4)},
     shadowOpacity: 0.3,
     shadowRadius: scaleSize(8),
   },
@@ -465,7 +502,7 @@ const styles = StyleSheet.create({
     borderWidth: scaleSize(2),
     borderColor: BORDER_THEME_COLOR,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: scaleSize(2) },
+    shadowOffset: {width: 0, height: scaleSize(2)},
     shadowOpacity: 0.1,
     shadowRadius: scaleSize(4),
   },

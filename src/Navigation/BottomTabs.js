@@ -14,7 +14,7 @@ import SellerDashboard from '../SellerSenerio/SellerDashboard';
 import SellerProducts from '../SellerSenerio/SellerProducts';
 import SellerOrders from '../SellerSenerio/SellerOrders';
 import SellerProfile from '../SellerSenerio/SellerProfile';
-import SellerVerification from '../SellerSenerio/SellerVerification';
+// import SellerVerification from '../SellerSenerio/SellerVerification';
 import {
   PRIMARY_THEME_COLOR, 
   SUBTEXT_THEME_COLOR,
@@ -94,11 +94,11 @@ const BottomTabs = ({ tabOffsetValue }) => {
     determineUserType();
   }, [user]);
 
-  useEffect(() => {
-    if (isSeller && !isVerified) {
-      navigation.replace('SellerVerification');
-    }
-  }, [isSeller, isVerified, navigation]);
+  // useEffect(() => {
+  //   if (isSeller && !isVerified) {
+  //     navigation.replace('');
+  //   }
+  // }, [isSeller, isVerified, navigation]);
 
   if (isSeller === null || isVerified === null) {
     return (

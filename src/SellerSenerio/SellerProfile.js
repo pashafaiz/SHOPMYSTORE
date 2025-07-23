@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   Image,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchSellerProfile, updateSellerProfile } from '../redux/slices/sellerSlice';
@@ -80,7 +82,9 @@ const SellerProfile = ({ navigation }) => {
       Alert.alert('Success', 'Profile updated successfully');
       setEditMode(false);
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to update profile');
+      // Handle error message properly (fix for object rendering error)
+      const errorMsg = error?.message || error?.msg || 'Failed to update profile';
+      Alert.alert('Error', typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
     }
   };
 
@@ -93,9 +97,14 @@ const SellerProfile = ({ navigation }) => {
   }
 
   if (error && !profile) {
+    // Handle error message properly (fix for object rendering error)
+    const errorMsg = error?.message || error?.msg || 'An error occurred';
+    
     return (
       <View style={commonStyles.errorContainer}>
-        <Text style={commonStyles.errorText}>{error}</Text>
+        <Text style={commonStyles.errorText}>
+          {typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg)}
+        </Text>
         <TouchableOpacity 
           onPress={() => dispatch(fetchSellerProfile())}
           style={commonStyles.retryButton}
@@ -111,246 +120,280 @@ const SellerProfile = ({ navigation }) => {
     <LinearGradient colors={COLORS.GRADIENT} style={commonStyles.container}>
       <Header 
         title="Seller Profile" 
+        rightIcon={editMode ? 'close' : 'edit'}
+        onRightPress={() => setEditMode(!editMode)}
       />
-      <ScrollView style={styles.scrollContainer}>
-        <View style={styles.header}>
-          {!editMode ? (
-            <TouchableOpacity onPress={() => setEditMode(true)}>
-              <Icon name="edit" size={24} color={COLORS.PRIMARY} />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity onPress={() => setEditMode(false)}>
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Business Logo */}
-        <View style={styles.imageContainer}>
-          {image ? (
-            <Image source={{ uri: image }} style={styles.image} />
-          ) : (
-            <View style={styles.imagePlaceholder}>
-              <Icon name="store" size={50} color={COLORS.SUBTEXT} />
+      
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
+          {/* Profile Image Section */}
+          <View style={styles.profileHeader}>
+            <View style={styles.imageContainer}>
+              <View style={styles.imageWrapper}>
+                {image ? (
+                  <Image source={{ uri: image }} style={styles.image} />
+                ) : (
+                  <View style={styles.imagePlaceholder}>
+                    <Icon name="store" size={scale(40)} color={COLORS.WHITE} />
+                  </View>
+                )}
+              </View>
+              
+              {editMode && (
+                <TouchableOpacity style={styles.imageEditButton} onPress={pickImage}>
+                  <Icon name="camera-alt" size={scale(16)} color={COLORS.WHITE} />
+                </TouchableOpacity>
+              )}
+              
+              {!editMode && profile?.isVerified && (
+                <View style={styles.verifiedBadge}>
+                  <Icon name="verified" size={scale(16)} color={COLORS.WHITE} />
+                </View>
+              )}
             </View>
-          )}
-          {editMode && (
-            <TouchableOpacity style={styles.imageEditButton} onPress={pickImage}>
-              <Icon name="camera-alt" size={20} color="#fff" />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {editMode ? (
-          <View style={styles.formContainer}>
-            <Controller
-              control={control}
-              rules={{ required: 'Business name is required' }}
-              render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                  label="Business Name *"
-                  mode="outlined"
-                  onBlur={onBlur}
-                  onChangeText={onChange}
-                  value={value}
-                  error={errors.businessName}
-                  style={styles.input}
-                  theme={{
-                    colors: {
-                      primary: COLORS.PRIMARY,
-                      placeholder: COLORS.SUBTEXT,
-                      text: COLORS.TEXT,
-                    }
-                  }}
-                />
-              )}
-              name="businessName"
-            />
-            {errors.businessName && (
-              <Text style={styles.errorMessage}>{errors.businessName.message}</Text>
-            )}
-
-            <Controller
-              control={control}
-              rules={{ required: 'Business type is required' }}
-              render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                  label="Business Type *"
-                  mode="outlined"
-                  onBlur={onBlur}
-                  onChangeText={onChange}
-                  value={value}
-                  error={errors.businessType}
-                  style={styles.input}
-                  theme={{
-                    colors: {
-                      primary: COLORS.PRIMARY,
-                      placeholder: COLORS.SUBTEXT,
-                      text: COLORS.TEXT,
-                    }
-                  }}
-                />
-              )}
-              name="businessType"
-            />
-            {errors.businessType && (
-              <Text style={styles.errorMessage}>{errors.businessType.message}</Text>
-            )}
-
-            <Controller
-              control={control}
-              render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                  label="GST Number"
-                  mode="outlined"
-                  onBlur={onBlur}
-                  onChangeText={onChange}
-                  value={value}
-                  style={styles.input}
-                  theme={{
-                    colors: {
-                      primary: COLORS.PRIMARY,
-                      placeholder: COLORS.SUBTEXT,
-                      text: COLORS.TEXT,
-                    }
-                  }}
-                />
-              )}
-              name="gstNumber"
-            />
-
-            <Controller
-              control={control}
-              rules={{ required: 'PAN Number is required' }}
-              render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                  label="PAN Number *"
-                  mode="outlined"
-                  onBlur={onBlur}
-                  onChangeText={onChange}
-                  value={value}
-                  error={errors.panNumber}
-                  style={styles.input}
-                  theme={{
-                    colors: {
-                      primary: COLORS.PRIMARY,
-                      placeholder: COLORS.SUBTEXT,
-                      text: COLORS.TEXT,
-                    }
-                  }}
-                />
-              )}
-              name="panNumber"
-            />
-            {errors.panNumber && (
-              <Text style={styles.errorMessage}>{errors.panNumber.message}</Text>
-            )}
-
-            <Controller
-              control={control}
-              render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                  label="Business Description"
-                  mode="outlined"
-                  multiline
-                  numberOfLines={4}
-                  onBlur={onBlur}
-                  onChangeText={onChange}
-                  value={value}
-                  style={styles.input}
-                  theme={{
-                    colors: {
-                      primary: COLORS.PRIMARY,
-                      placeholder: COLORS.SUBTEXT,
-                      text: COLORS.TEXT,
-                    }
-                  }}
-                />
-              )}
-              name="businessDescription"
-            />
-
-            <TouchableOpacity 
-              style={styles.saveButton} 
-              onPress={handleSubmit(onSubmit)}
-            >
-              <Text style={styles.saveButtonText}>Save Changes</Text>
-            </TouchableOpacity>
+            
+            <Text style={styles.businessName}>
+              {profile?.businessName}
+            </Text>
+            <Text style={styles.businessType}>
+              {profile?.businessType}
+            </Text>
           </View>
-        ) : (
-          <View style={styles.profileInfo}>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Business Name</Text>
-              <Text style={styles.infoValue}>{profile?.businessName}</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Business Type</Text>
-              <Text style={styles.infoValue}>{profile?.businessType}</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>GST Number</Text>
-              <Text style={styles.infoValue}>{profile?.gstNumber || 'Not provided'}</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>PAN Number</Text>
-              <Text style={styles.infoValue}>{profile?.panNumber}</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Business Description</Text>
-              <Text style={styles.infoValue}>{profile?.businessDescription || 'Not provided'}</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Verification Status</Text>
-              <View style={[
-                styles.verificationBadge,
-                { backgroundColor: profile?.isVerified ? COLORS.SUCCESS : COLORS.WARNING }
-              ]}>
-                <Text style={styles.verificationText}>
-                  {profile?.isVerified ? 'Verified' : 'Pending Verification'}
-                </Text>
+
+          {editMode ? (
+            <View style={styles.formContainer}>
+              <Controller
+                control={control}
+                rules={{ required: 'Business name is required' }}
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <TextInput
+                    label="Business Name *"
+                    mode="outlined"
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    value={value}
+                    error={!!errors.businessName}
+                    style={styles.input}
+                    outlineColor={COLORS.BORDER}
+                    activeOutlineColor={COLORS.PRIMARY}
+                    textColor={COLORS.TEXT}
+                  />
+                )}
+                name="businessName"
+              />
+              {errors.businessName && (
+                <Text style={styles.errorMessage}>{errors.businessName.message}</Text>
+              )}
+
+              <Controller
+                control={control}
+                rules={{ required: 'Business type is required' }}
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <TextInput
+                    label="Business Type *"
+                    mode="outlined"
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    value={value}
+                    error={!!errors.businessType}
+                    style={styles.input}
+                    outlineColor={COLORS.BORDER}
+                    activeOutlineColor={COLORS.PRIMARY}
+                    textColor={COLORS.TEXT}
+                  />
+                )}
+                name="businessType"
+              />
+              {errors.businessType && (
+                <Text style={styles.errorMessage}>{errors.businessType.message}</Text>
+              )}
+
+              <Controller
+                control={control}
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <TextInput
+                    label="GST Number"
+                    mode="outlined"
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    value={value}
+                    style={styles.input}
+                    outlineColor={COLORS.BORDER}
+                    activeOutlineColor={COLORS.PRIMARY}
+                    textColor={COLORS.TEXT}
+                  />
+                )}
+                name="gstNumber"
+              />
+
+              <Controller
+                control={control}
+                rules={{ required: 'PAN Number is required' }}
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <TextInput
+                    label="PAN Number *"
+                    mode="outlined"
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    value={value}
+                    error={!!errors.panNumber}
+                    style={styles.input}
+                    outlineColor={COLORS.BORDER}
+                    activeOutlineColor={COLORS.PRIMARY}
+                    textColor={COLORS.TEXT}
+                  />
+                )}
+                name="panNumber"
+              />
+              {errors.panNumber && (
+                <Text style={styles.errorMessage}>{errors.panNumber.message}</Text>
+              )}
+
+              <Controller
+                control={control}
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <TextInput
+                    label="Business Description"
+                    mode="outlined"
+                    multiline
+                    numberOfLines={4}
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    value={value}
+                    style={[styles.input, styles.textArea]}
+                    outlineColor={COLORS.BORDER}
+                    activeOutlineColor={COLORS.PRIMARY}
+                    textColor={COLORS.TEXT}
+                  />
+                )}
+                name="businessDescription"
+              />
+
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity 
+                  style={[styles.button, styles.cancelButton]} 
+                  onPress={() => setEditMode(false)}
+                >
+                  <Text style={styles.buttonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.button, styles.saveButton]} 
+                  onPress={handleSubmit(onSubmit)}
+                >
+                  {loading ? (
+                    <ActivityIndicator size="small" color={COLORS.WHITE} />
+                  ) : (
+                    <Text style={styles.buttonText}>Save Changes</Text>
+                  )}
+                </TouchableOpacity>
               </View>
             </View>
-          </View>
-        )}
+          ) : (
+            <View style={styles.detailsContainer}>
+              {/* Business Info Section */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Icon name="business" size={scale(20)} color={COLORS.PRIMARY} />
+                  <Text style={styles.sectionTitle}>Business Information</Text>
+                </View>
+                
+                <View style={styles.infoCard}>
+                  <View style={styles.infoRow}>
+                    <Icon name="badge" size={scale(16)} color={COLORS.SUBTEXT} />
+                    <Text style={styles.infoLabel}>PAN Number</Text>
+                    <Text style={styles.infoValue}>{profile?.panNumber}</Text>
+                  </View>
+                  
+                  {profile?.gstNumber && (
+                    <View style={styles.infoRow}>
+                      <Icon name="receipt" size={scale(16)} color={COLORS.SUBTEXT} />
+                      <Text style={styles.infoLabel}>GST Number</Text>
+                      <Text style={styles.infoValue}>{profile.gstNumber}</Text>
+                    </View>
+                  )}
+                  
+                  <View style={styles.infoRow}>
+                    <Icon name="description" size={scale(16)} color={COLORS.SUBTEXT} />
+                    <Text style={styles.infoLabel}>Description</Text>
+                    <Text style={styles.infoValue}>
+                      {profile?.businessDescription || 'Not provided'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
 
-        {/* Business Address */}
-        <Text style={styles.sectionTitle}>Business Address</Text>
-        <View style={[commonStyles.card, styles.addressCard]}>
-          <Text style={styles.addressText}>
-            {profile?.businessAddress.street}
-          </Text>
-          <Text style={styles.addressText}>
-            {profile?.businessAddress.city}, {profile?.businessAddress.state}
-          </Text>
-          <Text style={styles.addressText}>
-            {profile?.businessAddress.pincode}
-          </Text>
-          <Text style={styles.addressText}>
-            {profile?.businessAddress.country}
-          </Text>
-        </View>
+              {/* Business Address Section */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Icon name="location-on" size={scale(20)} color={COLORS.PRIMARY} />
+                  <Text style={styles.sectionTitle}>Business Address</Text>
+                </View>
+                
+                <View style={styles.infoCard}>
+                  <View style={styles.infoRow}>
+                    <Icon name="home" size={scale(16)} color={COLORS.SUBTEXT} />
+                    <Text style={styles.infoValue}>
+                      {profile?.businessAddress.street}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.infoRow}>
+                    <Icon name="location-city" size={scale(16)} color={COLORS.SUBTEXT} />
+                    <Text style={styles.infoValue}>
+                      {profile?.businessAddress.city}, {profile?.businessAddress.state}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.infoRow}>
+                    <Icon name="map" size={scale(16)} color={COLORS.SUBTEXT} />
+                    <Text style={styles.infoValue}>
+                      {profile?.businessAddress.pincode}, {profile?.businessAddress.country}
+                    </Text>
+                  </View>
+                </View>
+              </View>
 
-        {/* Bank Details */}
-        <Text style={styles.sectionTitle}>Bank Details</Text>
-        <View style={[commonStyles.card, styles.bankCard]}>
-          <View style={styles.bankItem}>
-            <Text style={styles.bankLabel}>Account Holder</Text>
-            <Text style={styles.bankValue}>{profile?.bankDetails.accountHolderName}</Text>
-          </View>
-          <View style={styles.bankItem}>
-            <Text style={styles.bankLabel}>Account Number</Text>
-            <Text style={styles.bankValue}>{profile?.bankDetails.accountNumber}</Text>
-          </View>
-          <View style={styles.bankItem}>
-            <Text style={styles.bankLabel}>Bank Name</Text>
-            <Text style={styles.bankValue}>{profile?.bankDetails.bankName}</Text>
-          </View>
-          <View style={styles.bankItem}>
-            <Text style={styles.bankLabel}>IFSC Code</Text>
-            <Text style={styles.bankValue}>{profile?.bankDetails.ifscCode}</Text>
-          </View>
-        </View>
-      </ScrollView>
+              {/* Bank Details Section */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Icon name="account-balance" size={scale(20)} color={COLORS.PRIMARY} />
+                  <Text style={styles.sectionTitle}>Bank Details</Text>
+                </View>
+                
+                <View style={styles.infoCard}>
+                  <View style={styles.infoRow}>
+                    <Icon name="person" size={scale(16)} color={COLORS.SUBTEXT} />
+                    <Text style={styles.infoLabel}>Account Holder</Text>
+                    <Text style={styles.infoValue}>{profile?.bankDetails.accountHolderName}</Text>
+                  </View>
+                  
+                  <View style={styles.infoRow}>
+                    <Icon name="credit-card" size={scale(16)} color={COLORS.SUBTEXT} />
+                    <Text style={styles.infoLabel}>Account Number</Text>
+                    <Text style={styles.infoValue}>{profile?.bankDetails.accountNumber}</Text>
+                  </View>
+                  
+                  <View style={styles.infoRow}>
+                    <Icon name="account-balance" size={scale(16)} color={COLORS.SUBTEXT} />
+                    <Text style={styles.infoLabel}>Bank Name</Text>
+                    <Text style={styles.infoValue}>{profile?.bankDetails.bankName}</Text>
+                  </View>
+                  
+                  <View style={styles.infoRow}>
+                    <Icon name="code" size={scale(16)} color={COLORS.SUBTEXT} />
+                    <Text style={styles.infoLabel}>IFSC Code</Text>
+                    <Text style={styles.infoValue}>{profile?.bankDetails.ifscCode}</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </LinearGradient>
   );
 };
@@ -358,135 +401,163 @@ const SellerProfile = ({ navigation }) => {
 const styles = StyleSheet.create({
   scrollContainer: {
     flex: 1,
-    padding: scale(25),
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
+  scrollContent: {
+    paddingBottom: scale(30),
+  },
+  profileHeader: {
     alignItems: 'center',
-    marginBottom: scale(20),
-  },
-  cancelText: {
-    color: COLORS.SECONDARY,
-    ...FONTS.body3,
+    paddingVertical: scale(20),
+    paddingHorizontal: scale(20),
   },
   imageContainer: {
-    alignItems: 'center',
-    marginBottom: scale(20),
+    position: 'relative',
+    marginBottom: scale(10),
   },
-  image: {
-    width: scale(120),
-    height: scale(120),
-    borderRadius: scale(60),
-    borderWidth: 2,
-    borderColor: COLORS.BORDER,
-  },
-  imagePlaceholder: {
-    width: scale(120),
-    height: scale(120),
-    borderRadius: scale(60),
+  imageWrapper: {
+    width: scale(100),
+    height: scale(100),
+    borderRadius: scale(50),
     backgroundColor: COLORS.LIGHT_PRIMARY,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.BORDER,
+    borderWidth: 3,
+    borderColor: COLORS.PRIMARY,
+    overflow: 'hidden',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.LIGHT_PRIMARY,
   },
   imageEditButton: {
     position: 'absolute',
-    bottom: 0,
-    right: SIZES.width / 2 - scale(70),
+    bottom: scale(5),
+    right: scale(5),
     backgroundColor: COLORS.PRIMARY,
-    width: scale(40),
-    height: scale(40),
-    borderRadius: scale(20),
+    width: scale(30),
+    height: scale(30),
+    borderRadius: scale(15),
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: COLORS.TEXT,
-    shadowOffset: { width: 0, height: scale(2) },
-    shadowOpacity: 0.3,
-    shadowRadius: scale(4),
-    elevation: 5,
+    elevation: 3,
+  },
+  verifiedBadge: {
+    position: 'absolute',
+    top: scale(5),
+    right: scale(5),
+    backgroundColor: COLORS.SUCCESS,
+    width: scale(24),
+    height: scale(24),
+    borderRadius: scale(12),
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+  },
+  businessName: {
+    ...FONTS.h3,
+    color: COLORS.TEXT,
+    fontWeight: '600',
+    marginTop: scale(5),
+    textAlign: 'center',
+  },
+  businessType: {
+    ...FONTS.body2,
+    color: COLORS.SUBTEXT,
+    textAlign: 'center',
   },
   formContainer: {
-    marginBottom: scale(20),
+    paddingHorizontal: scale(20),
+    marginTop: scale(10),
   },
   input: {
     marginBottom: scale(10),
-    backgroundColor: COLORS.CARD_BACKGROUND,
+    backgroundColor: COLORS.WHITE,
+    borderRadius: scale(8),
+  },
+  textArea: {
+    height: scale(100),
   },
   errorMessage: {
-    color: COLORS.SECONDARY,
     ...FONTS.body4,
+    color: COLORS.SECONDARY,
     marginBottom: scale(10),
+    marginLeft: scale(5),
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: scale(20),
+  },
+  button: {
+    flex: 1,
+    paddingVertical: scale(15),
+    borderRadius: scale(8),
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    elevation: 3,
+  },
+  cancelButton: {
+    backgroundColor: COLORS.WHITE,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER,
+    marginRight: scale(10),
   },
   saveButton: {
     backgroundColor: COLORS.PRIMARY,
-    padding: scale(15),
-    borderRadius: scale(8),
-    alignItems: 'center',
-    marginTop: scale(10),
   },
-  saveButtonText: {
-    color: '#fff',
-    ...FONTS.body3,
+  buttonText: {
+    ...FONTS.body2,
     fontWeight: '600',
   },
-  profileInfo: {
+  detailsContainer: {
+    paddingHorizontal: scale(20),
+  },
+  section: {
     marginBottom: scale(20),
   },
-  infoItem: {
-    marginBottom: scale(15),
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: scale(10),
+  },
+  sectionTitle: {
+    ...FONTS.h4,
+    color: COLORS.TEXT,
+    fontWeight: '600',
+    marginLeft: scale(10),
+  },
+  infoCard: {
+    backgroundColor: COLORS.WHITE,
+    borderRadius: scale(12),
+    padding: scale(15),
+    elevation: 2,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: scale(8),
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.LIGHT_BORDER,
   },
   infoLabel: {
     ...FONTS.body3,
     color: COLORS.SUBTEXT,
-    marginBottom: scale(5),
+    marginLeft: scale(10),
+    width: scale(120),
   },
   infoValue: {
     ...FONTS.body3,
     color: COLORS.TEXT,
-  },
-  verificationBadge: {
-    paddingHorizontal: scale(10),
-    paddingVertical: scale(5),
-    borderRadius: scale(4),
-    alignSelf: 'flex-start',
-  },
-  verificationText: {
-    color: '#fff',
-    ...FONTS.body4,
-    fontWeight: '600',
-  },
-  sectionTitle: {
-    ...FONTS.h3,
-    fontWeight: '600',
-    color: COLORS.TEXT,
-    marginBottom: scale(10),
-  },
-  addressCard: {
-    marginBottom: scale(20),
-  },
-  addressText: {
-    ...FONTS.body3,
-    color: COLORS.TEXT,
-    marginBottom: scale(5),
-  },
-  bankCard: {
-    marginBottom: scale(90),
-  },
-  bankItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: scale(10),
-  },
-  bankLabel: {
-    ...FONTS.body3,
-    color: COLORS.SUBTEXT,
-  },
-  bankValue: {
-    ...FONTS.body3,
-    color: COLORS.TEXT,
-    fontWeight: '500',
+    flex: 1,
+    marginLeft: scale(10),
   },
 });
 

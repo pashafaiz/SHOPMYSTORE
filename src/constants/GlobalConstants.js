@@ -48,6 +48,8 @@ export const SELLER_UPDATE_ORDER_STATUS_ENDPOINT = 'seller/orders/';
 export const SELLER_CHATS_ENDPOINT = 'seller/chats';
 export const SELLER_CHAT_MESSAGES_ENDPOINT = 'seller/chats/';
 export const SELLER_SEND_MESSAGE_ENDPOINT = 'seller/chats/';
+export const AUTH_SELECT_ROLE_ENDPOINT = '/api/auth/select-role';
+export const AUTH_SELLER_SIGNUP_ENDPOINT = '/api/auth/seller-signup';
 
 export const RAZORPAY_KEY_ID = 'rzp_test_9r6fi8ChH5mImP';
 
